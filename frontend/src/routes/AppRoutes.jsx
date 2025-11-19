@@ -1,24 +1,29 @@
-import { Routes, Route } from 'react-router-dom';
-import Home from '../pages/Home';
-import Login from '../pages/Login';
-import Dashboard from '../pages/Dashboard';
-import NotFound from '../pages/NotFound';
-import ProtectedRoute from './ProtectedRoute';
-import Layout from '../components/layout/Layout';
+import { Routes, Route } from "react-router-dom";
+import Login from "../pages/auth/Login";
+import Dashboard from "../pages/dashboard/Dashboard";
+import ProtectedRoute from "./ProtectedRoute";
+import LayoutAuth from "../components/layout/LayoutAuth";
+import LayoutPublic from "../components/layout/LayoutPublic";
 
 const AppRoutes = () => {
   return (
     <Routes>
-      <Route element={<Layout />}>
-        <Route path="/" element={<Home />} />
-        <Route path="/login" element={<Login />} />
-        
-        <Route element={<ProtectedRoute />}>
-          <Route path="/dashboard" element={<Dashboard />} />
-        </Route>
 
-        <Route path="*" element={<NotFound />} />
+      <Route element={<LayoutPublic />}>
+        <Route path="/login" element={<Login />} />
       </Route>
+
+      <Route
+        element={
+          <ProtectedRoute>
+            <LayoutAuth />
+          </ProtectedRoute>
+        }
+      >
+        <Route path="/" element={<Dashboard />} />
+        <Route path="/dashboard" element={<Dashboard />} />
+      </Route>
+
     </Routes>
   );
 };
