@@ -1,0 +1,161 @@
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { Mail, Lock, Chrome, Github, GitBranch, AlertCircle } from "lucide-react";
+import { authService } from "../../services/api";
+
+const Register = () => {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [sendUpdates, setSendUpdates] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  
+  const navigate = useNavigate();
+
+  const handleSubmit = async () => {
+    setError("");
+    setLoading(true);
+
+    try {
+      await authService.register(email, password, sendUpdates);      
+      navigate('/login?registered=true');
+    } catch (err) {
+      setError(
+        err.response?.data?.message || 
+        "An error occurred while creating the account"
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSocialRegister = (provider) => {
+    console.log("Register with:", provider);
+  };
+
+  return (
+    <div className="w-full flex items-center justify-center px-4 py-12">
+      <div className="w-[45%] bg-white rounded-lg shadow-lg p-8">
+        <h2 className="text-2xl font-bold text-[#008CFF] text-center mb-8">
+          Create your account
+        </h2>
+
+        {error && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-red-500 mt-0.5" />
+            <p className="text-sm text-red-700">{error}</p>
+          </div>
+        )}
+
+        <div className="flex flex-row justify-around mb-8 gap-4">
+          <button
+            onClick={() => handleSocialRegister("Google")}
+            className="w-full flex items-center justify-center gap-3 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+          >
+            <Chrome className="w-5 h-5" />
+            <span className="text-gray-700">Google</span>
+          </button>
+
+          <button
+            onClick={() => handleSocialRegister("GitLab")}
+            className="w-full flex items-center justify-center gap-3 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+          >
+            <GitBranch className="w-5 h-5" />
+            <span className="text-gray-700">GitLab</span>
+          </button>
+
+          <button
+            onClick={() => handleSocialRegister("GitHub")}
+            className="w-full flex items-center justify-center gap-3 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+          >
+            <Github className="w-5 h-5" />
+            <span className="text-gray-700">GitHub</span>
+          </button>
+        </div>
+
+        <div className="relative mb-8">
+          <div className="relative flex justify-center">
+            <span className="px-2 bg-white text-gray-500">Or</span>
+          </div>
+        </div>
+
+        <div className="space-y-6">
+          <div>
+            <div className="relative">
+              <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <input
+                type="email"
+                placeholder="Email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50"
+                disabled={loading}
+              />
+            </div>
+          </div>
+
+          <div>
+            <div className="relative">
+              <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <input
+                type="password"
+                placeholder="Password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50"
+                disabled={loading}
+              />
+            </div>
+          </div>
+
+          <div className="flex items-start gap-3">
+            <input
+              type="checkbox"
+              id="updates"
+              checked={sendUpdates}
+              onChange={(e) => setSendUpdates(e.target.checked)}
+              className="mt-1 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+              disabled={loading}
+            />
+            <label htmlFor="updates" className="text-sm text-gray-700">
+              Send me news and feature updates
+            </label>
+          </div>
+
+          <div className="text-sm text-gray-600">
+            By selecting Create my account, I agree to the{" "}
+            <a href="#" className="text-[#008CFF] hover:underline font-medium">
+              Terms of Service
+            </a>{" "}
+            and{" "}
+            <a href="#" className="text-[#008CFF] hover:underline font-medium">
+              Master Services Agreement
+            </a>
+            , and acknowledge the{" "}
+            <a href="#" className="text-[#008CFF] hover:underline font-medium">
+              Privacy Policy
+            </a>
+            .
+          </div>
+
+          <button
+            onClick={handleSubmit}
+            disabled={loading || !email || !password}
+            className="w-full bg-[#008CFF] text-white py-2 rounded-lg hover:bg-[#007ACC] transition font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {loading ? "Creating..." : "Create my account"}
+          </button>
+        </div>
+
+        <p className="text-center text-gray-600 text-sm mt-6">
+          Already have an account?{" "}
+          <a href="/login" className="text-[#008CFF] hover:underline font-medium">
+            Login
+          </a>
+        </p>
+      </div>
+    </div>
+  );
+};
+
+export default Register;
