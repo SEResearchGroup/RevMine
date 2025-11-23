@@ -1,6 +1,5 @@
 from rest_framework import serializers
 from .models import User
-from rest_framework_simplejwt.tokens import RefreshToken
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
@@ -8,7 +7,10 @@ class UserSerializer(serializers.ModelSerializer):
         fields = ['id', 'email', 'date_joined']
 
 class RegisterSerializer(serializers.ModelSerializer):
-    password = serializers.CharField(write_only=True)
+    password = serializers.CharField(
+        write_only=True,
+        help_text="Password (minimum 8 characters recommended)"
+    )
 
     class Meta:
         model = User
@@ -22,5 +24,14 @@ class RegisterSerializer(serializers.ModelSerializer):
         return user
 
 class LoginSerializer(serializers.Serializer):
-    email = serializers.EmailField()
-    password = serializers.CharField(write_only=True)
+    email = serializers.EmailField(help_text="User's email address")
+    password = serializers.CharField(
+        write_only=True,
+        help_text="Password"
+    )
+
+class LoginResponseSerializer(serializers.Serializer):
+    """Serializer to document the login response"""
+    access = serializers.CharField(help_text="JWT access token")
+    refresh = serializers.CharField(help_text="JWT refresh token")
+    user = UserSerializer(help_text="User information")

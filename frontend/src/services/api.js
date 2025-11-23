@@ -11,7 +11,7 @@ const createApiInstance = (baseURL) => {
 
   instance.interceptors.request.use(
     (config) => {
-      const token = localStorage.getItem("token");
+      const token = localStorage.getItem("jwt");
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
       }
@@ -37,7 +37,7 @@ const createApiInstance = (baseURL) => {
 };
 
 export const authApi = createApiInstance("http://localhost:8000/api/auth");
-export const workspaceApi = createApiInstance("http://localhost:8001");
+export const workspaceApi = createApiInstance("http://localhost:8001/api");
 // export const projectApi = createApiInstance('http://localhost:8002');
 
 export const authService = {

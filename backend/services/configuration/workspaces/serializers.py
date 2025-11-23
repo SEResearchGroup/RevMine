@@ -3,6 +3,7 @@ from .models import Workspace
 import requests
 
 class WorkspaceSerializer(serializers.ModelSerializer):
+    """Serializer for workspace list view"""
     token = serializers.CharField(write_only=True, required=True)
     description = serializers.CharField(required=False, allow_blank=True)
 
@@ -28,12 +29,14 @@ class WorkspaceSerializer(serializers.ModelSerializer):
 
 
 class WorkspaceListSerializer(serializers.ModelSerializer):
+    """Serializer for workspace detail view"""
     class Meta:
         model = Workspace
         fields = ['id', 'name', 'description', 'platform', 'url', 'is_active', 'created_at', 'updated_at', 'last_sync']
 
 
 class TestConnectionSerializer(serializers.Serializer):
+    """Serializer for testing Git API connections"""
     platform = serializers.ChoiceField(choices=[choice[0] for choice in Workspace.PLATFORM_CHOICES])
     url = serializers.URLField(required=False, allow_blank=True)
     token = serializers.CharField()
