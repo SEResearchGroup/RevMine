@@ -1,6 +1,7 @@
 from rest_framework import serializers
-from .models import Workspace
+from .models import Workspace, Repository
 import requests
+
 
 class WorkspaceSerializer(serializers.ModelSerializer):
     """Serializer for workspace list view"""
@@ -46,3 +47,61 @@ class TestConnectionSerializer(serializers.Serializer):
         if platform == 'gitlab_self' and not data.get('url'):
             raise serializers.ValidationError({"url": "URL requise pour GitLab self-hosted"})
         return data
+    
+class RepositorySerializer(serializers.ModelSerializer):
+    platform = serializers.CharField(source='workspace.platform', read_only=True)
+    workspace_name = serializers.CharField(source='workspace.name', read_only=True)
+    
+    class Meta:
+        model = Repository
+        fields = [
+            'id',
+            'workspace',
+            'workspace_name',
+            'platform',
+            'external_id',
+            'name',
+            'full_name',
+            'description',
+            'url',
+            'web_url',
+            'owner',
+            'owner_type',
+            'default_branch',
+            'language',
+            'stars_count',
+            'forks_count',
+            'open_issues_count',
+            'is_private',
+            'is_fork',
+            'is_archived',
+            'is_active',
+            'created_at_platform',
+            'last_activity_at',
+            'last_analyzed_at',
+            'imported_at',
+            'updated_at',
+        ]
+        read_only_fields = [
+            'id',
+            'external_id',
+            'imported_at',
+            'updated_at',
+            'last_analyzed_at',
+        ]
+
+
+class RepositoryMinimalSerializer(serializers.ModelSerializer):
+    """Version allégée pour les listes"""
+    platform = serializers.CharField(source='workspace.platform', read_only=True)
+    
+    class Meta:
+        model = Repository
+        fields = [
+            'id',
+            'name',
+            'full_name',
+            'platform',
+            'is_active',
+            'last_activity_at',
+        ]

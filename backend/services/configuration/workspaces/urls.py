@@ -3,13 +3,40 @@ from .views import (
     WorkspaceListCreateView,
     WorkspaceDetailView,
     WorkspaceTestConnectionView,
-    WorkspaceRepositoriesView  
+    WorkspaceRepositoriesView,
+    RepositoryImportView,
+    RepositoryListView,
+    RepositoryDetailView,
 )
 
 urlpatterns = [
-    path('workspaces/', WorkspaceListCreateView.as_view(), name='workspace-list-create'),    
-    path('workspaces/test-connection/', WorkspaceTestConnectionView.as_view(), name='workspace-test-connection'),    
-    path('workspaces/<int:workspace_id>/', WorkspaceDetailView.as_view(), name='workspace-detail'),    
-    path('workspaces/<int:workspace_id>/test/', WorkspaceTestConnectionView.as_view(), name='workspace-test-existing'),
-    path('workspaces/<int:workspace_id>/repositories/', WorkspaceRepositoriesView.as_view(), name='workspace-repositories'), 
+    # ===== Workspaces =====
+    path("workspaces/", WorkspaceListCreateView.as_view(), name="workspace-list-create"),
+    path("workspaces/<int:workspace_id>/", WorkspaceDetailView.as_view(), name="workspace-detail"),
+
+    path("workspaces/test/", WorkspaceTestConnectionView.as_view(), name="workspace-test-global"),
+    path("workspaces/<int:workspace_id>/test/", WorkspaceTestConnectionView.as_view(), name="workspace-test"),
+
+    path(
+        "workspaces/<int:workspace_id>/remote-repositories/",
+        WorkspaceRepositoriesView.as_view(),
+        name="workspace-remote-repositories",
+    ),
+
+    path(
+        "workspaces/<int:workspace_id>/repositories/import/",
+        RepositoryImportView.as_view(),
+        name="repository-import",
+    ),
+
+    path(
+        "workspaces/<int:workspace_id>/repositories/",
+        RepositoryListView.as_view(),
+        name="repository-list",
+    ),
+    path(
+        "workspaces/<int:workspace_id>/repositories/<int:repository_id>/",
+        RepositoryDetailView.as_view(),
+        name="repository-detail",
+    ),
 ]
