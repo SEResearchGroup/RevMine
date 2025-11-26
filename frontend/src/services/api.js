@@ -26,7 +26,7 @@ const createApiInstance = (baseURL) => {
     (response) => response,
     (error) => {
       if (error.response?.status === 401) {
-        localStorage.removeItem("token");
+        localStorage.removeItem("jwt");
         window.location.href = "/login";
       }
       return Promise.reject(error);
@@ -37,8 +37,7 @@ const createApiInstance = (baseURL) => {
 };
 
 export const authApi = createApiInstance("http://localhost:8000/api/auth");
-export const workspaceApi = createApiInstance("http://localhost:8001/api");
-// export const projectApi = createApiInstance('http://localhost:8002');
+export const workspaceApi = createApiInstance("http://localhost:8000/api/workspaces");
 
 export const authService = {
   register: (email, password, sendUpdates) => {
@@ -55,19 +54,19 @@ export const authService = {
 // Services workspace
 export const workspaceService = {
   getAll: () => {
-    return workspaceApi.get("/workspaces");
+    return workspaceApi.get("/");
   },
   getById: (id) => {
-    return workspaceApi.get(`/workspaces/${id}`);
+    return workspaceApi.get(`/${id}`);
   },
   create: (data) => {
-    return workspaceApi.post("/workspaces", data);
+    return workspaceApi.post("/", data);
   },
   update: (id, data) => {
-    return workspaceApi.put(`/workspaces/${id}`, data);
+    return workspaceApi.put(`/${id}`, data);
   },
   delete: (id) => {
-    return workspaceApi.delete(`/workspaces/${id}`);
+    return workspaceApi.delete(`/${id}`);
   },
 };
 

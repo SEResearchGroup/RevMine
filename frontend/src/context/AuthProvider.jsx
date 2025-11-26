@@ -13,7 +13,6 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const checkToken = () => {
       const token = getToken();
-
       if (token && !isTokenExpired(token)) {
         const payload = JSON.parse(atob(token.split(".")[1]));
         setUser(payload.user || payload);

@@ -35,15 +35,22 @@ const Login = () => {
     }
   }, [searchParams]);
 
+  // useEffect(() => {
+  //   const token = localStorage.getItem("jwt");
+  //   if (token) {
+  //     navigate("/workspaces");
+  //   }
+  // }, [navigate]);
+
   const handleSubmit = async () => {
     setError("");
     setLoading(true);
-
     try {
       const response = await authService.login(email, password);
       login(response.data.access);
       navigate("/workspaces");
     } catch (err) {
+      console.error("Login error:", err);
       setError(err.response?.data?.message || "Incorrect email or password");
     } finally {
       setLoading(false);

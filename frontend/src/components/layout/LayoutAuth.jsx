@@ -5,7 +5,7 @@ import FooterAuth from "./FooterAuth";
 
 const LayoutAuth = () => {
   return (
-    <div className="app-auth-layout">
+    <>
       <NavbarAuth />
       <div className="flex">
         <Sidebar />
@@ -14,7 +14,7 @@ const LayoutAuth = () => {
         </main>
       </div>
       <FooterAuth />
-    </div>
+    </>
   );
 };
 
