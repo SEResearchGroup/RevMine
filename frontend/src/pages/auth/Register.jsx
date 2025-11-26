@@ -34,61 +34,61 @@ const Register = () => {
   };
 
   return (
-    <div className="w-full flex items-center justify-center px-4 py-12">
-      <div className="w-[45%] bg-white rounded-lg shadow-lg p-8">
-        <h2 className="text-2xl font-bold text-[#008CFF] text-center mb-8">
+    <div className="w-full flex items-center justify-center px-4 py-2">
+      <div className="w-full max-w-md lg:max-w-lg xl:max-w-xl bg-white rounded-lg shadow-lg p-6 sm:p-8">
+        <h2 className="text-xl sm:text-2xl font-bold text-[#008CFF] text-center mb-6 sm:mb-8">
           Create your account
         </h2>
 
         {error && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
-            <AlertCircle className="w-5 h-5 text-red-500 mt-0.5" />
-            <p className="text-sm text-red-700">{error}</p>
+          <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2 sm:gap-3">
+            <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-red-500 mt-0.5 flex-shrink-0" />
+            <p className="text-xs sm:text-sm text-red-700">{error}</p>
           </div>
         )}
 
-        <div className="flex flex-row justify-around mb-8 gap-4">
+        <div className="flex flex-col sm:flex-row justify-around mb-6 sm:mb-8 gap-3 sm:gap-4">
           <button
             onClick={() => handleSocialRegister("Google")}
-            className="w-full flex items-center justify-center gap-3 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+            className="w-full flex items-center justify-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
           >
-            <Chrome className="w-5 h-5" />
-            <span className="text-gray-700">Google</span>
+            <Chrome className="w-4 h-4 sm:w-5 sm:h-5" />
+            <span className="text-sm sm:text-base text-gray-700">Google</span>
           </button>
 
           <button
             onClick={() => handleSocialRegister("GitLab")}
-            className="w-full flex items-center justify-center gap-3 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+            className="w-full flex items-center justify-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
           >
-            <GitBranch className="w-5 h-5" />
-            <span className="text-gray-700">GitLab</span>
+            <GitBranch className="w-4 h-4 sm:w-5 sm:h-5" />
+            <span className="text-sm sm:text-base text-gray-700">GitLab</span>
           </button>
 
           <button
             onClick={() => handleSocialRegister("GitHub")}
-            className="w-full flex items-center justify-center gap-3 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+            className="w-full flex items-center justify-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
           >
-            <Github className="w-5 h-5" />
-            <span className="text-gray-700">GitHub</span>
+            <Github className="w-4 h-4 sm:w-5 sm:h-5" />
+            <span className="text-sm sm:text-base text-gray-700">GitHub</span>
           </button>
         </div>
 
-        <div className="relative mb-8">
+        <div className="relative mb-6 sm:mb-8">
           <div className="relative flex justify-center">
-            <span className="px-2 bg-white text-gray-500">Or</span>
+            <span className="px-2 bg-white text-gray-500 text-sm sm:text-base">Or</span>
           </div>
         </div>
 
-        <div className="space-y-6">
+        <div className="space-y-4 sm:space-y-6">
           <div>
             <div className="relative">
-              <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-gray-400" />
               <input
                 type="email"
                 placeholder="Email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50"
+                className="w-full pl-9 sm:pl-10 pr-3 sm:pr-4 py-2.5 sm:py-3 text-sm sm:text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50"
                 disabled={loading}
               />
             </div>
@@ -96,33 +96,33 @@ const Register = () => {
 
           <div>
             <div className="relative">
-              <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-gray-400" />
               <input
                 type="password"
                 placeholder="Password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50"
+                className="w-full pl-9 sm:pl-10 pr-3 sm:pr-4 py-2.5 sm:py-3 text-sm sm:text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50"
                 disabled={loading}
               />
             </div>
           </div>
 
-          <div className="flex items-start gap-3">
+          <div className="flex items-start gap-2 sm:gap-3">
             <input
               type="checkbox"
               id="updates"
               checked={sendUpdates}
               onChange={(e) => setSendUpdates(e.target.checked)}
-              className="mt-1 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+              className="mt-0.5 sm:mt-1 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 flex-shrink-0"
               disabled={loading}
             />
-            <label htmlFor="updates" className="text-sm text-gray-700">
+            <label htmlFor="updates" className="text-xs sm:text-sm text-gray-700">
               Send me news and feature updates
             </label>
           </div>
 
-          <div className="text-sm text-gray-600">
+          <div className="text-xs sm:text-sm text-gray-600">
             By selecting Create my account, I agree to the{" "}
             <a href="#" className="text-[#008CFF] hover:underline font-medium">
               Terms of Service
@@ -141,13 +141,13 @@ const Register = () => {
           <button
             onClick={handleSubmit}
             disabled={loading || !email || !password}
-            className="w-full bg-[#008CFF] text-white py-2 rounded-lg hover:bg-[#007ACC] transition font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full bg-[#008CFF] text-white py-2.5 sm:py-3 text-sm sm:text-base rounded-lg hover:bg-[#007ACC] transition font-medium disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? "Creating..." : "Create my account"}
           </button>
         </div>
 
-        <p className="text-center text-gray-600 text-sm mt-6">
+        <p className="text-center text-gray-600 text-xs sm:text-sm mt-4 sm:mt-6">
           Already have an account?{" "}
           <a href="/login" className="text-[#008CFF] hover:underline font-medium">
             Login
@@ -157,5 +157,6 @@ const Register = () => {
     </div>
   );
 };
+
 
 export default Register;

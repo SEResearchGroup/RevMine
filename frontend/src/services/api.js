@@ -57,26 +57,40 @@ export const authService = {
   },
 };
 
-// Services workspace
 export const workspaceService = {
   getAll: () => {
     return workspaceApi.get("/");
   },
+  
   getById: (id) => {
     return workspaceApi.get(`/${id}`);
   },
+  
+  testConnection: (data) => {
+    return workspaceApi.post("/test/", data);
+  },
+  
   create: (data) => {
     return workspaceApi.post("/", data);
   },
+  
   update: (id, data) => {
     return workspaceApi.put(`/${id}`, data);
   },
+  
   delete: (id) => {
     return workspaceApi.delete(`/${id}`);
   },
+  
+  getRemoteRepositories: (workspaceId) => {
+    return workspaceApi.get(`/${workspaceId}/remote-repositories/`);
+  },
+  
+  importRepositories: (workspaceId, data) => {
+    return workspaceApi.post(`/${workspaceId}/repositories/import/`, data);
+  },
 };
 
-// Vous pouvez ajouter d'autres services ici
 export default {
   auth: authService,
   workspace: workspaceService,
