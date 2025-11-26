@@ -55,55 +55,6 @@ const Workspaces = () => {
     }
   };
 
-  // Navigation
-  const handleNext = () => {
-    if (step === 1) {
-      if (!formData.name || !formData.platform) {
-        alert("Veuillez remplir tous les champs obligatoires");
-        return;
-      }
-      setStep(2);
-    } else if (step === 2) {
-      if (!formData.token) {
-        alert("Le token est obligatoire");
-        return;
-      }
-      if (
-        formData.platform === "gitlab" &&
-        formData.hostingType === "self-hosted" &&
-        !formData.url
-      ) {
-        alert("L'URL du serveur GitLab est obligatoire");
-        return;
-      }
-      setStep(3);
-    }
-  };
-
-  const handleBack = () => {
-    if (step > 1 && step !== 4 && step !== 5) {
-      setStep(step - 1);
-    }
-  };
-
-  const handleCloseModal = () => {
-    setShowModal(false);
-    setStep(1);
-    setFormData({
-      name: "",
-      description: "",
-      platform: "",
-      hostingType: "gitlab.com",
-      url: "",
-      token: "",
-    });
-    setTestResult(null);
-    setRemoteRepos([]);
-    setSelectedRepos([]);
-    setCreatedWorkspaceId(null);
-    // Recharger la liste des workspaces si nécessaire
-  };
-
   const filteredWorkspaces = workspaces.filter((ws) =>
     ws.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -118,15 +69,18 @@ const Workspaces = () => {
       : `il y a ${diff} jour${diff > 1 ? "s" : ""}`;
   };
   const [testResult, setTestResult] = useState(null);
+  const [testMessage, setTestMessage] = useState("");
   const [isTestLoading, setIsTestLoading] = useState(false);
   const [remoteRepos, setRemoteRepos] = useState([]);
   const [selectedRepos, setSelectedRepos] = useState([]);
   const [isLoadingRepos, setIsLoadingRepos] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
+  const [isCreatingWorkspace, setIsCreatingWorkspace] = useState(false);
   const [createdWorkspaceId, setCreatedWorkspaceId] = useState(null);
 
   const handleTestConnection = async () => {
     setIsTestLoading(true);
+    setTestResult(null);
     try {
       const testData = {
         platform: formData.platform,
@@ -143,11 +97,12 @@ const Workspaces = () => {
       const response = await workspaceService.testConnection(testData);
 
       if (response.data.success) {
-        setTestResult(response.data);
-        setStep(4); // Passer à l'étape d'importation
+        setTestResult("success");
+        setTestMessage(response.data.user_data?.login || "Connexion réussie");
       }
     } catch (error) {
-      alert(
+      setTestResult("error");
+      setTestMessage(
         error.response?.data?.message ||
           "Erreur lors du test de connexion. Vérifiez vos identifiants."
       );
@@ -156,7 +111,8 @@ const Workspaces = () => {
     }
   };
 
-  const handleCreateWorkspace = async () => {
+  const handleCreateWorkspaceAndLoadRepos = async () => {
+    setIsCreatingWorkspace(true);
     try {
       const workspaceData = {
         name: formData.name,
@@ -172,28 +128,35 @@ const Workspaces = () => {
         }
       }
 
+      // Créer le workspace
       const response = await workspaceService.create(workspaceData);
       const workspaceId = response.data.workspace.id;
       setCreatedWorkspaceId(workspaceId);
 
+      // Charger les repositories distants
       setIsLoadingRepos(true);
       const reposResponse = await workspaceService.getRemoteRepositories(
         workspaceId
       );
       setRemoteRepos(reposResponse.data.repositories);
       setIsLoadingRepos(false);
+
+      // Passer à l'étape d'importation
+      setStep(3);
     } catch (error) {
       alert(
         error.response?.data?.message ||
           "Erreur lors de la création du workspace"
       );
       setIsLoadingRepos(false);
+    } finally {
+      setIsCreatingWorkspace(false);
     }
   };
 
   const handleImportRepositories = async () => {
     if (selectedRepos.length === 0) {
-      setStep(5);
+      setStep(4);
       return;
     }
 
@@ -202,7 +165,7 @@ const Workspaces = () => {
       await workspaceService.importRepositories(createdWorkspaceId, {
         repository_ids: selectedRepos,
       });
-      setStep(5); // Succès
+      setStep(4); 
     } catch (error) {
       alert(
         error.response?.data?.message ||
@@ -229,15 +192,63 @@ const Workspaces = () => {
     }
   };
 
+  const handleNext = () => {
+    if (step === 1) {
+      if (!formData.name || !formData.platform) {
+        alert("Veuillez remplir tous les champs obligatoires");
+        return;
+      }
+      setStep(2);
+    } else if (step === 2) {
+      if (!formData.token) {
+        alert("Le token est obligatoire");
+        return;
+      }
+      if (
+        formData.platform === "gitlab" &&
+        formData.hostingType === "self-hosted" &&
+        !formData.url
+      ) {
+        alert("L'URL du serveur GitLab est obligatoire");
+        return;
+      }
+      handleCreateWorkspaceAndLoadRepos();
+    }
+  };
+
+  const handleBack = () => {
+    if (step === 2) {
+      setStep(1);
+      setTestResult(null);
+      setTestMessage("");
+    }
+  };
+
+  const handleCloseModal = () => {
+    setShowModal(false);
+    setStep(1);
+    setFormData({
+      name: "",
+      description: "",
+      platform: "",
+      hostingType: "gitlab.com",
+      url: "",
+      token: "",
+    });
+    setTestResult(null);
+    setTestMessage("");
+    setRemoteRepos([]);
+    setSelectedRepos([]);
+    setCreatedWorkspaceId(null);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 p-6">
-      {/* Header */}
       <div className="max-w-7xl mx-auto mb-6">
         <h1 className="text-2xl font-semibold text-gray-800 mb-6">
           <span className="text-blue-600">Data Sources</span> / Workspaces
         </h1>
 
-        {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           <div className="bg-white rounded-xl border border-gray-200 p-5 flex items-center justify-between">
             <div>
@@ -402,19 +413,16 @@ const Workspaces = () => {
         )}
       </div>
 
-      {/* Modal de création */}
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            {/* Header */}
             <div className="px-6 py-5 border-b border-gray-200 sticky top-0 bg-white z-10">
               <div className="flex justify-between items-center">
                 <h2 className="text-xl font-semibold text-gray-900">
                   {step === 1 && "Créer un nouveau workspace"}
                   {step === 2 && "Configuration de la plateforme"}
-                  {step === 3 && "Test de connexion"}
-                  {step === 4 && "Importer des repositories"}
-                  {step === 5 && "Workspace créé !"}
+                  {step === 3 && "Importer des repositories"}
+                  {step === 4 && "Workspace créé !"}
                 </h2>
                 <button
                   onClick={handleCloseModal}
@@ -436,9 +444,8 @@ const Workspaces = () => {
                 </button>
               </div>
 
-              {/* Barre de progression */}
               <div className="flex gap-2 mt-4">
-                {[1, 2, 3, 4, 5].map((i) => (
+                {[1, 2, 3, 4].map((i) => (
                   <div
                     key={i}
                     className={`h-2 flex-1 rounded-full transition-colors ${
@@ -449,9 +456,7 @@ const Workspaces = () => {
               </div>
             </div>
 
-            {/* Body */}
             <div className="px-6 py-8">
-              {/* Étape 1 - Infos générales */}
               {step === 1 && (
                 <div className="space-y-6">
                   <div>
@@ -506,7 +511,13 @@ const Workspaces = () => {
                             : "border-gray-300 hover:border-gray-400"
                         }`}
                       >
-                        <GitBranch className="w-10 h-10" />
+                        <svg
+                          className="w-10 h-10"
+                          viewBox="0 0 24 24"
+                          fill="currentColor"
+                        >
+                          <path d="M22.65 14.39L12 22.13 1.35 14.39a.84.84 0 0 1-.3-.94l1.22-3.78 2.44-7.51A.42.42 0 0 1 4.82 2a.43.43 0 0 1 .58 0 .42.42 0 0 1 .11.18l2.44 7.49h8.1l2.44-7.51A.42.42 0 0 1 18.6 2a.43.43 0 0 1 .58 0 .42.42 0 0 1 .11.18l2.44 7.51L23 13.45a.84.84 0 0 1-.35.94z" />
+                        </svg>
                         <span className="font-medium">GitLab</span>
                       </button>
 
@@ -520,7 +531,13 @@ const Workspaces = () => {
                             : "border-gray-300 hover:border-gray-400"
                         }`}
                       >
-                        <Github className="w-10 h-10" />
+                        <svg
+                          className="w-10 h-10"
+                          viewBox="0 0 24 24"
+                          fill="currentColor"
+                        >
+                          <path d="M12 2C6.477 2 2 6.477 2 12c0 4.42 2.865 8.17 6.839 9.49.5.092.682-.217.682-.482 0-.237-.008-.866-.013-1.7-2.782.603-3.369-1.34-3.369-1.34-.454-1.156-1.11-1.463-1.11-1.463-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.578 9.578 0 0112 6.836c.85.004 1.705.114 2.504.336 1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.203 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.743 0 .267.18.578.688.48C19.138 20.167 22 16.418 22 12c0-5.523-4.477-10-10-10z" />
+                        </svg>
                         <span className="font-medium">GitHub</span>
                       </button>
                     </div>
@@ -528,7 +545,6 @@ const Workspaces = () => {
                 </div>
               )}
 
-              {/* Étape 2 - Token & hébergement */}
               {step === 2 && (
                 <div className="space-y-6">
                   {formData.platform === "gitlab" && (
@@ -598,9 +614,10 @@ const Workspaces = () => {
                     <input
                       type="password"
                       value={formData.token}
-                      onChange={(e) =>
-                        setFormData({ ...formData, token: e.target.value })
-                      }
+                      onChange={(e) => {
+                        setFormData({ ...formData, token: e.target.value });
+                        setTestResult(null); // Reset test result when token changes
+                      }}
                       placeholder={
                         formData.platform === "github" ? "ghp_..." : "glpat-..."
                       }
@@ -612,122 +629,76 @@ const Workspaces = () => {
                         : "GitLab → User Settings → Access Tokens (scopes : api, read_repository)"}
                     </p>
                   </div>
-                </div>
-              )}
 
-              {step === 3 && (
-                <div className="space-y-6">
-                  {!testResult ? (
-                    <div className="text-center py-12">
-                      <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                        <svg
-                          className="w-12 h-12 text-blue-600"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M13 10V3L4 14h7v7l9-11h-7z"
-                          />
-                        </svg>
-                      </div>
-                      <h3 className="text-2xl font-semibold mb-3">
-                        Test de connexion
-                      </h3>
-                      <p className="text-gray-600 mb-8">
-                        Vérifiez que vos identifiants sont corrects avant de
-                        créer le workspace.
-                      </p>
-                      <div className="flex gap-3 justify-center">
-                        <button
-                          onClick={() => handleCreateWorkspace()}
-                          className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
-                        >
-                          Créer sans tester
-                        </button>
-                        <button
-                          onClick={handleTestConnection}
-                          disabled={isTestLoading}
-                          className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          {isTestLoading
-                            ? "Test en cours..."
-                            : "Tester la connexion"}
-                        </button>
+                  {/* Bouton de test de connexion */}
+                  <div>
+                    <button
+                      onClick={handleTestConnection}
+                      disabled={isTestLoading || !formData.token}
+                      className="w-full px-4 py-3 border-2 border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      {isTestLoading
+                        ? "Test en cours..."
+                        : "Tester la connexion"}
+                    </button>
+                  </div>
+
+                  {/* Résultat du test */}
+                  {testResult === "success" && (
+                    <div className="p-4 bg-green-50 border border-green-200 rounded-lg flex items-start gap-3">
+                      <svg
+                        className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                        />
+                      </svg>
+                      <div>
+                        <p className="font-medium text-green-900">
+                          Connexion réussie !
+                        </p>
+                        <p className="text-sm text-green-700 mt-1">
+                          {testMessage}
+                        </p>
                       </div>
                     </div>
-                  ) : (
-                    <div className="text-center py-12">
-                      <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                        <svg
-                          className="w-12 h-12 text-green-600"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M5 13l4 4L19 7"
-                          />
-                        </svg>
-                      </div>
-                      <h3 className="text-2xl font-semibold mb-3">
-                        Connexion réussie !
-                      </h3>
-                      <p className="text-gray-600 mb-6">
-                        Connecté en tant que{" "}
-                        <strong>{testResult.user_data.login}</strong>
-                      </p>
-                      <div className="bg-gray-50 rounded-lg p-6 text-left max-w-md mx-auto">
-                        <div className="flex items-center gap-4 mb-4">
-                          <img
-                            src={testResult.user_data.avatar_url}
-                            alt="Avatar"
-                            className="w-16 h-16 rounded-full"
-                          />
-                          <div>
-                            <p className="font-semibold">
-                              {testResult.user_data.name ||
-                                testResult.user_data.login}
-                            </p>
-                            <p className="text-sm text-gray-500">
-                              {testResult.user_data.email}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-3 gap-4 text-center text-sm">
-                          <div>
-                            <p className="font-semibold text-gray-900">
-                              {testResult.user_data.public_repos}
-                            </p>
-                            <p className="text-gray-500">Repos</p>
-                          </div>
-                          <div>
-                            <p className="font-semibold text-gray-900">
-                              {testResult.user_data.followers}
-                            </p>
-                            <p className="text-gray-500">Followers</p>
-                          </div>
-                          <div>
-                            <p className="font-semibold text-gray-900">
-                              {testResult.user_data.following}
-                            </p>
-                            <p className="text-gray-500">Following</p>
-                          </div>
-                        </div>
+                  )}
+
+                  {testResult === "error" && (
+                    <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
+                      <svg
+                        className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"
+                        />
+                      </svg>
+                      <div>
+                        <p className="font-medium text-red-900">
+                          Échec de connexion
+                        </p>
+                        <p className="text-sm text-red-700 mt-1">
+                          {testMessage}
+                        </p>
                       </div>
                     </div>
                   )}
                 </div>
               )}
 
-              {/* Étape 4 - Import repositories */}
-              {step === 4 && (
+              {step === 3 && (
                 <div className="space-y-6">
                   <div className="flex justify-between items-center mb-4">
                     <div>
@@ -829,8 +800,7 @@ const Workspaces = () => {
                 </div>
               )}
 
-              {/* Étape 5 - Succès */}
-              {step === 5 && (
+              {step === 4 && (
                 <div className="text-center py-12">
                   <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
                     <svg
@@ -864,12 +834,9 @@ const Workspaces = () => {
               )}
             </div>
 
-            {/* Footer */}
             <div className="px-6 py-4 border-t border-gray-200 flex justify-between sticky bottom-0 bg-white">
               <button
-                onClick={
-                  step === 5 || step === 4 ? handleCloseModal : handleBack
-                }
+                onClick={step === 4 ? handleCloseModal : handleBack}
                 className={`px-5 py-2 border rounded-lg ${
                   step === 1 || step === 3 || step === 4
                     ? "opacity-50 cursor-not-allowed border-gray-300"
@@ -877,10 +844,10 @@ const Workspaces = () => {
                 }`}
                 disabled={step === 1 || step === 3 || step === 4}
               >
-                {step === 5 ? "Fermer" : "Retour"}
+                {step === 4 ? "Fermer" : "Retour"}
               </button>
 
-              {step === 4 && (
+              {step === 3 && (
                 <button
                   onClick={handleImportRepositories}
                   disabled={isImporting}
@@ -897,13 +864,16 @@ const Workspaces = () => {
               {step < 3 && (
                 <button
                   onClick={handleNext}
-                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                  disabled={isCreatingWorkspace}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Suivant
+                  {step === 2 && isCreatingWorkspace
+                    ? "Création..."
+                    : "Suivant"}
                 </button>
               )}
 
-              {step === 5 && (
+              {step === 4 && (
                 <button
                   onClick={handleCloseModal}
                   className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
