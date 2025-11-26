@@ -26,8 +26,14 @@ const createApiInstance = (baseURL) => {
     (response) => response,
     (error) => {
       if (error.response?.status === 401) {
-        localStorage.removeItem("jwt");
-        window.location.href = "/login";
+        const currentPath = window.location.pathname;
+        const isAuthEndpoint = error.config?.url?.includes('/login') || 
+                               error.config?.url?.includes('/register');
+        
+        if (!isAuthEndpoint && currentPath !== '/login' && currentPath !== '/register') {
+          localStorage.removeItem("jwt");
+          window.location.href = "/login";
+        }
       }
       return Promise.reject(error);
     }

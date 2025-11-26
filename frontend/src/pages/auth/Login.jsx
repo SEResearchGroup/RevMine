@@ -6,6 +6,7 @@ import {
   Github,
   GitBranch,
   CheckCircle,
+  AlertCircle,
 } from "lucide-react";
 import { authService } from "../../services/api";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -18,7 +19,8 @@ const Login = () => {
   const [error, setError] = useState("");
   const [showSuccess, setShowSuccess] = useState(false);
   const navigate = useNavigate();
-  const { login } = useAuth();   
+  const { login } = useAuth();
+  
   const handleSocialLogin = (provider) => {
     console.log("Login with:", provider);
   };
@@ -35,22 +37,16 @@ const Login = () => {
     }
   }, [searchParams]);
 
-  // useEffect(() => {
-  //   const token = localStorage.getItem("jwt");
-  //   if (token) {
-  //     navigate("/workspaces");
-  //   }
-  // }, [navigate]);
-
-  const handleSubmit = async () => {
+  const handleSubmit = async (e) => {
+    e.preventDefault();
     setError("");
     setLoading(true);
+    
     try {
       const response = await authService.login(email, password);
       login(response.data.access);
       navigate("/workspaces");
     } catch (err) {
-      console.error("Login error:", err);
       setError(err.response?.data?.message || "Incorrect email or password");
     } finally {
       setLoading(false);
@@ -82,6 +78,7 @@ const Login = () => {
 
         <div className="flex flex-row justify-around mb-8 gap-4">
           <button
+            type="button"
             onClick={() => handleSocialLogin("Google")}
             className="w-full flex items-center justify-center gap-3 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
           >
@@ -90,6 +87,7 @@ const Login = () => {
           </button>
 
           <button
+            type="button"
             onClick={() => handleSocialLogin("GitLab")}
             className="w-full flex items-center justify-center gap-3 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
           >
@@ -98,6 +96,7 @@ const Login = () => {
           </button>
 
           <button
+            type="button"
             onClick={() => handleSocialLogin("GitHub")}
             className="w-full flex items-center justify-center gap-3 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
           >
@@ -112,7 +111,7 @@ const Login = () => {
           </div>
         </div>
 
-        <div className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-6">
           <div>
             <div className="relative">
               <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -123,6 +122,7 @@ const Login = () => {
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50"
                 disabled={loading}
+                required
               />
             </div>
           </div>
@@ -137,6 +137,7 @@ const Login = () => {
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50"
                 disabled={loading}
+                required
               />
             </div>
             <div className="text-right mt-2">
@@ -150,13 +151,13 @@ const Login = () => {
           </div>
 
           <button
-            onClick={handleSubmit}
+            type="submit"
             disabled={loading || !email || !password}
-            className="w-full bg-[#008CFF] text-white py-2 rounded-lg hover:bg-[#007ACC] transition font-medium"
+            className="w-full bg-[#008CFF] text-white py-2 rounded-lg hover:bg-[#007ACC] transition font-medium disabled:opacity-50 disabled:cursor-not-allowed"
           >
-             {loading ? "Logging in..." : "Sign In"}
+            {loading ? "Logging in..." : "Sign In"}
           </button>
-        </div>
+        </form>
 
         <p className="text-center text-gray-600 text-sm mt-6">
           Don't have an account?{" "}
