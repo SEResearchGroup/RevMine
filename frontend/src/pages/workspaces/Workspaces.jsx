@@ -16,7 +16,9 @@ import {
   Layers,
 } from "lucide-react";
 import { workspaceService } from "../../services/api";
+import { useNavigate } from "react-router-dom";
 const Workspaces = () => {
+  const navigate = useNavigate();
   const [workspaces, setWorkspaces] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [showModal, setShowModal] = useState(false);
@@ -344,6 +346,7 @@ const Workspaces = () => {
             {filteredWorkspaces.map((ws) => (
               <div
                 key={ws.id}
+                onClick={() => navigate(`/workspaces/${ws.id}`)}
                 className="bg-white rounded-xl border border-gray-200 p-5 hover:shadow-lg transition-shadow cursor-pointer"
               >
                 <div className="flex items-start gap-3 mb-4">

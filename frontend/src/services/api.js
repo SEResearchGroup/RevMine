@@ -89,6 +89,10 @@ export const workspaceService = {
   importRepositories: (workspaceId, data) => {
     return workspaceApi.post(`/${workspaceId}/repositories/import/`, data);
   },
+
+  getRepositories : (workspaceId) => {
+    return workspaceApi.get(`/${workspaceId}/repositories/`);
+  }
 };
 
 export default {

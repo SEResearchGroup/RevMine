@@ -6,6 +6,7 @@ import Workspaces from "../pages/workspaces/Workspaces";
 import ProtectedRoute from "./ProtectedRoute";
 import LayoutAuth from "../components/layout/LayoutAuth";
 import LayoutPublic from "../components/layout/LayoutPublic";
+import Projects from "../pages/projects/Projects";
 
 const AppRoutes = () => {
   return (
@@ -26,6 +27,7 @@ const AppRoutes = () => {
         <Route path="/" element={<Workspaces />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/workspaces" element={<Workspaces />} />
+        <Route path="/workspaces/:id" element={<Projects />} />
       </Route>
 
     </Routes>
