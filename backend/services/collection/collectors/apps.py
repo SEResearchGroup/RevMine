@@ -1,6 +1,6 @@
 from django.apps import AppConfig
 
 
-class ColectionsConfig(AppConfig):
+class CollectorsConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
-    name = 'colections'
+    name = 'collectors'

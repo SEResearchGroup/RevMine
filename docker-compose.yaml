@@ -41,7 +41,8 @@ services:
     networks:
       - app-network
 
-    # Base de données pour Collection Service
+
+  # Base de données pour Collection Service
   collection-db:
     image: postgres:15
     container_name: collection-db
@@ -116,28 +117,6 @@ services:
       - app-network  # ⬅️ IMPORTANT
     command: sh -c "sleep 10 && python manage.py migrate --run-syncdb && python manage.py runserver 0.0.0.0:8001"
     restart: unless-stopped
-
-
-
-  # Collection Service
-  collection-service:
-    build:
-      context: ./backend/services/collection
-    container_name: collection-service
-    hostname: collection-service
-    ports:
-      - "8002:8002"
-    env_file:
-      - ./backend/services/collection/.env
-    depends_on:
-      collection-db:
-        condition: service_healthy
-    volumes:
-      - ./backend/services/collection:/app
-    networks:
-      - app-network
-    restart: unless-stopped 
-    
 
 volumes:
   gateway_postgres_data:
