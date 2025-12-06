@@ -58,6 +58,11 @@ CONFIGURATION_SERVICE_URL = os.getenv(
     'http://configuration-service:8001/api/workspaces'  
 )
 
+COLLECTION_SERVICE_URL = os.getenv(
+    'COLLECTION_SERVICE_URL',
+    'http://collection-service:8002/api/collections'  # Running locally for development
+)
+
 
 TEMPLATES = [
     {

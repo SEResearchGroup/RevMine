@@ -34,9 +34,10 @@ urlpatterns = [
         RepositoryListView.as_view(),
         name="repository-list",
     ),
-    path(
-        "workspaces/<int:workspace_id>/repositories/<int:repository_id>/",
-        RepositoryDetailView.as_view(),
-        name="repository-detail",
-    ),
+  path(
+    "workspaces/<int:workspace_id>/repositories/<int:repository_id>/",
+    RepositoryDetailView.as_view(),
+    name="repository-detail",
+)
+
 ]

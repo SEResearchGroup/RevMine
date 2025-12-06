@@ -1039,8 +1039,8 @@ class RepositoryDetailView(APIView):
             )
         ]
     )
-    def get(self, request, repository_id):
-        repository = get_object_or_404(Repository, id=repository_id)
+    def get(self, request, workspace_id, repository_id):
+        repository = get_object_or_404(Repository, id=repository_id, workspace_id=workspace_id)
         serializer = RepositorySerializer(repository)
         return Response(serializer.data)
     
