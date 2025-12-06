@@ -10,7 +10,7 @@
   }
 
   body {
-    @apply bg-[#F4F4F6] text-black;
+    @apply bg-[#fbfbfb] text-black;
   }
 
   .dark body {

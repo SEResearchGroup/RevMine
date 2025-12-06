@@ -13,7 +13,6 @@ import {
 } from "lucide-react";
 import logo from "../../assets/images/logo_v1.png";
 
-
 const Sidebar = () => {
   const [isOpen, setIsOpen] = useState(true);
   const [expandedSections, setExpandedSections] = useState({
@@ -87,10 +86,6 @@ const Sidebar = () => {
       <div className="p-4 border-b border-gray-200 flex items-center justify-between">
         {isOpen && (
           <div className="flex items-center gap-2">
-            {/* <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
-              <div className="w-5 h-5 border-2 border-white rounded-full"></div>
-            </div>
-            <span className="text-xl font-semibold text-gray-700">RevMine</span> */}
             <img src={logo} alt="RevMine Logo" />
           </div>
         )}
@@ -100,8 +95,7 @@ const Sidebar = () => {
         >
           <Menu className="w-5 h-5 text-gray-600" />
         </button>
-      </div>
-      {" "}
+      </div>{" "}
       <div className="flex-1 overflow-y-auto py-4">
         {menuItems.map((item) => {
           const Icon = item.icon;

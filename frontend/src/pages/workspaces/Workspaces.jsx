@@ -167,7 +167,7 @@ const Workspaces = () => {
       await workspaceService.importRepositories(createdWorkspaceId, {
         repository_ids: selectedRepos,
       });
-      setStep(4); 
+      setStep(4);
     } catch (error) {
       alert(
         error.response?.data?.message ||
@@ -245,7 +245,7 @@ const Workspaces = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
+    <div className="min-h-screen p-6">
       <div className="max-w-7xl mx-auto mb-6">
         <h1 className="text-2xl font-semibold text-gray-800 mb-6">
           <span className="text-blue-600">Data Sources</span> / Workspaces
@@ -331,7 +331,6 @@ const Workspaces = () => {
         </div>
       </div>
 
-      {/* Liste des workspaces */}
       <div className="max-w-7xl mx-auto">
         {loading ? (
           <div className="text-center py-12 text-gray-500">

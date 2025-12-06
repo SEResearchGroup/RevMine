@@ -23,6 +23,14 @@ SECRET_KEY = config('SECRET_KEY')
 DEBUG = config('DEBUG', default=False, cast=bool)
 ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='').split(',')
 
+GITHUB_CLIENT_ID = config('GITHUB_CLIENT_ID')
+GITHUB_CLIENT_SECRET = config('GITHUB_CLIENT_SECRET')
+GITHUB_REDIRECT_URI = config('GITHUB_REDIRECT_URI', default='http://localhost:5173/auth/github/callback')
+
+GITLAB_CLIENT_ID = config('GITLAB_CLIENT_ID')
+GITLAB_CLIENT_SECRET = config('GITLAB_CLIENT_SECRET')
+GITLAB_REDIRECT_URI = config('GITLAB_REDIRECT_URI', default='http://localhost:5173/auth/gitlab/callback')
+FRONTEND_URL = config('FRONTEND_URL', default='http://localhost:5173')
 
 # Application definition
 
@@ -57,6 +65,8 @@ CONFIGURATION_SERVICE_URL = os.getenv(
     'CONFIGURATION_SERVICE_URL',
     'http://configuration-service:8001/api/workspaces'  
 )
+
+
 
 
 TEMPLATES = [

@@ -3,7 +3,7 @@ import { Search, Plus, Mail, Bell } from 'lucide-react';
 
 const NavbarAuth = () => {
   return (
-    <nav className="flex items-center justify-between px-6 py-3 bg-white border-b border-gray-200 ">
+    <nav className="flex items-center justify-between px-6 py-3 bg-white ">
       <div className="w-48"></div>      
       <div className="flex-1 max-w-2xl mx-auto">
         <div className="relative">
@@ -16,7 +16,6 @@ const NavbarAuth = () => {
         </div>
       </div>
       
-      {/* Right Section */}
       <div className="flex items-center gap-4 w-48 justify-end">
         <button className="p-2 hover:bg-gray-100 rounded-lg transition">
           <Plus className="w-5 h-5 text-blue-500" />
@@ -28,7 +27,6 @@ const NavbarAuth = () => {
           <Bell className="w-5 h-5 text-blue-500" />
         </button>
         
-        {/* Profile Section */}
         <div className="flex items-center gap-3 ml-2">
           <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-semibold">
             JD
