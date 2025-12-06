@@ -15,7 +15,17 @@ class WorkspaceSerializer(serializers.ModelSerializer):
             'token', 'is_active', 'created_at', 'updated_at', 'last_sync'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at', 'last_sync']
-
+        
+    def get_token(self, obj):
+        """Get decrypted token"""
+        return obj.get_token()
+    
+    def validate_platform(self, value):
+        """Validate platform choice"""
+        valid_platforms = ['github', 'gitlab', 'gitlab_self']
+        if value not in valid_platforms:
+            raise serializers.ValidationError(f"Platform must be one of: {valid_platforms}")
+        return value
     def validate(self, data):
         platform = data['platform']
         url = data.get('url')

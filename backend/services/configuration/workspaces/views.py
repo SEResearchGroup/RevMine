@@ -453,6 +453,47 @@ class WorkspaceDetailView(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+
+
+class WorkspaceTokenView(APIView):
+    """
+    Internal endpoint to get workspace token (for inter-service communication)
+    """
+    @extend_schema(
+        summary="Get workspace token (internal)",
+        description="Retrieve decrypted workspace token for inter-service use",
+        tags=["Workspaces - Internal"],
+        parameters=[
+            OpenApiParameter(
+                name='workspace_id',
+                type=OpenApiTypes.INT,
+                location=OpenApiParameter.PATH,
+                description='Workspace ID'
+            ),
+        ],
+        responses={
+            200: OpenApiTypes.OBJECT,
+            401: OpenApiTypes.OBJECT,
+            404: OpenApiTypes.OBJECT,
+        }
+    )
+    def get(self, request, workspace_id):
+        """Retrieve workspace token"""
+        if not request.user_id:
+            return Response(
+                {'error': 'Authentication required'}, 
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+        
+        workspace = get_object_or_404(Workspace, id=workspace_id, user=request.user_id)
+        
+        return Response({
+            'token': workspace.get_token(),
+            'platform': workspace.platform,
+            'url': workspace.url
+        })
+
+
 class WorkspaceTestConnectionView(APIView):
     """
     Connection testing endpoints

@@ -7,12 +7,14 @@ from .views import (
     RepositoryImportView,
     RepositoryListView,
     RepositoryDetailView,
+    WorkspaceTokenView,
 )
 
 urlpatterns = [
     # ===== Workspaces =====
     path("workspaces/", WorkspaceListCreateView.as_view(), name="workspace-list-create"),
     path("workspaces/<int:workspace_id>/", WorkspaceDetailView.as_view(), name="workspace-detail"),
+    path("workspaces/<int:workspace_id>/token/", WorkspaceTokenView.as_view(), name="workspace-token"),
 
     path("workspaces/test/", WorkspaceTestConnectionView.as_view(), name="workspace-test-global"),
     path("workspaces/<int:workspace_id>/test/", WorkspaceTestConnectionView.as_view(), name="workspace-test"),

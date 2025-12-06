@@ -22,3 +22,4 @@ class UserInjectionMiddleware:
             request.user_id = None
         
         return self.get_response(request)
+    
