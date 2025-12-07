@@ -41,7 +41,7 @@ function Projects() {
       const reposResponse = await workspaceService.getRepositories(id);
       setRepositories(reposResponse.data);
     } catch (error) {
-      console.error("Erreur lors du chargement:", error);
+      console.error("Error loading workspace data:", error);
     } finally {
       setLoading(false);
     }
@@ -65,18 +65,18 @@ function Projects() {
 
   const handleEditClose = () => {
     setShowEditModal(false);
-    fetchWorkspaceData(); // Recharger les données après édition
+    fetchWorkspaceData(); 
   };
 
   const handleImportClose = () => {
     setShowImportModal(false);
-    fetchWorkspaceData(); // Recharger les repositories après import
+    fetchWorkspaceData(); 
   };
 
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-gray-500">Chargement...</div>
+        <div className="text-gray-500">Loading...</div>
       </div>
     );
   }
@@ -84,7 +84,7 @@ function Projects() {
   if (!workspace) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-gray-500">Workspace non trouvé</div>
+        <div className="text-gray-500">Workspace not found</div>
       </div>
     );
   }
@@ -98,7 +98,7 @@ function Projects() {
           className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4 sm:mb-6"
         >
           <ArrowLeft className="w-5 h-5" />
-          <span className="text-sm sm:text-base">Retour aux workspaces</span>
+          <span className="text-sm sm:text-base">Back to workspaces</span>
         </button>
 
         {/* Section workspace info */}
@@ -222,7 +222,7 @@ function Projects() {
                 </div>
 
                 <p className="text-gray-600 text-xs sm:text-sm mb-4 line-clamp-2 min-h-[2.5rem]">
-                  {repo.description || "Aucune description"}
+                  {repo.description || "No description provided."}
                 </p>
 
                 <div className="space-y-2 text-xs sm:text-sm text-gray-600">

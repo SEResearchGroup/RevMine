@@ -36,7 +36,6 @@ const AppRoutes = () => {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/workspaces" element={<Workspaces />} />
         <Route path="/workspaces/:id" element={<Projects />} />
-
         <Route path="/profile" element={<Profile />} />
       </Route>
     </Routes>
