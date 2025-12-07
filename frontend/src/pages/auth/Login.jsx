@@ -11,6 +11,7 @@ import {
 import { authService } from "../../services/api";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../../hooks/useAuth";
+import axios from "axios";
 
 const Login = () => {
   const [email, setEmail] = useState("");
@@ -20,9 +21,25 @@ const Login = () => {
   const [showSuccess, setShowSuccess] = useState(false);
   const navigate = useNavigate();
   const { login } = useAuth();
-  
-  const handleSocialLogin = (provider) => {
-    console.log("Login with:", provider);
+
+  const handleSocialLogin = async (provider) => {
+    try {
+      let response;
+      if (provider === "GitHub") {
+        // response = await authService.getGitHubAuthUrl();
+        response = await axios.get('http://localhost:8000/api/auth/oauth/github');
+      } else if (provider === "GitLab") {
+        // response = await authService.getGitLabAuthUrl();
+        response = await axios.get('http://localhost:8000/api/auth/oauth/gitlab');
+      } else {
+        // response = await authService.getGoogleAuthUrl();
+        response = await axios.get('http://localhost:8000/api/auth/oauth/google');
+      }
+      window.location.href = response.data.url;
+    } catch (error) {
+      console.error(`Error initiating ${provider} login:`, error);
+      setError(`Failed to connect to ${provider}`);
+    }
   };
 
   const [searchParams] = useSearchParams();
@@ -41,7 +58,7 @@ const Login = () => {
     e.preventDefault();
     setError("");
     setLoading(true);
-    
+
     try {
       const response = await authService.login(email, password);
       login(response.data.access);
@@ -107,7 +124,9 @@ const Login = () => {
 
         <div className="relative mb-6 sm:mb-8">
           <div className="relative flex justify-center">
-            <span className="px-2 bg-white text-gray-500 text-sm sm:text-base">Or</span>
+            <span className="px-2 bg-white text-gray-500 text-sm sm:text-base">
+              Or
+            </span>
           </div>
         </div>
 

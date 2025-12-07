@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   ChevronDown,
   ChevronRight,
@@ -12,9 +12,9 @@ import {
   Menu,
 } from "lucide-react";
 import logo from "../../assets/images/logo_v1.png";
-
-
+import { useNavigate } from "react-router-dom";
 const Sidebar = () => {
+  const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(true);
   const [expandedSections, setExpandedSections] = useState({
     home: false,
@@ -25,6 +25,20 @@ const Sidebar = () => {
     settings: false,
     help: false,
   });
+
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth < 1024) {
+        setIsOpen(false);
+      } else {
+        setIsOpen(true);
+      }
+    };
+
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   const toggleSection = (section) => {
     setExpandedSections((prev) => ({
@@ -84,13 +98,15 @@ const Sidebar = () => {
         isOpen ? "w-64" : "w-16"
       } h-screen bg-white border-r border-gray-200 transition-all duration-300 flex flex-col`}
     >
+      {/* Header */}
       <div className="p-4 border-b border-gray-200 flex items-center justify-between">
         {isOpen && (
-          <div className="flex items-center gap-2">
-            {/* <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
-              <div className="w-5 h-5 border-2 border-white rounded-full"></div>
-            </div>
-            <span className="text-xl font-semibold text-gray-700">RevMine</span> */}
+          <div
+            className="flex items-center gap-2 cursor-pointer"
+            onClick={() => {
+              navigate("/");
+            }}
+          >
             <img src={logo} alt="RevMine Logo" />
           </div>
         )}
@@ -101,7 +117,8 @@ const Sidebar = () => {
           <Menu className="w-5 h-5 text-gray-600" />
         </button>
       </div>
-      {" "}
+
+      {/* Menu items */}
       <div className="flex-1 overflow-y-auto py-4">
         {menuItems.map((item) => {
           const Icon = item.icon;
@@ -112,6 +129,7 @@ const Sidebar = () => {
               <button
                 onClick={() => toggleSection(item.id)}
                 className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-gray-50 transition group"
+                title={!isOpen ? item.label : ""}
               >
                 <div className="flex items-center gap-3">
                   <Icon className="w-5 h-5 text-gray-600" />
