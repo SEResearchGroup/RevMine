@@ -1,20 +1,23 @@
-import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { 
-  Github, 
-  GitBranch, 
-  FolderGit2, 
-  BarChart3, 
-  Clock, 
+import { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import {
+  Github,
+  GitBranch,
+  FolderGit2,
+  BarChart3,
+  Clock,
   Lock,
   Search,
   Settings,
   ArrowLeft,
   Star,
   GitFork,
-  Eye
-} from 'lucide-react';
+  Eye,
+  Plus,
+} from "lucide-react";
 import { workspaceService } from "../../services/api";
+import WorkspaceModal from "../../components/workspaces/WorkspaceModal";
+import ImportRepositoriesModal from "../../components/workspaces/ImportRepositoriesModal";
 
 function Projects() {
   const { id } = useParams();
@@ -22,7 +25,9 @@ function Projects() {
   const [workspace, setWorkspace] = useState(null);
   const [repositories, setRepositories] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState("");
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
 
   useEffect(() => {
     fetchWorkspaceData();
@@ -32,17 +37,17 @@ function Projects() {
     try {
       setLoading(true);
       const wsResponse = await workspaceService.getById(id);
-      setWorkspace(wsResponse.data);      
+      setWorkspace(wsResponse.data);
       const reposResponse = await workspaceService.getRepositories(id);
       setRepositories(reposResponse.data);
     } catch (error) {
-      console.error('Erreur lors du chargement:', error);
+      console.error("Erreur lors du chargement:", error);
     } finally {
       setLoading(false);
     }
   };
 
-  const filteredRepositories = repositories.filter(repo =>
+  const filteredRepositories = repositories.filter((repo) =>
     repo.name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -50,12 +55,22 @@ function Projects() {
     const now = new Date();
     const past = new Date(date);
     const diffInDays = Math.floor((now - past) / (1000 * 60 * 60 * 24));
-    
-    if (diffInDays === 0) return 'today';
-    if (diffInDays === 1) return 'yesterday';
+
+    if (diffInDays === 0) return "today";
+    if (diffInDays === 1) return "yesterday";
     if (diffInDays < 7) return `${diffInDays} days ago`;
     if (diffInDays < 30) return `${Math.floor(diffInDays / 7)} weeks ago`;
     return `${Math.floor(diffInDays / 30)} months ago`;
+  };
+
+  const handleEditClose = () => {
+    setShowEditModal(false);
+    fetchWorkspaceData(); // Recharger les données après édition
+  };
+
+  const handleImportClose = () => {
+    setShowImportModal(false);
+    fetchWorkspaceData(); // Recharger les repositories après import
   };
 
   if (loading) {
@@ -75,37 +90,37 @@ function Projects() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
+    <div className="min-h-screen bg-gray-50 p-4 sm:p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header avec retour */}
         <button
-          onClick={() => navigate('/workspaces')}
-          className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-6"
+          onClick={() => navigate("/workspaces")}
+          className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4 sm:mb-6"
         >
           <ArrowLeft className="w-5 h-5" />
-          Retour aux workspaces
+          <span className="text-sm sm:text-base">Retour aux workspaces</span>
         </button>
 
-        {/* Section workspace info (comme dans l'image) */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
-          <div className="flex items-start gap-4">
-            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center flex-shrink-0">
+        {/* Section workspace info */}
+        <div className="bg-white rounded-xl border border-gray-200 p-4 sm:p-6 mb-4 sm:mb-6">
+          <div className="flex flex-col sm:flex-row items-start gap-4">
+            <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gray-100 rounded-full flex items-center justify-center flex-shrink-0">
               {workspace.platform === "github" ? (
-                <Github className="w-8 h-8" />
+                <Github className="w-6 h-6 sm:w-8 sm:h-8" />
               ) : (
-                <GitBranch className="w-8 h-8" />
+                <GitBranch className="w-6 h-6 sm:w-8 sm:h-8" />
               )}
             </div>
-            
-            <div className="flex-1">
-              <h1 className="text-2xl font-semibold text-gray-900 mb-2">
+
+            <div className="flex-1 min-w-0 w-full">
+              <h1 className="text-xl sm:text-2xl font-semibold text-gray-900 mb-2">
                 {workspace.name}
               </h1>
-              <p className="text-gray-600 mb-4">
+              <p className="text-sm sm:text-base text-gray-600 mb-3 sm:mb-4">
                 {workspace.description || "Aucune description"}
               </p>
-              
-              <div className="flex items-center gap-6 text-sm text-gray-600">
+
+              <div className="flex flex-wrap items-center gap-3 sm:gap-6 text-xs sm:text-sm text-gray-600">
                 <div className="flex items-center gap-2">
                   <FolderGit2 className="w-4 h-4" />
                   <span>{repositories.length} Repositories</span>
@@ -120,7 +135,9 @@ function Projects() {
                 </div>
                 <div className="flex items-center gap-2">
                   <Lock className="w-4 h-4" />
-                  <span className="capitalize">{workspace.visibility || "Public"}</span>
+                  <span className="capitalize">
+                    {workspace.visibility || "Public"}
+                  </span>
                 </div>
               </div>
 
@@ -129,21 +146,25 @@ function Projects() {
                   href={workspace.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-blue-600 hover:underline text-sm mt-3 inline-block"
+                  className="text-blue-600 hover:underline text-xs sm:text-sm mt-3 inline-block truncate max-w-full"
                 >
                   {workspace.url}
                 </a>
               )}
             </div>
 
-            <button className="p-2 hover:bg-gray-100 rounded-lg transition">
+            <button
+              onClick={() => setShowEditModal(true)}
+              className="p-2 hover:bg-gray-100 rounded-lg transition self-start"
+            >
               <Settings className="w-5 h-5 text-gray-600" />
             </button>
           </div>
         </div>
 
-        <div className="flex items-center justify-between mb-6">
-          <div className="relative flex-1 max-w-md">
+        {/* Search et Import */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-6">
+          <div className="relative flex-1 max-w-full sm:max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
             <input
               type="text"
@@ -153,43 +174,65 @@ function Projects() {
               className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
+
+          <button
+            onClick={() => setShowImportModal(true)}
+            className="px-5 py-2.5 bg-blue-600 text-white rounded-lg flex items-center justify-center gap-2 hover:bg-blue-700"
+          >
+            <Plus className="w-5 h-5" />
+            <span>Import Repositories</span>
+          </button>
         </div>
 
         {/* Liste des repositories */}
         {filteredRepositories.length === 0 ? (
-          <div className="text-center py-12 text-gray-500">
-            Aucun repository trouvé
+          <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
+            <FolderGit2 className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+            <p className="text-gray-500 mb-4">
+              {searchTerm
+                ? "Aucun repository trouvé"
+                : "Aucun repository dans ce workspace"}
+            </p>
+            {!searchTerm && (
+              <button
+                onClick={() => setShowImportModal(true)}
+                className="px-5 py-2.5 bg-blue-600 text-white rounded-lg inline-flex items-center gap-2 hover:bg-blue-700"
+              >
+                <Plus className="w-5 h-5" />
+                Importer des repositories
+              </button>
+            )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5">
             {filteredRepositories.map((repo) => (
               <div
                 key={repo.id}
-                className="bg-white rounded-xl border border-gray-200 p-5 hover:shadow-lg transition-shadow"
+                className="bg-white rounded-xl border border-gray-200 p-4 sm:p-5 hover:shadow-lg transition-shadow"
               >
                 <div className="flex items-start gap-3 mb-4">
-                  <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center flex-shrink-0">
-                    <FolderGit2 className="w-6 h-6 text-gray-600" />
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gray-100 rounded-full flex items-center justify-center flex-shrink-0">
+                    <FolderGit2 className="w-5 h-5 sm:w-6 sm:h-6 text-gray-600" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-base text-gray-900 truncate">
+                    <h3 className="font-semibold text-sm sm:text-base text-gray-900 truncate">
                       {repo.name}
                     </h3>
                   </div>
                 </div>
 
-                <p className="text-gray-600 text-sm mb-4 line-clamp-2 min-h-[2.5rem]">
+                <p className="text-gray-600 text-xs sm:text-sm mb-4 line-clamp-2 min-h-[2.5rem]">
                   {repo.description || "Aucune description"}
                 </p>
 
-                <div className="space-y-2.5 text-sm text-gray-600">
+                <div className="space-y-2 text-xs sm:text-sm text-gray-600">
                   {repo.language && (
                     <div className="flex items-center gap-2">
                       <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
                       <span>{repo.language}</span>
                     </div>
                   )}
-                  
+
                   <div className="flex items-center gap-4">
                     {repo.stars_count !== undefined && (
                       <div className="flex items-center gap-1">
@@ -213,7 +256,7 @@ function Projects() {
                   </div>
                 </div>
 
-                <div className="flex justify-end items-center mt-5 pt-4 border-t border-gray-200">
+                <div className="flex justify-end items-center mt-4 sm:mt-5 pt-4 border-t border-gray-200">
                   <button className="p-2 hover:bg-gray-100 rounded-lg transition">
                     <Eye className="w-4 h-4 text-blue-600" />
                   </button>
@@ -223,6 +266,15 @@ function Projects() {
           </div>
         )}
       </div>
+
+      {/* Modal d'édition du workspace */}
+      {showEditModal && (
+        <WorkspaceModal workspace={workspace} onClose={handleEditClose} />
+      )}
+
+      {showImportModal && (
+        <ImportRepositoriesModal workspaceId={id} onClose={handleImportClose} />
+      )}
     </div>
   );
 }

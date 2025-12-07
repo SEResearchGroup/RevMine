@@ -99,11 +99,11 @@ export const workspaceService = {
   },
 
   update: (id, data) => {
-    return workspaceApi.put(`/${id}`, data);
+    return workspaceApi.put(`/${id}/`, data);
   },
 
   delete: (id) => {
-    return workspaceApi.delete(`/${id}`);
+    return workspaceApi.delete(`/${id}/`);
   },
 
   getRemoteRepositories: (workspaceId) => {

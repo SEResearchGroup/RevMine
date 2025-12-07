@@ -8,6 +8,7 @@ const NavbarAuth = () => {
   const [userInformation, setUserInformation] = useState({});
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
+
   const navigate = useNavigate();
   const { logout } = useAuth();
 
@@ -30,7 +31,6 @@ const NavbarAuth = () => {
         setIsDropdownOpen(false);
       }
     };
-
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
@@ -41,10 +41,10 @@ const NavbarAuth = () => {
   };
 
   return (
-    <nav className="flex items-center justify-between px-6 py-3 bg-white">
-      <div className="w-48"></div>
-      <div className="flex-1 max-w-2xl mx-auto">
-        <div className="relative">
+    <nav className="flex items-center justify-between px-3 sm:px-6 py-3 bg-white border-b border-gray-200">
+      {/* Search - Hidden on small screens */}
+      <div className="hidden md:flex flex-1 max-w-xl mx-auto">
+        <div className="relative w-full">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-blue-500 w-5 h-5" />
           <input
             type="text"
@@ -54,27 +54,36 @@ const NavbarAuth = () => {
         </div>
       </div>
 
-      <div className="flex items-center gap-4 w-48 justify-end">
-        <button className="p-2 hover:bg-gray-100 rounded-lg transition">
+      {/* Mobile Search Icon */}
+      <button className="md:hidden p-2 hover:bg-gray-100 rounded-lg transition">
+        <Search className="w-5 h-5 text-blue-500" />
+      </button>
+
+      {/* Right side actions */}
+      <div className="flex items-center gap-2 sm:gap-4">
+        {/* Action buttons - Some hidden on mobile */}
+        <button className="hidden sm:block p-2 hover:bg-gray-100 rounded-lg transition">
           <Plus className="w-5 h-5 text-blue-500" />
         </button>
-        <button className="p-2 hover:bg-gray-100 rounded-lg transition">
+        <button className="hidden lg:block p-2 hover:bg-gray-100 rounded-lg transition">
           <Mail className="w-5 h-5 text-blue-500" />
         </button>
         <button className="p-2 hover:bg-gray-100 rounded-lg transition">
           <Bell className="w-5 h-5 text-blue-500" />
         </button>
 
+        {/* User dropdown */}
         <div className="relative" ref={dropdownRef}>
           <div
-            className="flex items-center gap-3 ml-2 cursor-pointer hover:bg-gray-50 p-2 rounded-lg transition"
+            className="flex items-center gap-2 sm:gap-3 ml-2 cursor-pointer hover:bg-gray-50 p-2 rounded-lg transition"
             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
           >
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-semibold">
+            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-semibold text-sm sm:text-base">
               {userInformation.first_name?.[0]}
               {userInformation.last_name?.[0]}
             </div>
-            <div className="flex flex-col">
+            {/* User info - Hidden on small screens */}
+            <div className="hidden lg:flex flex-col">
               <span
                 className="text-sm font-bold text-gray-800 whitespace-nowrap max-w-[120px] overflow-hidden text-ellipsis"
                 title={`${userInformation.first_name} ${userInformation.last_name}`}
@@ -114,7 +123,7 @@ const NavbarAuth = () => {
                 </div>
               </div>
 
-              <div className="py-2 ">
+              <div className="py-2">
                 <button
                   onClick={() => {
                     navigate("/profile");
