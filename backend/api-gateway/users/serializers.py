@@ -4,7 +4,7 @@ from .models import User
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['id', 'email', 'first_name', 'last_name', 'date_joined']
+        fields = ['id', 'email', 'first_name', 'position', 'last_name', 'date_joined']
 
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(
@@ -22,10 +22,15 @@ class RegisterSerializer(serializers.ModelSerializer):
         allow_blank=True,
         help_text="Last name"
     )
+    position = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        help_text="Position or job title"
+    )
 
     class Meta:
         model = User
-        fields = ['email', 'password', 'first_name', 'last_name']  
+        fields = ['email', 'password', 'first_name', 'last_name', 'position']  
 
     def create(self, validated_data):
         user = User.objects.create_user(
@@ -34,6 +39,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         )
         user.first_name = validated_data.get('first_name', "")
         user.last_name = validated_data.get('last_name', "")
+        user.position = validated_data.get('position', "")
         user.save()
         return user
 
@@ -53,4 +59,4 @@ class LoginResponseSerializer(serializers.Serializer):
 class OAuthUserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['id', 'email', 'first_name', 'last_name', 'date_joined']
+        fields = ['id', 'email', 'first_name', 'position', 'last_name', 'date_joined']

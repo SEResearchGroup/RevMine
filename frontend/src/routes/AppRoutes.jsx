@@ -10,7 +10,9 @@ import Projects from "../pages/projects/Projects";
 import {
   GitHubCallback,
   GitLabCallback,
-} from "../components/auth/OAuthCallbacks";
+  GoogleCallback 
+} from "../pages/auth/OAuthCallbacks";
+import Profile from "../pages/profile/Profile";
 
 const AppRoutes = () => {
   return (
@@ -20,6 +22,7 @@ const AppRoutes = () => {
         <Route path="/register" element={<Register />} />
         <Route path="/auth/github/callback" element={<GitHubCallback />} />
         <Route path="/auth/gitlab/callback" element={<GitLabCallback />} />
+        <Route path="/auth/google/callback" element={<GoogleCallback />} />
       </Route>
 
       <Route
@@ -33,6 +36,8 @@ const AppRoutes = () => {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/workspaces" element={<Workspaces />} />
         <Route path="/workspaces/:id" element={<Projects />} />
+
+        <Route path="/profile" element={<Profile />} />
       </Route>
     </Routes>
   );

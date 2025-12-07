@@ -12,8 +12,9 @@ import {
   Menu,
 } from "lucide-react";
 import logo from "../../assets/images/logo_v1.png";
-
+import { useNavigate } from "react-router-dom";
 const Sidebar = () => {
+  const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(true);
   const [expandedSections, setExpandedSections] = useState({
     home: false,
@@ -85,7 +86,12 @@ const Sidebar = () => {
     >
       <div className="p-4 border-b border-gray-200 flex items-center justify-between">
         {isOpen && (
-          <div className="flex items-center gap-2">
+          <div
+            className="flex items-center gap-2 cursor-pointer"
+            onClick={() => {
+              navigate("/");
+            }}
+          >
             <img src={logo} alt="RevMine Logo" />
           </div>
         )}

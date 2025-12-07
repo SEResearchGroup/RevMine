@@ -18,6 +18,9 @@ const Register = () => {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [sendUpdates, setSendUpdates] = useState(false);
+  const [position, setPosition] = useState("");
+  const [customPosition, setCustomPosition] = useState("");
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -40,12 +43,14 @@ const Register = () => {
     setLoading(true);
 
     try {
+      const finalPosition = position === "other" ? customPosition : position;
       await authService.register(
         email,
         password,
         sendUpdates,
         firstName,
-        lastName
+        lastName,
+        finalPosition
       );
       navigate("/login?registered=true");
     } catch (err) {
@@ -140,6 +145,45 @@ const Register = () => {
               </div>
             </div>
           </div>
+
+          <div>
+            <select
+              value={position}
+              onChange={(e) => {
+                setPosition(e.target.value);
+                if (e.target.value !== "other") setCustomPosition("");
+              }}
+              className="w-full px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50"
+              disabled={loading}
+            >
+              <option value="">Select your position (optional)</option>
+              <option value="business-owner">Business Owner</option>
+              <option value="product-manager">Product Manager</option>
+              <option value="data-analyst">Data Analyst</option>
+              <option value="team-lead">Team Lead</option>
+              <option value="engineering-manager">Engineering Manager</option>
+              <option value="tech-lead">Tech Lead</option>
+              <option value="software-engineer">Software Engineer</option>
+              <option value="devops-engineer">DevOps Engineer</option>
+              <option value="project-manager">Project Manager</option>
+              <option value="scrum-master">Scrum Master</option>
+              <option value="cto">CTO</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+
+          {position === "other" && (
+            <div>
+              <input
+                type="text"
+                placeholder="Please specify your position"
+                value={customPosition}
+                onChange={(e) => setCustomPosition(e.target.value)}
+                className="w-full px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50"
+                disabled={loading}
+              />
+            </div>
+          )}
 
           <div>
             <div className="relative">

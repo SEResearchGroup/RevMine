@@ -32,8 +32,8 @@ const Login = () => {
         // response = await authService.getGitLabAuthUrl();
         response = await axios.get('http://localhost:8000/api/auth/oauth/gitlab');
       } else {
-        console.log("Google OAuth not implemented yet");
-        return;
+        // response = await authService.getGoogleAuthUrl();
+        response = await axios.get('http://localhost:8000/api/auth/oauth/google');
       }
       window.location.href = response.data.url;
     } catch (error) {

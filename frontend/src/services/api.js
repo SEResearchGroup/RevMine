@@ -53,13 +53,14 @@ export const workspaceApi = createApiInstance(
 );
 
 export const authService = {
-  register: (email, password, sendUpdates, firstName, lastName) => {
+  register: (email, password, sendUpdates, firstName, lastName, position) => {
     return authApi.post("/register", {
       email,
       password,
       sendUpdates,
       first_name: firstName,
       last_name: lastName,
+      position,
     });
   },
   login: (email, password) => {
@@ -67,6 +68,9 @@ export const authService = {
   },
   logout: () => {
     return authApi.post("/logout");
+  },
+  getUserInfo: () => {
+    return authApi.get("/me");
   },
   getGitHubAuthUrl: () => axios.get("/oauth/github"),
 
