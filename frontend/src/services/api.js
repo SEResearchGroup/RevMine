@@ -51,6 +51,9 @@ export const authApi = createApiInstance("http://localhost:8000/api/auth");
 export const workspaceApi = createApiInstance(
   "http://localhost:8000/api/workspaces"
 );
+export const collectionApi = createApiInstance(
+  "http://localhost:8000/api/collections"
+);
 
 export const authService = {
   register: (email, password, sendUpdates, firstName, lastName, position) => {
@@ -121,7 +124,49 @@ export const workspaceService = {
 
 
 
+export const collectionService = {
+  // Start collection plan
+  startCollection: (workspaceId, repositoryId) => {
+    return collectionApi.post("/start", {
+      workspace_id: workspaceId,
+      repository_id: repositoryId,
+    });
+  },
+
+  // Configure metrics and filters
+  configureMetrics: (planId, data) => {
+    return collectionApi.post(`/plans/${planId}/configure/`, data);
+  },
+
+  // Validate collection plan
+  validatePlan: (planId) => {
+    return collectionApi.get(`/plans/${planId}/validate/`);
+  },
+
+  // Execute collection
+  executeCollection: (planId) => {
+    return collectionApi.post(`/plans/${planId}/execute/`);
+  },
+
+  // Get collection status
+  getStatus: (planId) => {
+    return collectionApi.get(`/plans/${planId}/status/`);
+  },
+
+  // Get collected data
+  getData: (planId) => {
+    return collectionApi.get(`/plans/${planId}/data/`);
+  },
+
+  // List all plans
+  getAllPlans: () => {
+    return collectionApi.get("/plans/");
+  },
+};
+
 export default {
   auth: authService,
   workspace: workspaceService,
+  collection: collectionService,
 };
+

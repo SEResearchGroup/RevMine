@@ -1,12 +1,9 @@
-"""
-backend/services/collection/collectors/models.py
-"""
 from django.db import models
 
 
 class CollectionPlan(models.Model):
     """
-    Represents a data collection plan for a repository
+    Represents a data collection plan for a repository/project
     """
     STATUS_CHOICES = [
         ('pending', 'Pending'),
@@ -27,7 +24,7 @@ class CollectionPlan(models.Model):
     default_branch = models.CharField(max_length=100, null=True, blank=True)
     
     # Store encrypted token
-    token_encrypted = models.TextField(help_text="Encrypted access token" ,default=None)
+    token_encrypted = models.TextField(help_text="Encrypted access token")
     
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     
@@ -42,6 +39,12 @@ class CollectionPlan(models.Model):
     # Progress tracking
     total_items = models.IntegerField(default=0)
     collected_items = models.IntegerField(default=0)
+    
+    # Statistics for summary
+    stats = models.JSONField(
+        default=dict,
+        help_text="Collection statistics (commits_count, comments_count, etc.)"
+    )
     
     error_message = models.TextField(null=True, blank=True)
     
@@ -61,36 +64,26 @@ class CollectionPlan(models.Model):
 
 class CollectedData(models.Model):
     """
-    Stores raw data collected from Git APIs
+    Stores ALL raw data collected for a collection plan
+    It contains collection plan insformation as a one-to-one relationship and a JSON field with all raw data
     """
-    collection_plan = models.ForeignKey(
+    collection_plan = models.OneToOneField(
         CollectionPlan,
         on_delete=models.CASCADE,
-        related_name='collected_data'
+        related_name='collected_data',
+        primary_key=True
     )
     
-    metric_type = models.CharField(
-        max_length=50,
-        help_text="Type of metric (pull_requests, commits, issues, etc.)"
-    )
-    
-    raw_data = models.JSONField(help_text="Raw data from API")
-    
-    external_id = models.CharField(
-        max_length=100,
-        help_text="ID from GitHub/GitLab API"
+    # All raw data organized by metric type
+    raw_data = models.JSONField(
+        help_text="All collected data organized by metric type: {pull_requests: [...], commits: [...], etc.}"
     )
     
     collected_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
     
     class Meta:
         db_table = 'collected_data'
-        ordering = ['-collected_at']
-        unique_together = ['collection_plan', 'metric_type', 'external_id']
-        indexes = [
-            models.Index(fields=['collection_plan', 'metric_type']),
-            models.Index(fields=['external_id']),
-        ]
     
     def __str__(self):
-        return f"{self.metric_type} - {self.external_id}"
+        return f"Collected Data for Plan {self.collection_plan.id}"

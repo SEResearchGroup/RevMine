@@ -7,6 +7,9 @@ import ProtectedRoute from "./ProtectedRoute";
 import LayoutAuth from "../components/layout/LayoutAuth";
 import LayoutPublic from "../components/layout/LayoutPublic";
 import Projects from "../pages/projects/Projects";
+import ProjectDetail from "../pages/collection/ProjectDetail";
+import CollectionProgress from "../pages/collection/CollectionProgress";
+import CollectionResults from "../pages/collection/CollectionResults";
 import {
   GitHubCallback,
   GitLabCallback,
@@ -36,6 +39,20 @@ const AppRoutes = () => {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/workspaces" element={<Workspaces />} />
         <Route path="/workspaces/:id" element={<Projects />} />
+
+        <Route 
+          path="/workspaces/:workspaceId/repositories/:repositoryId/collect" 
+          element={<ProjectDetail />} 
+        />
+        <Route 
+          path="/workspaces/:workspaceId/repositories/:repositoryId/collection/:planId/progress" 
+          element={<CollectionProgress />} 
+        />
+        <Route 
+          path="/workspaces/:workspaceId/repositories/:repositoryId/collection/:planId/results" 
+          element={<CollectionResults />} 
+        />
+
         <Route path="/profile" element={<Profile />} />
       </Route>
     </Routes>

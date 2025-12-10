@@ -1,7 +1,3 @@
-"""
-backend/services/collection/collectors/collector.py
-Service for collecting data from Git APIs
-"""
 import requests
 from datetime import datetime
 from typing import Dict, List

@@ -1,19 +1,14 @@
-"""
-backend/services/collection/collectors/views.py
-"""
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from django.shortcuts import get_object_or_404
-from django.utils import timezone
 from .serializers import (
     StartCollectionSerializer,
     MetricsFilterSerializer,
     CollectionPlanSerializer,
-    CollectedDataSerializer
 )
 from .models import CollectionPlan, CollectedData
-from .collector import DataCollector
+from .tasks import run_collection_in_background
 import logging
 
 logger = logging.getLogger(__name__)
@@ -22,6 +17,7 @@ logger = logging.getLogger(__name__)
 class StartCollectionView(APIView):
     """
     Create a collection plan with repository details and token
+
     """
     
     def post(self, request):
@@ -38,23 +34,6 @@ class StartCollectionView(APIView):
         
         validated_data = serializer.validated_data
         
-        # Print project details
-        print("\n" + "="*80)
-        print("🚀 COLLECTION SERVICE - PROJECT DETAILS RECEIVED")
-        print("="*80)
-        print(f"👤 User ID: {user_id}")
-        print(f"📦 Repository ID: {validated_data['repository_id']}")
-        print(f"🏢 Workspace ID: {validated_data['workspace_id']}")
-        print(f"📂 Repository Name: {validated_data['repository_name']}")
-        print(f"📋 Full Name: {validated_data['repository_full_name']}")
-        print(f"🔧 Platform: {validated_data['platform']}")
-        if 'repository_url' in validated_data:
-            print(f"🔗 URL: {validated_data['repository_url']}")
-        if 'default_branch' in validated_data:
-            print(f"🌿 Default Branch: {validated_data['default_branch']}")
-        print(f"🔑 Token received: ✓")
-        print("="*80 + "\n")
-        
         logger.info(f"Collection plan initiated for: {validated_data['repository_full_name']}")
         
         # Create collection plan
@@ -67,7 +46,7 @@ class StartCollectionView(APIView):
             platform=validated_data['platform'],
             repository_url=validated_data.get('repository_url'),
             default_branch=validated_data.get('default_branch'),
-            token_encrypted=validated_data['token'],  # Store token directly for now
+            token_encrypted=validated_data['token'],
             status='pending'
         )
         
@@ -98,7 +77,6 @@ class ConfigureMetricsView(APIView):
                 status=status.HTTP_401_UNAUTHORIZED
             )
         
-        # Get collection plan
         collection_plan = get_object_or_404(
             CollectionPlan,
             id=plan_id,
@@ -111,7 +89,6 @@ class ConfigureMetricsView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # Validate metrics and filters
         serializer = MetricsFilterSerializer(data=request.data)
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -155,7 +132,6 @@ class ValidateCollectionPlanView(APIView):
             user=int(user_id)
         )
         
-        # Prepare summary
         summary = {
             'collection_plan': CollectionPlanSerializer(collection_plan).data,
             'summary': {
@@ -172,7 +148,7 @@ class ValidateCollectionPlanView(APIView):
 
 class ExecuteCollectionView(APIView):
     """
-    Start the actual data collection
+    Start the actual data collection IN BACKGROUND
     """
     
     def post(self, request, plan_id):
@@ -201,85 +177,14 @@ class ExecuteCollectionView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # Start collection
-        collection_plan.status = 'in_progress'
-        collection_plan.started_at = timezone.now()
-        collection_plan.error_message = None
-        collection_plan.save()
+        # Start collection in background
+        run_collection_in_background(plan_id)
         
-        logger.info(f"Starting collection for plan {plan_id}")
-        
-        try:
-            # Initialize collector
-            collector = DataCollector(
-                platform=collection_plan.platform,
-                token=collection_plan.token_encrypted,
-                repo_full_name=collection_plan.repository_full_name
-            )
-            
-            # Prepare filters
-            filters = collection_plan.filters.copy()
-            if filters.get('start_date'):
-                from datetime import date
-                filters['start_date'] = date.fromisoformat(filters['start_date'])
-            if filters.get('end_date'):
-                from datetime import date
-                filters['end_date'] = date.fromisoformat(filters['end_date'])
-            
-            total_collected = 0
-            
-            # Collect each metric
-            for metric in collection_plan.selected_metrics:
-                print(f"\n📊 Collecting {metric}...")
-                
-                data = collector.collect_metric(metric, filters)
-                
-                print(f"✅ Collected {len(data)} items for {metric}")
-                
-                # Store collected data
-                for item in data:
-                    external_id = str(item.get('id') or item.get('number') or item.get('sha', ''))
-                    
-                    CollectedData.objects.update_or_create(
-                        collection_plan=collection_plan,
-                        metric_type=metric,
-                        external_id=external_id,
-                        defaults={'raw_data': item}
-                    )
-                    
-                    total_collected += 1
-                    
-                    # Update progress
-                    collection_plan.collected_items = total_collected
-                    collection_plan.save()
-            
-            # Mark as completed
-            collection_plan.status = 'completed'
-            collection_plan.completed_at = timezone.now()
-            collection_plan.total_items = total_collected
-            collection_plan.save()
-            
-            print(f"\n🎉 Collection completed! Total items: {total_collected}\n")
-            
-            return Response({
-                'success': True,
-                'message': 'Collection completed successfully',
-                'collection_plan': CollectionPlanSerializer(collection_plan).data,
-                'total_collected': total_collected
-            })
-        
-        except Exception as e:
-            logger.error(f"Collection failed: {e}")
-            
-            collection_plan.status = 'failed'
-            collection_plan.error_message = str(e)
-            collection_plan.save()
-            
-            return Response({
-                'success': False,
-                'error': 'Collection failed',
-                'message': str(e)
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response({
+            'success': True,
+            'message': 'Collection started in background',
+            'collection_plan': CollectionPlanSerializer(collection_plan).data
+        })
 
 
 class CollectionStatusView(APIView):
@@ -307,6 +212,7 @@ class CollectionStatusView(APIView):
             'progress_percentage': collection_plan.progress_percentage,
             'collected_items': collection_plan.collected_items,
             'total_items': collection_plan.total_items,
+            'stats': collection_plan.stats,
         })
 
 
@@ -348,18 +254,17 @@ class CollectedDataView(APIView):
             user=int(user_id)
         )
         
-        # Get metric type from query params
-        metric_type = request.query_params.get('metric_type')
-        
-        collected_data = CollectedData.objects.filter(collection_plan=collection_plan)
-        
-        if metric_type:
-            collected_data = collected_data.filter(metric_type=metric_type)
-        
-        serializer = CollectedDataSerializer(collected_data, many=True)
-        
-        return Response({
-            'collection_plan_id': plan_id,
-            'total_items': collected_data.count(),
-            'data': serializer.data
-        })
+        try:
+            collected_data = CollectedData.objects.get(collection_plan=collection_plan)
+            
+            return Response({
+                'collection_plan_id': plan_id,
+                'raw_data': collected_data.raw_data,
+                'stats': collection_plan.stats,
+            })
+        except CollectedData.DoesNotExist:
+            return Response({
+                'collection_plan_id': plan_id,
+                'raw_data': {},
+                'message': 'No data collected yet'
+            })

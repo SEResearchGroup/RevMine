@@ -1,3 +1,8 @@
+/**
+ * frontend/src/pages/projects/Projects.jsx
+ * Updated: Navigate to collection page on card click
+ */
+
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
@@ -12,7 +17,6 @@ import {
   ArrowLeft,
   Star,
   GitFork,
-  Eye,
   Plus,
 } from "lucide-react";
 import { workspaceService } from "../../services/api";
@@ -71,6 +75,11 @@ function Projects() {
   const handleImportClose = () => {
     setShowImportModal(false);
     fetchWorkspaceData(); 
+  };
+
+ 
+  const handleRepositoryClick = (repoId) => {
+    navigate(`/workspaces/${id}/repositories/${repoId}/collect`);
   };
 
   if (loading) {
@@ -208,7 +217,8 @@ function Projects() {
             {filteredRepositories.map((repo) => (
               <div
                 key={repo.id}
-                className="bg-white rounded-xl border border-gray-200 p-4 sm:p-5 hover:shadow-lg transition-shadow"
+                onClick={() => handleRepositoryClick(repo.id)}
+                className="bg-white rounded-xl border border-gray-200 p-4 sm:p-5 hover:shadow-lg transition-shadow cursor-pointer"
               >
                 <div className="flex items-start gap-3 mb-4">
                   <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gray-100 rounded-full flex items-center justify-center flex-shrink-0">
@@ -254,12 +264,6 @@ function Projects() {
                       Updated {getTimeDiff(repo.updated_at)}
                     </span>
                   </div>
-                </div>
-
-                <div className="flex justify-end items-center mt-4 sm:mt-5 pt-4 border-t border-gray-200">
-                  <button className="p-2 hover:bg-gray-100 rounded-lg transition">
-                    <Eye className="w-4 h-4 text-blue-600" />
-                  </button>
                 </div>
               </div>
             ))}

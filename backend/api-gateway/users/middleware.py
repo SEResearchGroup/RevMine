@@ -28,7 +28,7 @@ class ServiceProxyMiddleware:
             'http://collection-service:8002/api/collections'  
         )
         
-        logger.info(f"🔧 ServiceProxyMiddleware initialized")
+        logger.info(f"ServiceProxyMiddleware initialized")
         logger.info(f"   Configuration Service: {self.configuration_service_url}")
         logger.info(f"   Collection Service: {self.collection_service_url}")
     
@@ -85,6 +85,7 @@ class ServiceProxyMiddleware:
                 status=400
             )
         
+        #getting repository_id and workspace_id from request body
         repository_id = body_data.get('repository_id')
         workspace_id = body_data.get('workspace_id')
         
@@ -94,11 +95,11 @@ class ServiceProxyMiddleware:
                 status=400
             )
         
-        logger.info(f"🔄 Starting collection for repository {repository_id} in workspace {workspace_id}")
+        logger.info(f"Starting collection for repository {repository_id} in workspace {workspace_id}")
         
         # Step 1: Get repository details
         repo_url = f"{self.configuration_service_url.rstrip('/')}/{workspace_id}/repositories/{repository_id}/"
-        logger.info(f"📡 Fetching repository details from: {repo_url}")
+        logger.info(f"Fetching repository details from: {repo_url}")
         
         try:
             repo_response = requests.get(
@@ -108,7 +109,7 @@ class ServiceProxyMiddleware:
             )
             
             if repo_response.status_code != 200:
-                logger.error(f"❌ Configuration service error: {repo_response.status_code}")
+                logger.error(f"Configuration service error: {repo_response.status_code}")
                 return JsonResponse(
                     {
                         'error': 'Failed to fetch repository details',
@@ -118,18 +119,18 @@ class ServiceProxyMiddleware:
                 )
             
             repository_details = repo_response.json()
-            logger.info(f"✅ Repository details fetched: {repository_details.get('full_name')}")
+            logger.info(f"Repository details fetched: {repository_details.get('full_name')}")
             
         except requests.RequestException as e:
-            logger.error(f"❌ Error fetching repository: {e}")
+            logger.error(f"Error fetching repository: {e}")
             return JsonResponse(
                 {'error': 'Configuration service unavailable', 'detail': str(e)},
                 status=503
             )
         
-        # Step 2: Get workspace token from dedicated token endpoint
+        # Step 2: Get workspace token to prepare collection
         workspace_token_url = f"{self.configuration_service_url.rstrip('/')}/{workspace_id}/token/"
-        logger.info(f"🔑 Fetching workspace token from: {workspace_token_url}")
+        logger.info(f"Fetching workspace token from: {workspace_token_url}")
         
         try:
             workspace_response = requests.get(
@@ -139,7 +140,7 @@ class ServiceProxyMiddleware:
             )
             
             if workspace_response.status_code != 200:
-                logger.error(f"❌ Failed to fetch workspace token: {workspace_response.status_code}")
+                logger.error(f"Failed to fetch workspace token: {workspace_response.status_code}")
                 return JsonResponse(
                     {
                         'error': 'Failed to fetch workspace token',
@@ -152,22 +153,22 @@ class ServiceProxyMiddleware:
             workspace_token = workspace_data.get('token')
             
             if not workspace_token:
-                logger.error("❌ No token found in workspace response")
+                logger.error("No token found in workspace response")
                 return JsonResponse(
                     {'error': 'Workspace token not found'},
                     status=500
                 )
             
-            logger.info(f"✅ Workspace token retrieved")
+            logger.info(f"Workspace token retrieved")
             
         except requests.RequestException as e:
-            logger.error(f"❌ Error fetching workspace token: {e}")
+            logger.error(f"Error fetching workspace token: {e}")
             return JsonResponse(
                 {'error': 'Configuration service unavailable', 'detail': str(e)},
                 status=503
             )
         
-        # Step 3: Forward to collection service with all details
+        # Step 3: Forward to collection service with all details to execute collection
         collection_payload = {
             'repository_id': repository_id,
             'workspace_id': workspace_id,
@@ -180,7 +181,7 @@ class ServiceProxyMiddleware:
         }
         
         collection_url = f"{self.collection_service_url}/start/"
-        logger.info(f"📡 Forwarding to collection service: {collection_url}")
+        logger.info(f"Forwarding to collection service: {collection_url}")
         
         try:
             collection_response = requests.post(
@@ -193,7 +194,7 @@ class ServiceProxyMiddleware:
                 timeout=30
             )
             
-            logger.info(f"✅ Collection service responded: {collection_response.status_code}")
+            logger.info(f"Collection service responded: {collection_response.status_code}")
             
             return JsonResponse(
                 collection_response.json(),
@@ -201,7 +202,7 @@ class ServiceProxyMiddleware:
             )
             
         except requests.RequestException as e:
-            logger.error(f"❌ Collection service error: {e}")
+            logger.error(f"Collection service error: {e}")
             return JsonResponse(
                 {'error': 'Collection service unavailable', 'detail': str(e)},
                 status=503
@@ -238,7 +239,7 @@ class ServiceProxyMiddleware:
         if request.META.get('QUERY_STRING'):
             target_url = f"{target_url}?{request.META['QUERY_STRING']}"
         
-        logger.info(f"🔄 Proxying {request.method} {request.path} → {target_url}")
+        logger.info(f"Proxying {request.method} {request.path} → {target_url}")
         
         # Prepare headers
         headers = {
@@ -262,7 +263,7 @@ class ServiceProxyMiddleware:
                 timeout=30
             )
             
-            logger.info(f"✅ Response from service: {response.status_code}")
+            logger.info(f"Response from service: {response.status_code}")
             
             # Return the response
             try:
@@ -277,19 +278,19 @@ class ServiceProxyMiddleware:
             )
         
         except requests.Timeout:
-            logger.error(f"❌ Timeout connecting to {target_url}")
+            logger.error(f"Timeout connecting to {target_url}")
             return JsonResponse(
                 {'error': 'Service timeout', 'detail': 'The service took too long to respond'}, 
                 status=504
             )
         except requests.ConnectionError as e:
-            logger.error(f"❌ Connection error to {target_url}: {e}")
+            logger.error(f"Connection error to {target_url}: {e}")
             return JsonResponse(
                 {'error': 'Service unavailable', 'detail': str(e)}, 
                 status=503
             )
         except requests.RequestException as e:
-            logger.error(f"❌ Request error to {target_url}: {e}")
+            logger.error(f"Request error to {target_url}: {e}")
             return JsonResponse(
                 {'error': 'Service error', 'detail': str(e)}, 
                 status=503
