@@ -133,7 +133,12 @@ export const collectionService = {
     });
   },
 
-  // Configure metrics and filters
+  // Get branches for a collection plan
+  getBranches: (planId) => {
+    return collectionApi.get(`/plans/${planId}/branches/`);
+  },
+
+  // Configure metrics, filters, and branch
   configureMetrics: (planId, data) => {
     return collectionApi.post(`/plans/${planId}/configure/`, data);
   },
@@ -162,8 +167,12 @@ export const collectionService = {
   getAllPlans: () => {
     return collectionApi.get("/plans/");
   },
-};
 
+  // Get collection history for a repository
+  getHistory: (repositoryId) => {
+    return collectionApi.get(`/history/${repositoryId}/`);
+  },
+};
 export default {
   auth: authService,
   workspace: workspaceService,

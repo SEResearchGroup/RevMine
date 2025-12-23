@@ -2,7 +2,8 @@ import threading
 from datetime import datetime, date
 from django.utils import timezone
 from .models import CollectionPlan, CollectedData
-from .collector import DataCollector
+from .github_collector import GitHubCollector
+from .gitlab_collector import GitLabCollector
 import logging
 
 logger = logging.getLogger(__name__)
@@ -16,14 +17,12 @@ def run_collection_in_background(plan_id):
     thread = threading.Thread(target=execute_collection_task, args=(plan_id,))
     thread.daemon = True
     thread.start()
-    logger.info(f"Started background collection for plan {plan_id}")
+    logger.info(f"🚀 Started background collection for plan {plan_id}")
 
 
 def execute_collection_task(plan_id):
     """
-    Execute the actual collection task
-    This runs in background and updates progress
-
+    Execute the actual collection task with real data collectors
     """
     try:
         collection_plan = CollectionPlan.objects.get(id=plan_id)
@@ -33,14 +32,7 @@ def execute_collection_task(plan_id):
         collection_plan.started_at = timezone.now()
         collection_plan.save()
         
-        logger.info(f"Starting collection for plan {plan_id}")
-        
-        # Initialize collector
-        collector = DataCollector(
-            platform=collection_plan.platform,
-            token=collection_plan.token_encrypted,
-            repo_full_name=collection_plan.repository_full_name
-        )
+        logger.info(f"📊 Starting collection for plan {plan_id}")
         
         # Prepare filters
         filters = collection_plan.filters.copy()
@@ -49,38 +41,43 @@ def execute_collection_task(plan_id):
         if filters.get('end_date'):
             filters['end_date'] = date.fromisoformat(filters['end_date'])
         
-        # Store all collected data organized by metric
-        all_data = {}
-        stats = {}
-        total_collected = 0
+        # Progress callback function
+        def update_progress(current, total, message=""):
+            try:
+                collection_plan.collected_items = current
+                collection_plan.total_items = total
+                collection_plan.save(update_fields=['collected_items', 'total_items'])
+                logger.info(f"Progress: {current}/{total} - {message}")
+            except Exception as e:
+                logger.error(f"Error updating progress: {e}")
         
-        # Collect each metric
-        for metric in collection_plan.selected_metrics:
-            logger.info(f"Collecting {metric}...")
-            
-            data = collector.collect_metric(metric, filters)
-            all_data[metric] = data
-            stats[f"{metric}_count"] = len(data)
-            
-            logger.info(f"Collected {len(data)} items for {metric}")
-            
-            total_collected += len(data)
-            
-            # Update progress
-            collection_plan.collected_items = total_collected
-            collection_plan.save()
+        # Initialize the appropriate collector
+        if collection_plan.platform == 'github':
+            collector = GitHubCollector(
+                token=collection_plan.token_encrypted,
+                repo_full_name=collection_plan.repository_full_name,
+                branch_name=collection_plan.branch_name
+            )
+        else:  # GitLab
+            collector = GitLabCollector(
+                token=collection_plan.token_encrypted,
+                repo_full_name=collection_plan.repository_full_name,
+                branch_name=collection_plan.branch_name
+            )
         
-        # Calculate date range from collected data
-        start_date, end_date = calculate_date_range(all_data)
+        # Collect all data with progress updates
+        logger.info(f"🔍 Starting data collection...")
+        all_data = collector.collect_all_data(
+            filters=filters,
+            progress_callback=update_progress
+        )
+        
+        # Calculate statistics
+        stats = calculate_statistics(all_data, collection_plan.platform)
         
         # Store statistics
-        collection_plan.stats = {
-            **stats,
-            'start_date': start_date,
-            'end_date': end_date,
-            'total_items': total_collected
-        }
-        collection_plan.total_items = total_collected
+        collection_plan.stats = stats
+        collection_plan.total_items = stats.get('total_items', 0)
         collection_plan.status = 'completed'
         collection_plan.completed_at = timezone.now()
         collection_plan.save()
@@ -91,12 +88,12 @@ def execute_collection_task(plan_id):
             defaults={'raw_data': all_data}
         )
         
-        logger.info(f"Collection completed for plan {plan_id}! Total items: {total_collected}")
+        logger.info(f"🎉 Collection completed for plan {plan_id}! Total items: {stats.get('total_items', 0)}")
         
     except CollectionPlan.DoesNotExist:
-        logger.error(f"Collection plan {plan_id} not found")
+        logger.error(f"❌ Collection plan {plan_id} not found")
     except Exception as e:
-        logger.error(f"Collection failed for plan {plan_id}: {e}")
+        logger.error(f"❌ Collection failed for plan {plan_id}: {e}")
         
         try:
             collection_plan = CollectionPlan.objects.get(id=plan_id)
@@ -107,25 +104,93 @@ def execute_collection_task(plan_id):
             pass
 
 
-def calculate_date_range(all_data):
+def calculate_statistics(all_data, platform):
     """
-    Calculate the date range from collected data
+    Calculate statistics from collected data
     """
-    all_dates = []
+    stats = {
+        'total_items': 0
+    }
     
-    for metric, items in all_data.items():
-        for item in items:
-            date_str = item.get('created_at') or item.get('committed_date')
-            if date_str:
+    if platform == 'github':
+        # GitHub statistics
+        prs = all_data.get('pull_requests', [])
+        stats['pull_requests_count'] = len(prs)
+        stats['total_items'] = len(prs)
+        
+        # Count commits, comments, reviews
+        total_commits = 0
+        total_comments = 0
+        total_reviews = 0
+        total_review_comments = 0
+        
+        all_dates = []
+        
+        for pr in prs:
+            total_commits += len(pr.get('commits', []))
+            total_comments += len(pr.get('comments', []))
+            total_reviews += len(pr.get('reviews', []))
+            total_review_comments += len(pr.get('review_comments', []))
+            
+            # Collect dates
+            if pr.get('details', {}).get('created_at'):
                 try:
-                    date_obj = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+                    date_obj = datetime.fromisoformat(
+                        pr['details']['created_at'].replace('Z', '+00:00')
+                    )
                     all_dates.append(date_obj)
                 except:
                     pass
+        
+        stats['commits_count'] = total_commits
+        stats['comments_count'] = total_comments
+        stats['reviews_count'] = total_reviews
+        stats['review_comments_count'] = total_review_comments
+        
+        # Calculate date range
+        if all_dates:
+            start = min(all_dates).strftime('%d/%m/%Y')
+            end = max(all_dates).strftime('%d/%m/%Y')
+            stats['start_date'] = start
+            stats['end_date'] = end
     
-    if all_dates:
-        start = min(all_dates).strftime('%d/%m/%Y')
-        end = max(all_dates).strftime('%d/%m/%Y')
-        return start, end
+    else:  # GitLab
+        # GitLab statistics
+        mrs = all_data.get('merge_requests', [])
+        stats['merge_requests_count'] = len(mrs)
+        stats['total_items'] = len(mrs)
+        
+        # Count commits, notes, discussions
+        total_commits = 0
+        total_notes = 0
+        total_discussions = 0
+        
+        all_dates = []
+        
+        for mr in mrs:
+            total_commits += len(mr.get('commits', []))
+            total_notes += len(mr.get('notes', []))
+            total_discussions += len(mr.get('discussions', []))
+            
+            # Collect dates
+            if mr.get('details', {}).get('created_at'):
+                try:
+                    date_obj = datetime.fromisoformat(
+                        mr['details']['created_at'].replace('Z', '+00:00')
+                    )
+                    all_dates.append(date_obj)
+                except:
+                    pass
+        
+        stats['commits_count'] = total_commits
+        stats['notes_count'] = total_notes
+        stats['discussions_count'] = total_discussions
+        
+        # Calculate date range
+        if all_dates:
+            start = min(all_dates).strftime('%d/%m/%Y')
+            end = max(all_dates).strftime('%d/%m/%Y')
+            stats['start_date'] = start
+            stats['end_date'] = end
     
-    return None, None
+    return stats
