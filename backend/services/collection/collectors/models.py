@@ -3,7 +3,7 @@ from django.db import models
 
 class CollectionPlan(models.Model):
     """
-    Represents a data collection plan for a repository/project
+    Represents a data collection plan for a repository
     """
     STATUS_CHOICES = [
         ('pending', 'Pending'),
@@ -22,6 +22,14 @@ class CollectionPlan(models.Model):
     platform = models.CharField(max_length=20)
     repository_url = models.URLField(null=True, blank=True)
     default_branch = models.CharField(max_length=100, null=True, blank=True)
+    
+    # Selected branch for collection
+    branch_name = models.CharField(
+        max_length=255, 
+        null=True, 
+        blank=True,
+        help_text="Branch to collect data from"
+    )
     
     # Store encrypted token
     token_encrypted = models.TextField(help_text="Encrypted access token")
@@ -51,6 +59,10 @@ class CollectionPlan(models.Model):
     class Meta:
         db_table = 'collection_plans'
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['user', 'repository_id']),
+            models.Index(fields=['status']),
+        ]
     
     def __str__(self):
         return f"Collection Plan {self.id} - {self.repository_full_name} ({self.status})"
@@ -65,7 +77,7 @@ class CollectionPlan(models.Model):
 class CollectedData(models.Model):
     """
     Stores ALL raw data collected for a collection plan
-    It contains collection plan insformation as a one-to-one relationship and a JSON field with all raw data
+    ONE instance per collection plan
     """
     collection_plan = models.OneToOneField(
         CollectionPlan,

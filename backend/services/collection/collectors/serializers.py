@@ -1,6 +1,3 @@
-"""
-backend/services/collection/collectors/serializers.py
-"""
 from rest_framework import serializers
 from .models import CollectionPlan, CollectedData
 
@@ -27,19 +24,8 @@ class MetricsFilterSerializer(serializers.Serializer):
     """
     Serializer for metrics selection and filters
     """
-    # Available metrics
-    METRIC_CHOICES = [
-        'pull_requests',
-        'commits',
-        'issues',
-        'comments',
-        'reviews',
-    ]
-    
-    STATUS_CHOICES = ['open', 'closed', 'merged']
-    
     selected_metrics = serializers.ListField(
-        child=serializers.ChoiceField(choices=METRIC_CHOICES),
+        child=serializers.CharField(),
         required=True,
         min_length=1
     )
@@ -47,10 +33,12 @@ class MetricsFilterSerializer(serializers.Serializer):
     start_date = serializers.DateField(required=False, allow_null=True)
     end_date = serializers.DateField(required=False, allow_null=True)
     status = serializers.ListField(
-        child=serializers.ChoiceField(choices=STATUS_CHOICES),
+        child=serializers.CharField(),
         required=False,
         allow_empty=True
     )
+    
+    branch_name = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     
     def validate(self, data):
         """Validate that end_date is after start_date"""
@@ -83,6 +71,7 @@ class CollectionPlanSerializer(serializers.ModelSerializer):
             'platform',
             'repository_url',
             'default_branch',
+            'branch_name',
             'status',
             'created_at',
             'started_at',
@@ -92,6 +81,7 @@ class CollectionPlanSerializer(serializers.ModelSerializer):
             'total_items',
             'collected_items',
             'progress_percentage',
+            'stats',
             'error_message',
         ]
         read_only_fields = [
@@ -110,11 +100,9 @@ class CollectedDataSerializer(serializers.ModelSerializer):
     class Meta:
         model = CollectedData
         fields = [
-            'id',
             'collection_plan',
-            'metric_type',
             'raw_data',
-            'external_id',
             'collected_at',
+            'updated_at',
         ]
-        read_only_fields = ['id', 'collected_at']
+        read_only_fields = ['collected_at', 'updated_at']

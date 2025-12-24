@@ -9,6 +9,8 @@ from .serializers import (
 )
 from .models import CollectionPlan, CollectedData
 from .tasks import run_collection_in_background
+from .branch_fetcher import BranchFetcher
+from .metrics_config import get_metrics_for_platform
 import logging
 
 logger = logging.getLogger(__name__)
@@ -17,7 +19,7 @@ logger = logging.getLogger(__name__)
 class StartCollectionView(APIView):
     """
     Create a collection plan with repository details and token
-
+    Returns platform-specific metrics organized by category
     """
     
     def post(self, request):
@@ -50,23 +52,65 @@ class StartCollectionView(APIView):
             status='pending'
         )
         
+        # Get platform-specific metrics (organized by category)
+        platform = validated_data['platform']
+        available_metrics = get_metrics_for_platform(platform)
+        
         return Response({
             'success': True,
             'message': 'Collection plan created. Now select metrics and filters.',
             'collection_plan': CollectionPlanSerializer(collection_plan).data,
-            'available_metrics': [
-                {'value': 'pull_requests', 'label': 'Pull Requests / Merge Requests'},
-                {'value': 'commits', 'label': 'Commits'},
-                {'value': 'issues', 'label': 'Issues'},
-                {'value': 'comments', 'label': 'Comments'},
-                {'value': 'reviews', 'label': 'Reviews (GitHub only)'},
-            ]
+            'available_metrics': available_metrics,  # Dict of categories
+            'platform': platform
         }, status=status.HTTP_201_CREATED)
+
+class GetBranchesView(APIView):
+    """
+    Get list of branches for a repository
+    """
+    
+    def get(self, request, plan_id):
+        user_id = request.headers.get('X-User-ID')
+        if not user_id:
+            return Response(
+                {'error': 'User ID required'}, 
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+        
+        collection_plan = get_object_or_404(
+            CollectionPlan,
+            id=plan_id,
+            user=int(user_id)
+        )
+        
+        try:
+            # Fetch branches
+            branch_fetcher = BranchFetcher(
+                platform=collection_plan.platform,
+                token=collection_plan.token_encrypted,
+                repo_full_name=collection_plan.repository_full_name
+            )
+            
+            branches = branch_fetcher.fetch_branches()
+            
+            return Response({
+                'success': True,
+                'branches': branches,
+                'default_branch': collection_plan.default_branch
+            })
+            
+        except Exception as e:
+            logger.error(f"Error fetching branches: {e}")
+            return Response({
+                'success': False,
+                'error': str(e),
+                'branches': []
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class ConfigureMetricsView(APIView):
     """
-    Configure metrics and filters for a collection plan
+    Configure metrics, filters, and branch for a collection plan
     """
     
     def post(self, request, plan_id):
@@ -102,6 +146,11 @@ class ConfigureMetricsView(APIView):
             'end_date': validated_data.get('end_date').isoformat() if validated_data.get('end_date') else None,
             'status': validated_data.get('status', []),
         }
+        
+        # Update branch if provided
+        if 'branch_name' in request.data:
+            collection_plan.branch_name = request.data['branch_name']
+        
         collection_plan.save()
         
         logger.info(f"Metrics configured for plan {plan_id}: {validated_data['selected_metrics']}")
@@ -137,6 +186,7 @@ class ValidateCollectionPlanView(APIView):
             'summary': {
                 'repository': collection_plan.repository_full_name,
                 'platform': collection_plan.platform,
+                'branch': collection_plan.branch_name or collection_plan.default_branch,
                 'metrics_count': len(collection_plan.selected_metrics),
                 'metrics': collection_plan.selected_metrics,
                 'filters': collection_plan.filters,
@@ -233,6 +283,35 @@ class CollectionPlanListView(APIView):
         serializer = CollectionPlanSerializer(plans, many=True)
         
         return Response(serializer.data)
+
+
+class CollectionHistoryView(APIView):
+    """
+    Get collection history for a specific repository
+    """
+    
+    def get(self, request, repository_id):
+        user_id = request.headers.get('X-User-ID')
+        if not user_id:
+            return Response(
+                {'error': 'User ID required'}, 
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+        
+        # Get all completed collections for this repository
+        collections = CollectionPlan.objects.filter(
+            user=int(user_id),
+            repository_id=repository_id,
+            status='completed'
+        ).order_by('-completed_at')
+        
+        serializer = CollectionPlanSerializer(collections, many=True)
+        
+        return Response({
+            'success': True,
+            'collections': serializer.data,
+            'total': collections.count()
+        })
 
 
 class CollectedDataView(APIView):
