@@ -56,7 +56,9 @@ const WorkspaceModal = ({ workspace, onClose }) => {
 
       if (response.data.success) {
         setTestResult("success");
-        setTestMessage(response.data.user_data?.login || "Connection successful!");
+        setTestMessage(
+          response.data.user_data?.login || "Connection successful!"
+        );
       }
     } catch (error) {
       setTestResult("error");
@@ -75,9 +77,16 @@ const WorkspaceModal = ({ workspace, onClose }) => {
       const workspaceData = {
         name: formData.name,
         description: formData.description,
-        platform: formData.platform,
-        token: formData.token,
       };
+
+      if (!isEditMode) {
+        workspaceData.platform = formData.platform;
+        workspaceData.token = formData.token;
+      } else {
+        if (formData.token && formData.token !== workspace.token) {
+          workspaceData.token = formData.token;
+        }
+      }
 
       if (formData.platform === "gitlab") {
         workspaceData.hosting_type = formData.hostingType;
@@ -88,11 +97,9 @@ const WorkspaceModal = ({ workspace, onClose }) => {
 
       let workspaceId;
       if (isEditMode) {
-        // Edit mode
         await workspaceService.update(workspace.id, workspaceData);
         setStep(4);
       } else {
-        // Create mode
         const response = await workspaceService.create(workspaceData);
         workspaceId = response.data.workspace.id;
         setCreatedWorkspaceId(workspaceId);
@@ -130,10 +137,7 @@ const WorkspaceModal = ({ workspace, onClose }) => {
       });
       setStep(4);
     } catch (error) {
-      alert(
-        error.response?.data?.message ||
-          "Error importing repositories"
-      );
+      alert(error.response?.data?.message || "Error importing repositories");
     } finally {
       setIsImporting(false);
     }
@@ -161,9 +165,13 @@ const WorkspaceModal = ({ workspace, onClose }) => {
         alert("Please fill in all required fields");
         return;
       }
-      setStep(2);
+      if (isEditMode) {
+        setStep(2);
+      } else {
+        setStep(2);
+      }
     } else if (step === 2) {
-      if (!formData.token) {
+      if (!isEditMode && !formData.token) {
         alert("Token is required");
         return;
       }
@@ -197,7 +205,9 @@ const WorkspaceModal = ({ workspace, onClose }) => {
         <div className="px-4 sm:px-6 py-4 sm:py-5 border-b border-gray-200 sticky top-0 bg-white z-10">
           <div className="flex justify-between items-center">
             <h2 className="text-lg sm:text-xl font-semibold text-gray-900">
-              {isEditMode ? "Edit Workspace" : (
+              {isEditMode ? (
+                "Edit Workspace"
+              ) : (
                 <>
                   {step === 1 && "Create a new workspace"}
                   {step === 2 && "Platform Configuration"}
@@ -283,17 +293,19 @@ const WorkspaceModal = ({ workspace, onClose }) => {
                 <div className="grid grid-cols-2 gap-3 sm:gap-4">
                   <button
                     onClick={() =>
+                      !isEditMode &&
                       setFormData({
                         ...formData,
                         platform: "gitlab",
                         hostingType: "gitlab.com",
                       })
                     }
+                    disabled={isEditMode}
                     className={`p-4 sm:p-6 border-2 rounded-lg flex flex-col items-center gap-2 sm:gap-3 transition-all ${
                       formData.platform === "gitlab"
                         ? "border-blue-600 bg-blue-50"
                         : "border-gray-300 hover:border-gray-400"
-                    }`}
+                    } ${isEditMode ? "opacity-60 cursor-not-allowed" : ""}`}
                   >
                     <svg
                       className="w-8 h-8 sm:w-10 sm:h-10"
@@ -302,18 +314,22 @@ const WorkspaceModal = ({ workspace, onClose }) => {
                     >
                       <path d="M22.65 14.39L12 22.13 1.35 14.39a.84.84 0 0 1-.3-.94l1.22-3.78 2.44-7.51A.42.42 0 0 1 4.82 2a.43.43 0 0 1 .58 0 .42.42 0 0 1 .11.18l2.44 7.49h8.1l2.44-7.51A.42.42 0 0 1 18.6 2a.43.43 0 0 1 .58 0 .42.42 0 0 1 .11.18l2.44 7.51L23 13.45a.84.84 0 0 1-.35.94z" />
                     </svg>
-                    <span className="font-medium text-sm sm:text-base">GitLab</span>
+                    <span className="font-medium text-sm sm:text-base">
+                      GitLab
+                    </span>
                   </button>
 
                   <button
                     onClick={() =>
+                      !isEditMode &&
                       setFormData({ ...formData, platform: "github" })
                     }
+                    disabled={isEditMode}
                     className={`p-4 sm:p-6 border-2 rounded-lg flex flex-col items-center gap-2 sm:gap-3 transition-all ${
                       formData.platform === "github"
                         ? "border-blue-600 bg-blue-50"
                         : "border-gray-300 hover:border-gray-400"
-                    }`}
+                    } ${isEditMode ? "opacity-60 cursor-not-allowed" : ""}`}
                   >
                     <svg
                       className="w-8 h-8 sm:w-10 sm:h-10"
@@ -322,7 +338,9 @@ const WorkspaceModal = ({ workspace, onClose }) => {
                     >
                       <path d="M12 2C6.477 2 2 6.477 2 12c0 4.42 2.865 8.17 6.839 9.49.5.092.682-.217.682-.482 0-.237-.008-.866-.013-1.7-2.782.603-3.369-1.34-3.369-1.34-.454-1.156-1.11-1.463-1.11-1.463-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.578 9.578 0 0112 6.836c.85.004 1.705.114 2.504.336 1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.203 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.743 0 .267.18.578.688.48C19.138 20.167 22 16.418 22 12c0-5.523-4.477-10-10-10z" />
                     </svg>
-                    <span className="font-medium text-sm sm:text-base">GitHub</span>
+                    <span className="font-medium text-sm sm:text-base">
+                      GitHub
+                    </span>
                   </button>
                 </div>
               </div>
@@ -375,8 +393,7 @@ const WorkspaceModal = ({ workspace, onClose }) => {
                 formData.hostingType === "self-hosted" && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      GitLab Server URL{" "}
-                      <span className="text-red-500">*</span>
+                      GitLab Server URL <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="url"
@@ -393,7 +410,7 @@ const WorkspaceModal = ({ workspace, onClose }) => {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Personal Access Token{" "}
-                  <span className="text-red-500">*</span>
+                  {!isEditMode && <span className="text-red-500">*</span>}
                 </label>
                 <input
                   type="password"
@@ -403,12 +420,18 @@ const WorkspaceModal = ({ workspace, onClose }) => {
                     setTestResult(null);
                   }}
                   placeholder={
-                    formData.platform === "github" ? "ghp_..." : "glpat-..."
+                    isEditMode
+                      ? "Leave empty to keep current token"
+                      : formData.platform === "github"
+                      ? "ghp_..."
+                      : "glpat-..."
                   }
                   className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
                 <p className="mt-2 text-xs sm:text-sm text-gray-500">
-                  {formData.platform === "github"
+                  {isEditMode
+                    ? "Only update if you want to change the token"
+                    : formData.platform === "github"
                     ? "GitHub → Settings → Developer settings → Personal access tokens"
                     : "GitLab → User Settings → Access Tokens (scopes : api, read_repository)"}
                 </p>
@@ -420,9 +443,7 @@ const WorkspaceModal = ({ workspace, onClose }) => {
                   disabled={isTestLoading || !formData.token}
                   className="w-full px-4 py-3 border-2 border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
-                  {isTestLoading
-                    ? "Test en cours..."
-                    : "Tester la connexion"}
+                  {isTestLoading ? "Test en cours..." : "Tester la connexion"}
                 </button>
               </div>
 
@@ -445,9 +466,7 @@ const WorkspaceModal = ({ workspace, onClose }) => {
                     <p className="font-medium text-green-900">
                       Connection successful!
                     </p>
-                    <p className="text-sm text-green-700 mt-1">
-                      {testMessage}
-                    </p>
+                    <p className="text-sm text-green-700 mt-1">{testMessage}</p>
                   </div>
                 </div>
               )}
@@ -471,9 +490,7 @@ const WorkspaceModal = ({ workspace, onClose }) => {
                     <p className="font-medium text-red-900">
                       Connection failed
                     </p>
-                    <p className="text-sm text-red-700 mt-1">
-                      {testMessage}
-                    </p>
+                    <p className="text-sm text-red-700 mt-1">{testMessage}</p>
                   </div>
                 </div>
               )}
@@ -600,22 +617,23 @@ const WorkspaceModal = ({ workspace, onClose }) => {
                 </svg>
               </div>
               <h3 className="text-xl sm:text-2xl font-semibold mb-3">
-                {isEditMode ? "Workspace updated!" : "Workspace created successfully!"}
+                {isEditMode
+                  ? "Workspace updated!"
+                  : "Workspace created successfully!"}
               </h3>
               <p className="text-sm sm:text-base text-gray-600 mb-4">
                 {isEditMode ? (
                   <>Changes have been saved.</>
                 ) : (
                   <>
-                    Your workspace <strong>"{formData.name}"</strong> is
-                    now available.
+                    Your workspace <strong>"{formData.name}"</strong> is now
+                    available.
                   </>
                 )}
               </p>
               {!isEditMode && selectedRepos.length > 0 && (
                 <p className="text-sm sm:text-base text-gray-600 mb-8">
-                  <strong>{selectedRepos.length}</strong> repository(s)
-                  imported
+                  <strong>{selectedRepos.length}</strong> repository(s) imported
                 </p>
               )}
             </div>
@@ -656,7 +674,9 @@ const WorkspaceModal = ({ workspace, onClose }) => {
               className="px-4 sm:px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
             >
               {step === 2 && isCreatingWorkspace
-                ? isEditMode ? "Updating..." : "Creating..."
+                ? isEditMode
+                  ? "Updating..."
+                  : "Creating..."
                 : "Next"}
             </button>
           )}

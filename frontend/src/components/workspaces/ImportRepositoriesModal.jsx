@@ -4,51 +4,73 @@ import { workspaceService } from "../../services/api";
 const ImportRepositoriesModal = ({ workspaceId, onClose }) => {
   const [remoteRepos, setRemoteRepos] = useState([]);
   const [selectedRepos, setSelectedRepos] = useState([]);
+  const [importedRepoIds, setImportedRepoIds] = useState([]);
   const [isLoadingRepos, setIsLoadingRepos] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [importComplete, setImportComplete] = useState(false);
 
   useEffect(() => {
-    loadRemoteRepositories();
+    loadData();
   }, [workspaceId]);
 
-  const loadRemoteRepositories = async () => {
+  const loadData = async () => {
     setIsLoadingRepos(true);
     try {
-      const response = await workspaceService.getRemoteRepositories(workspaceId);
-      setRemoteRepos(response.data.repositories || []);
+      const importedResponse = await workspaceService.getRepositories(
+        workspaceId
+      );
+      const importedRepos = importedResponse.data || [];
+      const importedIds = importedRepos.map((repo) => String(repo.external_id));
+      setImportedRepoIds(importedIds);
+
+      const remoteResponse = await workspaceService.getRemoteRepositories(
+        workspaceId
+      );
+      const allRepos = remoteResponse.data.repositories || [];
+      setRemoteRepos(allRepos);
+
+      setSelectedRepos(
+        allRepos
+          .filter((repo) => importedIds.includes(String(repo.id)))
+          .map((repo) => String(repo.id))
+      );
     } catch (error) {
-      console.error("Error loading remote repositories:", error);
-      alert("Error loading remote repositories");
+      console.error("Error loading repositories:", error);
+      alert("Error loading repositories");
     } finally {
       setIsLoadingRepos(false);
     }
   };
 
   const handleImportRepositories = async () => {
-    if (selectedRepos.length === 0) {
-      alert("Please select at least one repository");
+    const newReposToImport = selectedRepos.filter(
+      (repoId) => !importedRepoIds.includes(repoId)
+    );
+
+    if (newReposToImport.length === 0) {
+      alert("No new repositories to import");
       return;
     }
 
     setIsImporting(true);
     try {
       await workspaceService.importRepositories(workspaceId, {
-        repository_ids: selectedRepos,
+        repository_ids: newReposToImport,
       });
       setImportComplete(true);
     } catch (error) {
       console.error("Error importing repositories:", error);
-      alert(
-        error.response?.data?.message ||
-          "Error importing repositories"
-      );
+      alert(error.response?.data?.message || "Error importing repositories");
     } finally {
       setIsImporting(false);
     }
   };
 
   const toggleRepoSelection = (repoId) => {
+    if (importedRepoIds.includes(repoId)) {
+      return;
+    }
+
     setSelectedRepos((prev) =>
       prev.includes(repoId)
         ? prev.filter((id) => id !== repoId)
@@ -57,16 +79,31 @@ const ImportRepositoriesModal = ({ workspaceId, onClose }) => {
   };
 
   const toggleSelectAll = () => {
-    if (selectedRepos.length === remoteRepos.length) {
-      setSelectedRepos([]);
+    const selectableRepos = remoteRepos.filter(
+      (repo) => !importedRepoIds.includes(repo.id)
+    );
+    const selectableIds = selectableRepos.map((repo) => repo.id);
+
+    const allSelectableSelected = selectableIds.every((id) =>
+      selectedRepos.includes(id)
+    );
+
+    if (allSelectableSelected) {
+      setSelectedRepos(
+        selectedRepos.filter((id) => importedRepoIds.includes(id))
+      );
     } else {
-      setSelectedRepos(remoteRepos.map((repo) => repo.id));
+      setSelectedRepos([...importedRepoIds, ...selectableIds]);
     }
   };
 
   const handleClose = () => {
     onClose();
   };
+
+  const newSelectedCount = selectedRepos.filter(
+    (id) => !importedRepoIds.includes(id)
+  ).length;
 
   if (importComplete) {
     return (
@@ -92,7 +129,7 @@ const ImportRepositoriesModal = ({ workspaceId, onClose }) => {
               Import successful!
             </h3>
             <p className="text-sm sm:text-base text-gray-600 mb-6">
-              <strong>{selectedRepos.length}</strong> repository(s) imported
+              <strong>{newSelectedCount}</strong> repository(s) imported
               successfully
             </p>
             <button
@@ -118,6 +155,12 @@ const ImportRepositoriesModal = ({ workspaceId, onClose }) => {
               </h2>
               <p className="text-xs sm:text-sm text-gray-500 mt-1">
                 {selectedRepos.length} repository(s) selected
+                {importedRepoIds.length > 0 && (
+                  <span className="text-blue-600">
+                    {" "}
+                    ({importedRepoIds.length} already imported)
+                  </span>
+                )}
               </p>
             </div>
             <button
@@ -145,9 +188,7 @@ const ImportRepositoriesModal = ({ workspaceId, onClose }) => {
           {isLoadingRepos ? (
             <div className="text-center py-12">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-              <p className="text-gray-600 text-sm">
-                Loading repositories...
-              </p>
+              <p className="text-gray-600 text-sm">Loading repositories...</p>
             </div>
           ) : remoteRepos.length === 0 ? (
             <div className="text-center py-12 bg-gray-50 rounded-lg">
@@ -164,11 +205,9 @@ const ImportRepositoriesModal = ({ workspaceId, onClose }) => {
                   d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
                 />
               </svg>
-              <p className="text-gray-600">
-                No new repositories available
-              </p>
+              <p className="text-gray-600">No repositories available</p>
               <p className="text-sm text-gray-500 mt-2">
-                All repositories have already been imported
+                No repositories found to import
               </p>
             </div>
           ) : (
@@ -179,7 +218,9 @@ const ImportRepositoriesModal = ({ workspaceId, onClose }) => {
                     onClick={toggleSelectAll}
                     className="px-3 sm:px-4 py-2 text-xs sm:text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
                   >
-                    {selectedRepos.length === remoteRepos.length
+                    {remoteRepos
+                      .filter((r) => !importedRepoIds.includes(r.id))
+                      .every((r) => selectedRepos.includes(r.id))
                       ? "Deselect All"
                       : "Select All"}
                   </button>
@@ -187,54 +228,71 @@ const ImportRepositoriesModal = ({ workspaceId, onClose }) => {
               </div>
 
               <div className="space-y-3 max-h-[60vh] overflow-y-auto">
-                {remoteRepos.map((repo) => (
-                  <div
-                    key={repo.id}
-                    onClick={() => toggleRepoSelection(repo.id)}
-                    className={`p-3 sm:p-4 border-2 rounded-lg cursor-pointer transition-all ${
-                      selectedRepos.includes(repo.id)
-                        ? "border-blue-600 bg-blue-50"
-                        : "border-gray-200 hover:border-gray-300"
-                    }`}
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1 flex-wrap">
-                          <h4 className="font-semibold text-gray-900 text-sm sm:text-base truncate">
-                            {repo.name}
-                          </h4>
-                          {repo.private && (
-                            <span className="px-2 py-0.5 text-xs bg-yellow-100 text-yellow-800 rounded">
-                              Private
+                {remoteRepos.map((repo) => {
+                  const isImported = importedRepoIds.includes(String(repo.id));
+
+                  const isSelected = selectedRepos.includes(String(repo.id));
+                  return (
+                    <div
+                      key={repo.id}
+                      onClick={() => toggleRepoSelection(repo.id)}
+                      className={`p-3 sm:p-4 border-2 rounded-lg transition-all ${
+                        isImported
+                          ? "border-green-600 bg-green-50 cursor-not-allowed"
+                          : isSelected
+                          ? "border-blue-600 bg-blue-50 cursor-pointer"
+                          : "border-gray-200 hover:border-gray-300 cursor-pointer"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            <h4 className="font-semibold text-gray-900 text-sm sm:text-base truncate">
+                              {repo.name}
+                            </h4>
+                            {isImported && (
+                              <span className="px-2 py-0.5 text-xs bg-green-100 text-green-800 rounded font-medium">
+                                Already Imported
+                              </span>
+                            )}
+                            {repo.private && (
+                              <span className="px-2 py-0.5 text-xs bg-yellow-100 text-yellow-800 rounded">
+                                Private
+                              </span>
+                            )}
+                            {repo.language && (
+                              <span className="px-2 py-0.5 text-xs bg-gray-100 text-gray-700 rounded">
+                                {repo.language}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs sm:text-sm text-gray-500 mb-2">
+                            {repo.description || "Pas de description"}
+                          </p>
+                          <p className="text-xs text-gray-400">
+                            Default Branch:{" "}
+                            <span className="font-medium">
+                              {repo.default_branch}
                             </span>
-                          )}
-                          {repo.language && (
-                            <span className="px-2 py-0.5 text-xs bg-gray-100 text-gray-700 rounded">
-                              {repo.language}
-                            </span>
-                          )}
+                          </p>
                         </div>
-                        <p className="text-xs sm:text-sm text-gray-500 mb-2">
-                          {repo.description || "Pas de description"}
-                        </p>
-                        <p className="text-xs text-gray-400">
-                          Default Branch:{" "}
-                          <span className="font-medium">
-                            {repo.default_branch}
-                          </span>
-                        </p>
-                      </div>
-                      <div className="ml-4 flex-shrink-0">
-                        <input
-                          type="checkbox"
-                          checked={selectedRepos.includes(repo.id)}
-                          onChange={() => {}}
-                          className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500"
-                        />
+                        <div className="ml-4 flex-shrink-0">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            disabled={isImported}
+                            onChange={() => {}}
+                            className={`w-5 h-5 rounded focus:ring-blue-500 ${
+                              isImported
+                                ? "text-green-600 cursor-not-allowed"
+                                : "text-blue-600 cursor-pointer"
+                            }`}
+                          />
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
@@ -250,12 +308,12 @@ const ImportRepositoriesModal = ({ workspaceId, onClose }) => {
 
           <button
             onClick={handleImportRepositories}
-            disabled={isImporting || selectedRepos.length === 0}
+            disabled={isImporting || newSelectedCount === 0}
             className="px-4 sm:px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
           >
             {isImporting
               ? "Importing..."
-              : `Import ${selectedRepos.length > 0 ? `(${selectedRepos.length})` : ""}`}
+              : `Import ${newSelectedCount > 0 ? `(${newSelectedCount})` : ""}`}
           </button>
         </div>
       </div>

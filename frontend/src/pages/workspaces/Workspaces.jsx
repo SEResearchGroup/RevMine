@@ -31,7 +31,7 @@ const Workspaces = () => {
       const response = await workspaceService.getAll();
       setWorkspaces(response.data);
     } catch (error) {
-      console.error("Erreur lors du chargement des workspaces", error);
+      console.error("Error loading workspaces", error);
     } finally {
       setLoading(false);
     }

@@ -102,7 +102,7 @@ export const workspaceService = {
   },
 
   update: (id, data) => {
-    return workspaceApi.put(`/${id}/`, data);
+    return workspaceApi.patch(`/${id}/`, data);
   },
 
   delete: (id) => {
