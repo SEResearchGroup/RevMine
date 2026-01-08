@@ -55,7 +55,7 @@ function CollectionResults() {
 
   const handleCreateStructuredCSV = () => {
     navigate(
-      `/workspaces/${workspaceId}/repositories/${repositoryId}/collection/${planId}/cleaning`
+      `/workspaces/${workspaceId}/repositories/${repositoryId}/collection/${planId}/cleaned-data/new`
     );
   };
 

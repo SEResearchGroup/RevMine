@@ -3,6 +3,9 @@ import requests
 from django.http import JsonResponse, HttpResponse
 from django.conf import settings
 import logging
+from rest_framework_simplejwt.tokens import AccessToken
+
+
 
 from .token_utils import extract_token_from_header, validate_token, get_user_id_from_request
 from .service_clients import (
