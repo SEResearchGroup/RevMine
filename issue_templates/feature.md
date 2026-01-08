@@ -1,3 +1,11 @@
+---
+name: Issue
+about: Report a problem or propose an improvement
+title: ""
+labels: ["triage"]
+---
+
+
 ## Description
 <!-- What is the issue? Keep it short and concrete. -->
 
