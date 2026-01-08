@@ -1,6 +1,27 @@
 version: '3.8'
 
 services:
+
+  # Service de stockage d'objets MinIO
+  minio:
+      image: minio/minio:latest
+      container_name: minio
+      ports:
+        - "9000:9000"
+        - "9001:9001"
+      hostname: minio
+      env_file:
+        - ./backend/services/collection/.env
+      volumes:
+        - minio_data:/data
+      command: server /data --console-address ":9001"
+      healthcheck:
+        test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+        interval: 10s
+        timeout: 5s
+        retries: 5
+      networks:
+        - app-network
   # Base de données pour API Gateway
   gateway-db:
     image: postgres:15
@@ -150,6 +171,7 @@ volumes:
   gateway_postgres_data:
   configuration_postgres_data:
   collection_postgres_data:
+  minio_data:
 
 networks:
   app-network:

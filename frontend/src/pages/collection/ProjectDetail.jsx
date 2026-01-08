@@ -1,10 +1,12 @@
 /**
  * frontend/src/pages/collection/ProjectDetail.jsx
- * Updated with categorized metrics and category selection
+ * 
+ * FIXED: Collections are NO LONGER created automatically on page load.
+ * A collection is only created when the user explicitly clicks "Go to collect plan".
  */
 
-import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useState, useEffect, useRef } from "react";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import {
   Github,
   GitBranch,
@@ -19,6 +21,11 @@ import {
   Download,
   BarChart3,
   Trash2,
+  Eye,
+  AlertCircle,
+  AlertTriangle,
+  Play,
+  X,
 } from "lucide-react";
 import { workspaceService, collectionService } from "../../services/api";
 import CollectPlanModal from "../../components/collection/CollectPlanModal";
@@ -26,17 +33,21 @@ import CollectPlanModal from "../../components/collection/CollectPlanModal";
 function ProjectDetail() {
   const { workspaceId, repositoryId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [repository, setRepository] = useState(null);
   const [workspace, setWorkspace] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Collection plan
+  // Collection plan - only set when user explicitly creates one
   const [planId, setPlanId] = useState(null);
   const [platform, setPlatform] = useState("");
+  
+  // Active collection info (if one already exists)
+  const [activeCollection, setActiveCollection] = useState(null);
 
-  // Available metrics (categorized)
+  // Available metrics (categorized) - loaded WITHOUT creating a collection
   const [availableMetrics, setAvailableMetrics] = useState({});
 
   // Selected metrics (flat list of values)
@@ -47,7 +58,7 @@ function ProjectDetail() {
   // Expanded categories
   const [expandedCategories, setExpandedCategories] = useState({});
 
-  // Branches
+  // Branches - loaded WITHOUT creating a collection
   const [branches, setBranches] = useState([]);
   const [selectedBranch, setSelectedBranch] = useState("");
   const [showBranchDropdown, setShowBranchDropdown] = useState(false);
@@ -65,10 +76,75 @@ function ProjectDetail() {
   // Collection History
   const [collectionHistory, setCollectionHistory] = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
+  
+  // Delete confirmation modal
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [collectionToDelete, setCollectionToDelete] = useState(null);
+  const [deletingCollection, setDeletingCollection] = useState(false);
+
+  // Warning modal for incomplete collections
+  const [showIncompleteWarning, setShowIncompleteWarning] = useState(false);
+  const [incompleteCollections, setIncompleteCollections] = useState([]);
+
+  // Loading state for creating collection
+  const [creatingCollection, setCreatingCollection] = useState(false);
+
+  // Interrupted collection notification
+  const [interruptedNotifications, setInterruptedNotifications] = useState([]);
+  const [resumingCollection, setResumingCollection] = useState(null);
+
+  // Prevent duplicate data fetching
+  const dataFetchedRef = useRef(false);
+
+  // Load dismissed notifications from localStorage
+  const getDismissedNotifications = () => {
+    try {
+      const dismissed = localStorage.getItem(`dismissed_collection_warnings_${repositoryId}`);
+      return dismissed ? JSON.parse(dismissed) : [];
+    } catch {
+      return [];
+    }
+  };
+
+  const dismissNotification = (collectionId) => {
+    const dismissed = getDismissedNotifications();
+    if (!dismissed.includes(collectionId)) {
+      dismissed.push(collectionId);
+      localStorage.setItem(`dismissed_collection_warnings_${repositoryId}`, JSON.stringify(dismissed));
+    }
+    setInterruptedNotifications(prev => prev.filter(n => n.id !== collectionId));
+  };
+
+  // Check for interrupted collection from navigation state
+  useEffect(() => {
+    if (location.state?.interruptedCollection) {
+      const interruptedFromNav = location.state.interruptedCollection;
+      const dismissed = getDismissedNotifications();
+      
+      // Add to notifications if not dismissed
+      if (!dismissed.includes(interruptedFromNav.id)) {
+        setInterruptedNotifications(prev => {
+          // Avoid duplicates
+          if (prev.some(n => n.id === interruptedFromNav.id)) return prev;
+          return [...prev, interruptedFromNav];
+        });
+      }
+      
+      // Clear the state to prevent showing again on refresh
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state, repositoryId]);
 
   useEffect(() => {
-    fetchData();
-    fetchCollectionHistory();
+    if (!dataFetchedRef.current) {
+      dataFetchedRef.current = true;
+      fetchData();
+      fetchCollectionHistory();
+    }
+    
+    return () => {
+      dataFetchedRef.current = false;
+    };
   }, [workspaceId, repositoryId]);
 
   const fetchData = async () => {
@@ -83,6 +159,9 @@ function ProjectDetail() {
       const repo = reposRes.data.find((r) => r.id === parseInt(repositoryId));
       setRepository(repo);
       setPlatform(repo.platform);
+      
+      // After getting repository, load metrics and branches WITHOUT creating a collection
+      await loadMetricsAndBranches(repo.platform);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -90,11 +169,88 @@ function ProjectDetail() {
     }
   };
 
+  /**
+   * Load available metrics and branches WITHOUT creating a collection.
+   * This is the key fix - we no longer call startCollection() on page load.
+   */
+  const loadMetricsAndBranches = async (repoPlatform) => {
+    try {
+      // Get available metrics (does NOT create a collection)
+      const metricsRes = await collectionService.getAvailableMetrics(
+        repositoryId,
+        repoPlatform
+      );
+      
+      setAvailableMetrics(metricsRes.data.available_metrics);
+      
+      // If there's already an active collection, restore its settings
+      if (metricsRes.data.has_active_collection && metricsRes.data.active_collection) {
+        const existingCollection = metricsRes.data.active_collection;
+        setActiveCollection(existingCollection);
+        setPlanId(existingCollection.id);
+        
+        // Restore selected metrics if any
+        if (existingCollection.selected_metrics?.length > 0) {
+          setSelectedMetrics(existingCollection.selected_metrics);
+        }
+        
+        // Restore filters
+        const existingFilters = existingCollection.filters || {};
+        if (existingFilters.start_date) setStartDate(existingFilters.start_date);
+        if (existingFilters.end_date) setEndDate(existingFilters.end_date);
+        if (existingFilters.status?.length > 0) setSelectedStatus(existingFilters.status);
+        
+        // Restore branch
+        if (existingCollection.branch_name) {
+          setSelectedBranch(existingCollection.branch_name);
+        }
+      }
+
+      // Expand all categories by default
+      const allCategories = {};
+      Object.keys(metricsRes.data.available_metrics).forEach((category) => {
+        allCategories[category] = true;
+      });
+      setExpandedCategories(allCategories);
+
+      // Fetch branches (does NOT create a collection)
+      await fetchBranches();
+    } catch (err) {
+      console.error("Error loading metrics and branches:", err);
+      // Non-fatal error - page can still work
+    }
+  };
+
   const fetchCollectionHistory = async () => {
     try {
       setLoadingHistory(true);
       const res = await collectionService.getHistory(repositoryId);
-      setCollectionHistory(res.data.collections || []);
+      const collections = res.data.collections || [];
+      setCollectionHistory(collections);
+      
+      // Load incomplete collections as notifications (paused, failed, in_progress)
+      const dismissed = getDismissedNotifications();
+      const incompleteCollections = collections.filter(
+        c => ['paused', 'failed', 'in_progress'].includes(c.status) && !dismissed.includes(c.id)
+      );
+      
+      // Add to notifications without duplicates
+      setInterruptedNotifications(prev => {
+        const existingIds = new Set(prev.map(n => n.id));
+        const newNotifications = incompleteCollections
+          .filter(c => !existingIds.has(c.id))
+          .map(c => ({
+            id: c.id,
+            collected_items: c.collected_items,
+            total_items: c.total_items,
+            progress_percentage: c.progress_percentage || Math.round((c.collected_items / c.total_items) * 100) || 0,
+            last_collected_item: c.last_collected_item_id,
+            can_resume: c.can_resume,
+            status: c.status,
+            error_message: c.error_message
+          }));
+        return [...prev, ...newNotifications];
+      });
     } catch (err) {
       console.error("Error fetching history:", err);
     } finally {
@@ -102,44 +258,23 @@ function ProjectDetail() {
     }
   };
 
-  const initializeCollection = async () => {
+  /**
+   * Fetch branches WITHOUT creating a collection.
+   * Uses the new endpoint that only needs workspace/repository IDs.
+   */
+  const fetchBranches = async () => {
     try {
-      // Create collection plan
-      const startRes = await collectionService.startCollection(
+      setLoadingBranches(true);
+      const res = await collectionService.getBranchesForRepository(
         workspaceId,
         repositoryId
       );
-
-      setPlanId(startRes.data.collection_plan.id);
-      setAvailableMetrics(startRes.data.available_metrics);
-      setPlatform(startRes.data.platform);
-
-      // Expand all categories by default
-      const allCategories = {};
-      Object.keys(startRes.data.available_metrics).forEach((category) => {
-        allCategories[category] = true;
-      });
-      setExpandedCategories(allCategories);
-
-      // Fetch branches
-      await fetchBranches(startRes.data.collection_plan.id);
-    } catch (err) {
-      setError("Error initializing collection: " + err.message);
-    }
-  };
-
-  useEffect(() => {
-    if (repository) {
-      initializeCollection();
-    }
-  }, [repository]);
-
-  const fetchBranches = async (planIdParam) => {
-    try {
-      setLoadingBranches(true);
-      const res = await collectionService.getBranches(planIdParam);
       setBranches(res.data.branches || []);
-      setSelectedBranch(res.data.default_branch || "");
+      
+      // Only set default branch if not already set (from active collection)
+      if (!selectedBranch) {
+        setSelectedBranch(res.data.default_branch || "");
+      }
     } catch (err) {
       console.error("Error fetching branches:", err);
     } finally {
@@ -242,6 +377,10 @@ function ProjectDetail() {
     );
   }, [selectedMetrics, availableMetrics]);
 
+  /**
+   * Handle "Go to collect plan" button click.
+   * Check for incomplete collections first, then create if confirmed.
+   */
   const handleGoToPlan = async () => {
     if (selectedMetrics.length === 0) {
       alert("Please select at least one metric");
@@ -253,9 +392,42 @@ function ProjectDetail() {
       return;
     }
 
+    // Check for incomplete collections
+    const incomplete = collectionHistory.filter(
+      c => ['paused', 'failed', 'in_progress'].includes(c.status)
+    );
+
+    if (incomplete.length > 0) {
+      setIncompleteCollections(incomplete);
+      setShowIncompleteWarning(true);
+      return;
+    }
+
+    // No incomplete collections, proceed directly
+    await proceedWithNewCollection();
+  };
+
+  /**
+   * Actually create the new collection after confirmation
+   */
+  const proceedWithNewCollection = async () => {
+    setShowIncompleteWarning(false);
+    setCreatingCollection(true);
+
     try {
-      // Configure metrics
-      await collectionService.configureMetrics(planId, {
+      // Always call startCollection - it will either:
+      // 1. Return the existing active collection if it's still valid
+      // 2. Mark stale collections as paused and create a new one
+      // 3. Create a new collection if none exists
+      const startRes = await collectionService.startCollection(
+        workspaceId,
+        repositoryId
+      );
+      const currentPlanId = startRes.data.collection_plan.id;
+      setPlanId(currentPlanId);
+
+      // Configure metrics on the collection
+      await collectionService.configureMetrics(currentPlanId, {
         selected_metrics: selectedMetrics,
         start_date: startDate || null,
         end_date: endDate || null,
@@ -263,12 +435,14 @@ function ProjectDetail() {
         branch_name: selectedBranch,
       });
 
-      // Get validation
-      const validateRes = await collectionService.validatePlan(planId);
+      // Get validation summary
+      const validateRes = await collectionService.validatePlan(currentPlanId);
       setCollectionPlan(validateRes.data);
       setShowPlanModal(true);
     } catch (err) {
       alert("Error creating collection plan: " + err.message);
+    } finally {
+      setCreatingCollection(false);
     }
   };
 
@@ -284,6 +458,104 @@ function ProjectDetail() {
     } catch (err) {
       alert("Error starting collection: " + err.message);
     }
+  };
+
+  const handleDownloadJSON = async (collectionId) => {
+    try {
+      const response = await collectionService.downloadCollectionJSON(collectionId);
+      const blob = new Blob([response.data], { type: 'application/json' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `collection_${collectionId}_data.json`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (err) {
+      alert("Error downloading data: " + err.message);
+    }
+  };
+
+  const handleDeleteCollection = (collection) => {
+    setCollectionToDelete(collection);
+    setShowDeleteModal(true);
+  };
+
+  const confirmDeleteCollection = async () => {
+    if (!collectionToDelete) return;
+
+    setDeletingCollection(true);
+    try {
+      await collectionService.deleteCollection(collectionToDelete.id);
+      // Refresh history
+      await fetchCollectionHistory();
+      setShowDeleteModal(false);
+      setCollectionToDelete(null);
+    } catch (err) {
+      alert("Error deleting collection: " + err.message);
+    } finally {
+      setDeletingCollection(false);
+    }
+  };
+
+  const handleViewCollection = (collectionId) => {
+    navigate(`/workspaces/${workspaceId}/repositories/${repositoryId}/collection/${collectionId}`);
+  };
+
+  // Resume interrupted collection
+  const handleResumeCollection = async (collectionId) => {
+    try {
+      setResumingCollection(collectionId);
+      await collectionService.resumeCollection(collectionId);
+      // Navigate to progress page
+      navigate(
+        `/workspaces/${workspaceId}/repositories/${repositoryId}/collection/${collectionId}/progress`,
+        { state: { resume: true } }
+      );
+    } catch (err) {
+      alert("Error resuming collection: " + err.message);
+    } finally {
+      setResumingCollection(null);
+    }
+  };
+
+  // Resume from notification toast
+  const handleResumeFromNotification = (collectionId) => {
+    handleResumeCollection(collectionId);
+    // Remove notification after resuming
+    setInterruptedNotifications(prev => prev.filter(n => n.id !== collectionId));
+    // Also remove from dismissed so it doesn't reappear
+    const dismissed = getDismissedNotifications();
+    if (!dismissed.includes(collectionId)) {
+      dismissed.push(collectionId);
+      localStorage.setItem(`dismissed_collection_warnings_${repositoryId}`, JSON.stringify(dismissed));
+    }
+  };
+
+  const formatCollectionDate = (collection) => {
+    const startDate = collection.filters?.start_date;
+    const endDate = collection.filters?.end_date;
+    
+    if (startDate && endDate) {
+      return `${new Date(startDate).toLocaleDateString()} → ${new Date(endDate).toLocaleDateString()}`;
+    } else if (startDate) {
+      return `From ${new Date(startDate).toLocaleDateString()}`;
+    } else if (endDate) {
+      return `Until ${new Date(endDate).toLocaleDateString()}`;
+    }
+    return "All data";
+  };
+
+  const formatCollectionProgress = (collection) => {
+    if (collection.status === 'completed') {
+      return "100%";
+    } else if (collection.status === 'paused' || collection.status === 'failed' || collection.status === 'in_progress') {
+      if (collection.total_items > 0) {
+        return `${collection.collected_items} / ${collection.total_items}`;
+      }
+    }
+    return "-";
   };
 
   if (loading) {
@@ -382,10 +654,13 @@ function ProjectDetail() {
                 <thead>
                   <tr className="border-b border-gray-200">
                     <th className="text-left py-3 px-4 font-medium text-gray-700">
-                      ID
+                      Date & Time
                     </th>
                     <th className="text-left py-3 px-4 font-medium text-gray-700">
-                      Date
+                      Data Range
+                    </th>
+                    <th className="text-left py-3 px-4 font-medium text-gray-700">
+                      Progress
                     </th>
                     <th className="text-left py-3 px-4 font-medium text-gray-700">
                       {platform === "github" ? "Pull Requests" : "Merge Requests"}
@@ -396,53 +671,100 @@ function ProjectDetail() {
                     <th className="text-left py-3 px-4 font-medium text-gray-700">
                       Comments
                     </th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-700">
+                    <th className="text-left py-3 px-4 font-medium text-gray-700 text-center">
                       Actions
                     </th>
                   </tr>
                 </thead>
                 <tbody>
                   {collectionHistory.map((collection) => (
-                    <tr key={collection.id} className="border-b border-gray-100">
-                      <td className="py-3 px-4 text-gray-900">#{collection.id}</td>
+                    <tr key={collection.id} className="border-b border-gray-100 hover:bg-gray-50">
                       <td className="py-3 px-4 text-gray-600">
-                        {new Date(collection.completed_at).toLocaleDateString()}
+                        <div className="text-sm">
+                          {collection.completed_at ? (
+                            <>
+                              <div>{new Date(collection.completed_at).toLocaleDateString()}</div>
+                              <div className="text-xs text-gray-500">
+                                {new Date(collection.completed_at).toLocaleTimeString([], {
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                })}
+                              </div>
+                            </>
+                          ) : ['in_progress', 'paused', 'failed'].includes(collection.status) ? (
+                            <span className="inline-flex items-center gap-1 text-red-600">
+                              <AlertCircle className="w-3 h-3" />
+                              Interrupted
+                            </span>
+                          ) : (
+                            <span className="text-blue-600">In Progress</span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="py-3 px-4 text-gray-600 text-sm">
+                        {formatCollectionDate(collection)}
+                      </td>
+                      <td className="py-3 px-4 text-gray-900 font-medium">
+                        {formatCollectionProgress(collection)}
                       </td>
                       <td className="py-3 px-4 text-gray-900">
                         {collection.stats.pull_requests_count ||
                           collection.stats.merge_requests_count ||
+                          collection.collected_items ||
                           0}
                       </td>
                       <td className="py-3 px-4 text-gray-900">
-                        {collection.stats.commits_count || 0}
+                        {collection.stats.commits_count || '-'}
                       </td>
                       <td className="py-3 px-4 text-gray-900">
                         {collection.stats.comments_count ||
                           collection.stats.notes_count ||
-                          0}
+                          '-'}
                       </td>
                       <td className="py-3 px-4">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center justify-center gap-2">
+                          {/* Resume button for paused/failed collections */}
+                          {collection.can_resume && (
+                            <button
+                              onClick={() => handleResumeCollection(collection.id)}
+                              disabled={resumingCollection === collection.id}
+                              className="p-2 text-yellow-600 hover:bg-yellow-50 rounded-lg transition-colors disabled:opacity-50"
+                              title="Continue collection"
+                            >
+                              {resumingCollection === collection.id ? (
+                                <div className="w-4 h-4 border-2 border-yellow-600 border-t-transparent rounded-full animate-spin" />
+                              ) : (
+                                <Play className="w-4 h-4" />
+                              )}
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleDownloadJSON(collection.id)}
+                            className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                            title="Download raw data (JSON)"
+                          >
+                            <Download className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleViewCollection(collection.id)}
+                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                            title="View details"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
                           <button
                             disabled
-                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                             title="Analyze (Coming soon)"
                           >
                             <BarChart3 className="w-4 h-4" />
                           </button>
                           <button
-                            disabled
-                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
-                            title="Clean (Coming soon)"
+                            onClick={() => handleDeleteCollection(collection)}
+                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Delete collection"
                           >
                             <Trash2 className="w-4 h-4" />
-                          </button>
-                          <button
-                            disabled
-                            className="p-2 text-green-600 hover:bg-green-50 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
-                            title="Download (Coming soon)"
-                          >
-                            <Download className="w-4 h-4" />
                           </button>
                         </div>
                       </td>
@@ -452,7 +774,7 @@ function ProjectDetail() {
               </table>
             </div>
 
-            <p className="text-sm text-gray-900 mt-4">
+            <p className="text-sm text-gray-600 mt-4">
               <strong>Note:</strong> These are previous collection instances of{" "}
               {repository.name} project
             </p>
@@ -461,7 +783,9 @@ function ProjectDetail() {
 
         {/* Configure Data Collection */}
         <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
-          <h2 className="text-xl font-semibold mb-6">Configure data collection</h2>
+          <h2 className="text-xl font-semibold mb-6">
+            {collectionHistory.length > 0 ? 'Configure a New Collection' : 'Configure Collection'}
+          </h2>
 
           {/* Branch Selection */}
           <div className="mb-8">
@@ -536,59 +860,75 @@ function ProjectDetail() {
 
             {/* Metrics by Category */}
             <div className="space-y-2 max-h-96 overflow-y-auto border border-gray-200 rounded-lg p-4">
-              {Object.entries(availableMetrics).map(([category, metrics]) => (
-                <div key={category} className="border border-gray-200 rounded-lg">
-                  {/* Category Header */}
-                  <div className="bg-gray-50 px-4 py-3 flex items-center justify-between">
-                    <div className="flex items-center gap-3 flex-1">
-                      <button
-                        onClick={() => toggleCategoryExpansion(category)}
-                        className="text-gray-600 hover:text-gray-900"
-                      >
-                        {expandedCategories[category] ? (
-                          <ChevronDown className="w-5 h-5" />
-                        ) : (
-                          <ChevronRight className="w-5 h-5" />
-                        )}
-                      </button>
-                      <label className="flex items-center gap-3 cursor-pointer flex-1">
-                        <input
-                          type="checkbox"
-                          checked={isCategorySelected(category)}
-                          onChange={() => toggleCategory(category)}
-                          className="w-5 h-5 text-blue-600"
-                        />
-                        <span className="font-medium text-gray-900">
-                          {category}
-                        </span>
-                      </label>
-                    </div>
-                    <span className="text-sm text-gray-500">
-                      {metrics.length} metrics
-                    </span>
-                  </div>
+              {Object.entries(availableMetrics)
+                .map(([category, metrics]) => {
+                  // Filter metrics based on search
+                  const filteredMetrics = searchMetric
+                    ? metrics.filter(
+                        (metric) =>
+                          metric.label.toLowerCase().includes(searchMetric.toLowerCase()) ||
+                          metric.value.toLowerCase().includes(searchMetric.toLowerCase())
+                      )
+                    : metrics;
 
-                  {/* Category Metrics */}
-                  {expandedCategories[category] && (
-                    <div className="p-2">
-                      {metrics.map((metric) => (
-                        <label
-                          key={metric.value}
-                          className="flex items-center gap-3 p-3 hover:bg-gray-50 rounded-lg cursor-pointer"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={selectedMetrics.includes(metric.value)}
-                            onChange={() => toggleMetric(metric.value)}
-                            className="w-5 h-5 text-blue-600"
-                          />
-                          <span className="text-gray-700">{metric.label}</span>
-                        </label>
-                      ))}
+                  // Skip category if no metrics match
+                  if (filteredMetrics.length === 0) return null;
+
+                  return (
+                    <div key={category} className="border border-gray-200 rounded-lg">
+                      {/* Category Header */}
+                      <div className="bg-gray-50 px-4 py-3 flex items-center justify-between">
+                        <div className="flex items-center gap-3 flex-1">
+                          <button
+                            onClick={() => toggleCategoryExpansion(category)}
+                            className="text-gray-600 hover:text-gray-900"
+                          >
+                            {expandedCategories[category] ? (
+                              <ChevronDown className="w-5 h-5" />
+                            ) : (
+                              <ChevronRight className="w-5 h-5" />
+                            )}
+                          </button>
+                          <label className="flex items-center gap-3 cursor-pointer flex-1">
+                            <input
+                              type="checkbox"
+                              checked={isCategorySelected(category)}
+                              onChange={() => toggleCategory(category)}
+                              className="w-5 h-5 text-blue-600"
+                            />
+                            <span className="font-medium text-gray-900">
+                              {category}
+                            </span>
+                          </label>
+                        </div>
+                        <span className="text-sm text-gray-500">
+                          {filteredMetrics.length} metric{filteredMetrics.length !== 1 ? "s" : ""}
+                        </span>
+                      </div>
+
+                      {/* Category Metrics */}
+                      {expandedCategories[category] && (
+                        <div className="p-2">
+                          {filteredMetrics.map((metric) => (
+                            <label
+                              key={metric.value}
+                              className="flex items-center gap-3 p-3 hover:bg-gray-50 rounded-lg cursor-pointer"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={selectedMetrics.includes(metric.value)}
+                                onChange={() => toggleMetric(metric.value)}
+                                className="w-5 h-5 text-blue-600"
+                              />
+                              <span className="text-gray-700">{metric.label}</span>
+                            </label>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-              ))}
+                  );
+                })
+                .filter(Boolean)}
             </div>
 
             <p className="text-sm text-gray-500 mt-2">
@@ -650,10 +990,10 @@ function ProjectDetail() {
           {/* Go to Collect Plan button */}
           <button
             onClick={handleGoToPlan}
-            disabled={selectedMetrics.length === 0 || !selectedBranch}
+            disabled={selectedMetrics.length === 0 || !selectedBranch || creatingCollection}
             className="mt-8 w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
           >
-            Go to collect plan →
+            {creatingCollection ? "Creating collection plan..." : "Go to collect plan →"}
           </button>
         </div>
       </div>
@@ -666,6 +1006,187 @@ function ProjectDetail() {
           onClose={() => setShowPlanModal(false)}
           onStartCollection={handleStartCollection}
         />
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && collectionToDelete && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full mx-4 p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
+                <AlertCircle className="w-6 h-6 text-red-600" />
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900">
+                Delete Collection?
+              </h3>
+            </div>
+            
+            <div className="mb-6">
+              <p className="text-gray-600 mb-3">
+                Are you sure you want to delete this collection?
+              </p>
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                <p className="text-sm text-red-800">
+                  <strong>Warning:</strong> This action cannot be undone. All collected data, 
+                  cleaning operations, and created files will be permanently deleted.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowDeleteModal(false);
+                  setCollectionToDelete(null);
+                }}
+                disabled={deletingCollection}
+                className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDeleteCollection}
+                disabled={deletingCollection}
+                className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
+              >
+                {deletingCollection ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Incomplete Collections Warning Modal */}
+      {showIncompleteWarning && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full mx-4 p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center">
+                <AlertTriangle className="w-6 h-6 text-yellow-600" />
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900">
+                Incomplete Collections Found
+              </h3>
+            </div>
+            
+            <div className="mb-6">
+              <p className="text-gray-600 mb-4">
+                You have <strong>{incompleteCollections.length}</strong> incomplete collection{incompleteCollections.length > 1 ? 's' : ''} for this project. 
+                Do you want to continue one of them or create a new collection?
+              </p>
+              
+              {/* List of incomplete collections */}
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 max-h-48 overflow-y-auto">
+                {incompleteCollections.map((collection) => (
+                  <div key={collection.id} className="flex items-center justify-between py-2 border-b border-gray-200 last:border-0">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-gray-900">
+                          Collection #{collection.id}
+                        </span>
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-red-100 text-red-700">
+                          <AlertCircle className="w-3 h-3" />
+                          Interrupted
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        Progress: {collection.collected_items} / {collection.total_items} {platform === 'github' ? 'PRs' : 'MRs'}
+                        {collection.total_items > 0 && ` (${Math.round((collection.collected_items / collection.total_items) * 100)}%)`}
+                      </p>
+                    </div>
+                    {collection.can_resume && (
+                      <button
+                        onClick={() => {
+                          setShowIncompleteWarning(false);
+                          handleResumeCollection(collection.id);
+                        }}
+                        className="px-3 py-1.5 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                      >
+                        Continue
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowIncompleteWarning(false)}
+                className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={proceedWithNewCollection}
+                className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Create New Collection
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Interrupted Collection Notification Toasts */}
+      {interruptedNotifications.length > 0 && (
+        <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-3">
+          {interruptedNotifications.map((notification) => (
+            <div key={notification.id} className="animate-slide-up">
+              <div className="bg-white rounded-xl shadow-2xl border border-red-200 p-4 max-w-sm">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 bg-red-100">
+                    <AlertCircle className="w-5 h-5 text-red-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <h4 className="font-semibold text-gray-900 text-sm">
+                        Collection Interrupted
+                      </h4>
+                      <button
+                        onClick={() => dismissNotification(notification.id)}
+                        className="text-gray-400 hover:text-gray-600"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Collection #{notification.id}
+                    </p>
+                    <p className="text-xs text-gray-600 mt-1">
+                      Progress: {notification.collected_items} / {notification.total_items}{" "}
+                      {platform === "github" ? "PRs" : "MRs"} ({notification.progress_percentage}%)
+                    </p>
+                    {notification.error_message && (
+                      <p className="text-xs text-red-600 mt-1 truncate" title={notification.error_message}>
+                        {notification.error_message}
+                      </p>
+                    )}
+                    {notification.can_resume && (
+                      <button
+                        onClick={() => handleResumeFromNotification(notification.id)}
+                        disabled={resumingCollection === notification.id}
+                        className="mt-3 w-full flex items-center justify-center gap-2 px-3 py-2 text-white text-sm rounded-lg transition-colors disabled:opacity-50 bg-red-600 hover:bg-red-700"
+                      >
+                        {resumingCollection === notification.id ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            Resuming...
+                          </>
+                        ) : (
+                          <>
+                            <Play className="w-4 h-4" />
+                            Continue Collection
+                          </>
+                        )}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );

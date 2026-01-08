@@ -6,9 +6,7 @@ logger = logging.getLogger(__name__)
 
 
 class GitHubCollector:
-    """
-    Collects data from GitHub API based on PR_Extraction.py script
-    """
+    """Collects data from GitHub API with resume capability"""
     
     def __init__(self, token, repo_full_name, branch_name=None):
         self.token = token
@@ -20,22 +18,30 @@ class GitHubCollector:
             'Accept': 'application/vnd.github.v3+json'
         }
     
-    def collect_all_data(self, filters=None, progress_callback=None):
+    def collect_all_data(self, filters=None, progress_callback=None, resume_from=None, existing_data=None):
         """
-        Collect all pull request data with progress updates
+        Collect all pull request data with progress updates and resume support
         
         Args:
             filters (dict): Date and status filters
-            progress_callback (callable): Function to call with progress updates
+            progress_callback (callable): Function to call with progress updates (current, total, message, item_data)
+            resume_from (str): PR number to resume from (if resuming)
+            existing_data (dict): Existing collected data (if resuming)
         
         Returns:
             dict: All collected data organized by type
         """
-        all_data = {
-            'pull_requests': []
-        }
+        if existing_data:
+            all_data = existing_data
+        else:
+            all_data = {'pull_requests': []}
         
         try:
+            # Get collected PR numbers to skip
+            collected_prs = set()
+            if existing_data:
+                collected_prs = {pr['pull_request_number'] for pr in existing_data.get('pull_requests', [])}
+            
             # First pass: Collect all PRs to get accurate count
             logger.info("Collecting PRs...")
             all_prs = []
@@ -51,19 +57,22 @@ class GitHubCollector:
                 all_prs.extend(prs)
                 page += 1
                 
-                # Limit to 10 pages for now (300 PRs)
                 if page > 10:
                     break
             
-            # Now we have the accurate count
-            total_prs = len(all_prs)
-            logger.info(f"Total PRs to process: {total_prs}")
+            # Filter out already collected PRs
+            if resume_from:
+                resume_pr_num = int(resume_from)
+                all_prs = [pr for pr in all_prs if pr['number'] not in collected_prs]
+            
+            total_prs = len(all_prs) + len(collected_prs)
+            logger.info(f"Total PRs to process: {len(all_prs)} (already collected: {len(collected_prs)})")
             
             if progress_callback:
-                progress_callback(0, total_prs, "Starting collection...")
+                progress_callback(len(collected_prs), total_prs, "Starting collection...")
             
             # Process each PR
-            collected_count = 0
+            collected_count = len(collected_prs)
             
             for pr in all_prs:
                 pr_data = self._process_pull_request(pr['number'])
@@ -71,12 +80,13 @@ class GitHubCollector:
                     all_data['pull_requests'].append(pr_data)
                     collected_count += 1
                     
-                    # Update progress
+                    # Update progress with item data for incremental saving
                     if progress_callback:
                         progress_callback(
                             collected_count, 
                             total_prs,
-                            f"Collected PR #{pr['number']}"
+                            f"Collected PR #{pr['number']}",
+                            pr_data
                         )
             
             logger.info(f"Collection completed: {collected_count} PRs")
@@ -103,35 +113,45 @@ class GitHubCollector:
                 timeout=30
             )
             
+            if response.status_code == 401:
+                raise Exception("GitHub token invalid or expired. Please update the token in workspace settings.")
+            
+            if response.status_code == 404:
+                raise Exception(f"Repository not found: {self.repo_full_name}")
+            
             if response.status_code != 200:
-                logger.error(f"Error fetching PRs: {response.status_code}")
-                return []
+                raise Exception(f"GitHub API error: {response.status_code}")
             
             return response.json()
             
-        except Exception as e:
-            logger.error(f"Error fetching PR page: {e}")
-            return []
+        except requests.exceptions.ConnectionError as e:
+            logger.error(f"Network connection error: {e}")
+            raise Exception(f"Network connection lost while fetching PRs: {str(e)}")
+        except requests.exceptions.Timeout as e:
+            logger.error(f"Request timeout: {e}")
+            raise Exception(f"Request timeout while fetching PRs: {str(e)}")
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Network error fetching PR page: {e}")
+            raise Exception(f"Network error connecting to GitHub: {str(e)}")
     
     def _process_pull_request(self, pr_number):
-        """
-        Process a single pull request (like in PR_Extraction.py)
-        """
+        """Process a single pull request - raises exception on network errors"""
         try:
-            # Get PR details
             pr_response = requests.get(
                 f"{self.base_url}/repos/{self.repo_full_name}/pulls/{pr_number}",
                 headers=self.headers,
                 timeout=30
             )
             
+            if pr_response.status_code == 401:
+                raise Exception("GitHub token invalid or expired.")
+            
             if pr_response.status_code != 200:
                 logger.warning(f"Failed to fetch PR #{pr_number}: {pr_response.status_code}")
-                return None
+                raise Exception(f"Failed to fetch PR #{pr_number}: HTTP {pr_response.status_code}")
             
             pr_details = pr_response.json()
             
-            # Organize PR data
             organized_pr = {
                 'pull_request_number': pr_number,
                 'details': pr_details,
@@ -154,17 +174,17 @@ class GitHubCollector:
                 if commits_response.status_code == 200:
                     commits = commits_response.json()
                     for commit in commits:
-                        # Get commit details
                         commit_detail = self._get_commit_details(commit['sha'])
                         organized_pr['commits'].append({
                             'commit_sha': commit['sha'],
                             'details': commit,
                             'changes': commit_detail.get('files', []) if commit_detail else []
                         })
-            except Exception as e:
-                logger.warning(f"Error fetching commits for PR #{pr_number}: {e}")
+            except requests.exceptions.RequestException as e:
+                logger.error(f"Network error fetching commits for PR #{pr_number}: {e}")
+                raise Exception(f"Network error fetching commits for PR #{pr_number}: {str(e)}")
             
-            # Get comments (issue comments)
+            # Get comments
             try:
                 comments_response = requests.get(
                     f"{self.base_url}/repos/{self.repo_full_name}/issues/{pr_number}/comments",
@@ -174,8 +194,9 @@ class GitHubCollector:
                 
                 if comments_response.status_code == 200:
                     organized_pr['comments'] = comments_response.json()
-            except Exception as e:
-                logger.warning(f"Error fetching comments for PR #{pr_number}: {e}")
+            except requests.exceptions.RequestException as e:
+                logger.error(f"Network error fetching comments for PR #{pr_number}: {e}")
+                raise Exception(f"Network error fetching comments for PR #{pr_number}: {str(e)}")
             
             # Get reviews
             try:
@@ -187,8 +208,9 @@ class GitHubCollector:
                 
                 if reviews_response.status_code == 200:
                     organized_pr['reviews'] = reviews_response.json()
-            except Exception as e:
-                logger.warning(f"Error fetching reviews for PR #{pr_number}: {e}")
+            except requests.exceptions.RequestException as e:
+                logger.error(f"Network error fetching reviews for PR #{pr_number}: {e}")
+                raise Exception(f"Network error fetching reviews for PR #{pr_number}: {str(e)}")
             
             # Get review comments
             try:
@@ -200,8 +222,9 @@ class GitHubCollector:
                 
                 if review_comments_response.status_code == 200:
                     organized_pr['review_comments'] = review_comments_response.json()
-            except Exception as e:
-                logger.warning(f"Error fetching review comments for PR #{pr_number}: {e}")
+            except requests.exceptions.RequestException as e:
+                logger.error(f"Network error fetching review comments for PR #{pr_number}: {e}")
+                raise Exception(f"Network error fetching review comments for PR #{pr_number}: {str(e)}")
             
             # Get files changed
             try:
@@ -213,14 +236,21 @@ class GitHubCollector:
                 
                 if files_response.status_code == 200:
                     organized_pr['files'] = files_response.json()
-            except Exception as e:
-                logger.warning(f"Error fetching files for PR #{pr_number}: {e}")
+            except requests.exceptions.RequestException as e:
+                logger.error(f"Network error fetching files for PR #{pr_number}: {e}")
+                raise Exception(f"Network error fetching files for PR #{pr_number}: {str(e)}")
             
             return organized_pr
             
-        except Exception as e:
-            logger.error(f"Error processing PR {pr_number}: {e}")
-            return None
+        except requests.exceptions.ConnectionError as e:
+            logger.error(f"Network connection lost processing PR #{pr_number}: {e}")
+            raise Exception(f"Network connection lost while processing PR #{pr_number}")
+        except requests.exceptions.Timeout as e:
+            logger.error(f"Request timeout processing PR #{pr_number}: {e}")
+            raise Exception(f"Request timeout while processing PR #{pr_number}")
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Network error processing PR {pr_number}: {e}")
+            raise Exception(f"Network error processing PR #{pr_number}: {str(e)}")
     
     def _get_commit_details(self, commit_sha):
         """Get commit details with file changes"""

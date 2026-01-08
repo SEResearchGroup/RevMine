@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import logo from "../../assets/images/logo_v1.png";
 import { useNavigate } from "react-router-dom";
+
 const Sidebar = () => {
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(true);
@@ -70,7 +71,7 @@ const Sidebar = () => {
       id: "dataManagement",
       icon: FolderOpen,
       label: "Data Management",
-      subItems: ["Export collect results", "Import dataset", "data cleaning"],
+      subItems: ["Export collect results", "Import dataset", "Data Cleaning"],
     },
     {
       id: "analysis",
@@ -91,6 +92,13 @@ const Sidebar = () => {
       subItems: ["FAQs", "Contact Support"],
     },
   ];
+
+  const handleSubItemClick = (e, subItem) => {
+    e.preventDefault();
+    if (subItem === "Data Cleaning") {
+      navigate("/data-cleaning");
+    }
+  };
 
   return (
     <div
@@ -156,6 +164,7 @@ const Sidebar = () => {
                     <a
                       key={idx}
                       href="#"
+                      onClick={(e) => handleSubItemClick(e, subItem)}
                       className="flex items-center gap-2 px-4 py-2 pl-12 text-sm text-gray-600 hover:text-blue-600 hover:bg-gray-100 transition"
                     >
                       <span className="text-gray-400">›</span>

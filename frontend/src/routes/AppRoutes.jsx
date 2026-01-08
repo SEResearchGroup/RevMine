@@ -10,6 +10,10 @@ import Projects from "../pages/projects/Projects";
 import ProjectDetail from "../pages/collection/ProjectDetail";
 import CollectionProgress from "../pages/collection/CollectionProgress";
 import CollectionResults from "../pages/collection/CollectionResults";
+import CollectionDetail from "../pages/collection/CollectionDetail";
+import CleaningDetail from "../pages/collection/CleaningDetail";
+import DataCleaning from "../pages/collection/DataCleaning";
+import DataCleaningList from "../pages/collection/DataCleaningList";
 import {
   GitHubCallback,
   GitLabCallback,
@@ -39,6 +43,7 @@ const AppRoutes = () => {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/workspaces" element={<Workspaces />} />
         <Route path="/workspaces/:id" element={<Projects />} />
+        <Route path="/data-cleaning" element={<DataCleaningList />} />
 
         <Route 
           path="/workspaces/:workspaceId/repositories/:repositoryId/collect" 
@@ -51,6 +56,18 @@ const AppRoutes = () => {
         <Route 
           path="/workspaces/:workspaceId/repositories/:repositoryId/collection/:planId/results" 
           element={<CollectionResults />} 
+        />
+        <Route 
+          path="/workspaces/:workspaceId/repositories/:repositoryId/collection/:collectionId" 
+          element={<CollectionDetail />} 
+        />
+        <Route 
+          path="/workspaces/:workspaceId/repositories/:repositoryId/collection/:collectionId/cleaned-data/new" 
+          element={<DataCleaning />} 
+        />
+        <Route 
+          path="/workspaces/:workspaceId/repositories/:repositoryId/collection/:collectionId/cleaned-data/:cleanedDataId" 
+          element={<CleaningDetail />} 
         />
 
         <Route path="/profile" element={<Profile />} />
