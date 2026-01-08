@@ -1,4 +1,3 @@
-/label ~"triage" ~"type::feature"
 
 ## Description
 What is the issue?
