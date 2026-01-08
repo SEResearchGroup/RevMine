@@ -41,6 +41,12 @@ class ServiceProxyMiddleware:
             'COLLECTION_SERVICE_URL',
             'http://collection-service:8002/api/collections'  
         )
+
+        self.analyze_service_url = getattr(
+            settings,
+            'ANALYZE_SERVICE_URL',
+            'http://analyze-service:8003/api/analysis'  
+        )
         
         # Initialize service clients
         self.config_client = ConfigurationServiceClient(self.configuration_service_url)
@@ -57,6 +63,9 @@ class ServiceProxyMiddleware:
         
         if request.path.startswith('/api/collections'):
             return self.handle_collection_request(request)
+        
+        if request.path.startswith('/api/analysis'):
+            return self.proxy_request(request, self.analyze_service_url, '/api/analysis')
         
         return self.get_response(request)
     
@@ -181,59 +190,65 @@ class ServiceProxyMiddleware:
             return JsonResponse(error_response, status=e.status_code)
     
     def proxy_request(self, request, service_url, path_prefix, user_id=None):
-        """Proxy the request to the microservice."""
-        
-        # Extract the JWT token if not already provided
+        """Proxy the request to the microservice"""
+
         if user_id is None:
             auth_header = request.headers.get('Authorization', '')
-            token = extract_token_from_header(auth_header)
+            if not auth_header.startswith('Bearer '):
+                return JsonResponse({'error': 'Authentication required'}, status=401)
             
-            if not token:
-                return JsonResponse(
-                    {'error': 'Authentication required'}, 
-                    status=401
-                )
-            
-            token_data = validate_token(token)
-            if not token_data:
-                return JsonResponse(
-                    {'error': 'Invalid or expired token'}, 
-                    status=401
-                )
-            
-            user_id = token_data['user_id']
-        
-        # Build the target URL
+            token = auth_header.split(' ')[1]
+            try:
+                access_token = AccessToken(token)
+                user_id = access_token['user_id']
+            except Exception as e:
+                logger.error(f"Token validation failed: {e}")
+                return JsonResponse({'error': 'Invalid or expired token'}, status=401)
+
         relative_path = request.path.replace(path_prefix, '', 1)
         target_url = f"{service_url.rstrip('/')}{relative_path}"
-        
         if request.META.get('QUERY_STRING'):
             target_url = f"{target_url}?{request.META['QUERY_STRING']}"
         
         logger.info(f"Proxying {request.method} {request.path} → {target_url}")
-        
-        # Prepare headers
+
         headers = {
             'X-User-ID': str(user_id),
-            'Content-Type': request.content_type or 'application/json',
         }
-        
+
         body = None
-        if request.method in ['POST', 'PUT', 'PATCH']:
-            try:
-                body = request.body
-            except Exception as e:
-                logger.error(f"Error reading request body: {e}")
+        data = None
+        files = None
+
+        content_type = request.content_type or ''
         
+        if request.method in ['POST', 'PUT', 'PATCH']:
+            if content_type.startswith('application/json'):
+                body = request.body
+                headers['Content-Type'] = 'application/json'
+            elif content_type.startswith('multipart/form-data'):
+                data = []
+                for key in request.POST.keys():
+                    values = request.POST.getlist(key)
+                    for value in values:
+                        data.append((key, value))
+                
+                files = {}
+                for key, file in request.FILES.items():
+                    files[key] = (file.name, file.read(), file.content_type)
+            else:
+                body = request.body
+                headers['Content-Type'] = content_type
+
         try:
             response = requests.request(
                 method=request.method,
                 url=target_url,
                 headers=headers,
-                data=body,
+                data=data if data else body,
+                files=files,
                 timeout=30
             )
-            
             logger.info(f"Response from service: {response.status_code}")
             
             # Check if this is a file download (CSV, etc.)
@@ -258,28 +273,15 @@ class ServiceProxyMiddleware:
                 response_data = response.json()
             except ValueError:
                 response_data = {'detail': response.text or 'Empty response'}
-            
-            return JsonResponse(
-                response_data,
-                status=response.status_code,
-                safe=False
-            )
-        
+
+            return JsonResponse(response_data, status=response.status_code, safe=False)
+
         except requests.Timeout:
             logger.error(f"Timeout connecting to {target_url}")
-            return JsonResponse(
-                {'error': 'Service timeout', 'detail': 'The service took too long to respond'}, 
-                status=504
-            )
+            return JsonResponse({'error': 'Service timeout', 'detail': 'The service took too long to respond'}, status=504)
         except requests.ConnectionError as e:
             logger.error(f"Connection error to {target_url}: {e}")
-            return JsonResponse(
-                {'error': 'Service unavailable', 'detail': str(e)}, 
-                status=503
-            )
+            return JsonResponse({'error': 'Service unavailable', 'detail': str(e)}, status=503)
         except requests.RequestException as e:
             logger.error(f"Request error to {target_url}: {e}")
-            return JsonResponse(
-                {'error': 'Service error', 'detail': str(e)}, 
-                status=503
-            )
+            return JsonResponse({'error': 'Service error', 'detail': str(e)}, status=503)

@@ -17,9 +17,11 @@ import DataCleaningList from "../pages/collection/DataCleaningList";
 import {
   GitHubCallback,
   GitLabCallback,
-  GoogleCallback 
+  GoogleCallback,
 } from "../pages/auth/OAuthCallbacks";
 import Profile from "../pages/profile/Profile";
+import AnalysisPage from "../pages/Analysis/AnalysisPage";
+import AnalysisHistoryPage from "../pages/Analysis/AnalysisHistoryPage";
 
 const AppRoutes = () => {
   return (
@@ -45,17 +47,17 @@ const AppRoutes = () => {
         <Route path="/workspaces/:id" element={<Projects />} />
         <Route path="/data-cleaning" element={<DataCleaningList />} />
 
-        <Route 
-          path="/workspaces/:workspaceId/repositories/:repositoryId/collect" 
-          element={<ProjectDetail />} 
+        <Route
+          path="/workspaces/:workspaceId/repositories/:repositoryId/collect"
+          element={<ProjectDetail />}
         />
-        <Route 
-          path="/workspaces/:workspaceId/repositories/:repositoryId/collection/:planId/progress" 
-          element={<CollectionProgress />} 
+        <Route
+          path="/workspaces/:workspaceId/repositories/:repositoryId/collection/:planId/progress"
+          element={<CollectionProgress />}
         />
-        <Route 
-          path="/workspaces/:workspaceId/repositories/:repositoryId/collection/:planId/results" 
-          element={<CollectionResults />} 
+        <Route
+          path="/workspaces/:workspaceId/repositories/:repositoryId/collection/:planId/results"
+          element={<CollectionResults />}
         />
         <Route 
           path="/workspaces/:workspaceId/repositories/:repositoryId/collection/:collectionId" 
@@ -69,6 +71,8 @@ const AppRoutes = () => {
           path="/workspaces/:workspaceId/repositories/:repositoryId/collection/:collectionId/cleaned-data/:cleanedDataId" 
           element={<CleaningDetail />} 
         />
+        <Route path="/analysis" element={<AnalysisPage />} />
+        <Route path="/analysis/history" element={<AnalysisHistoryPage />} />
 
         <Route path="/profile" element={<Profile />} />
       </Route>

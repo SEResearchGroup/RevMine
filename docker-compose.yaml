@@ -42,7 +42,7 @@ services:
     networks:
       - app-network
 
-  # Base de données pour Configuration Service
+  # Database for Configuration Service
   configuration-db:
     image: postgres:15
     container_name: configuration-db
@@ -63,7 +63,7 @@ services:
       - app-network
 
 
-  # Base de données pour Collection Service
+  # Database for Collection Service
   collection-db:
     image: postgres:15
     container_name: collection-db
@@ -83,6 +83,24 @@ services:
       timeout: 5s
       retries: 5
 
+  analyze-db:
+      image: postgres:15
+      container_name: analyze-db
+      environment:
+        POSTGRES_DB: analyze_db
+        POSTGRES_USER: postgres
+        POSTGRES_PASSWORD: postgres
+      ports:
+        - "5435:5432"
+      volumes:
+        - analyze_postgres_data:/var/lib/postgresql/data
+      networks:
+        - app-network
+      healthcheck:
+        test: ["CMD-SHELL", "pg_isready -U postgres"]
+        interval: 5s
+        timeout: 5s
+        retries: 5
 
   # API Gateway
   api-gateway:
@@ -167,11 +185,39 @@ services:
     command: sh -c "sleep 10 && python manage.py migrate --run-syncdb && python manage.py runserver 0.0.0.0:8002"
     restart: unless-stopped
 
+
+  analyze-service:
+    build:
+      context: ./backend/services/analyze
+    container_name: analyze-service
+    hostname: analyze-service  
+    ports:
+      - "8003:8003"
+    env_file:
+      - ./backend/services/analyze/.env
+    environment:
+      DATABASE_HOST: analyze-db
+      DATABASE_NAME: analyze_db
+      DATABASE_USER: postgres
+      DATABASE_PASSWORD: postgres
+      DATABASE_PORT: 5432
+    depends_on:
+      analyze-db:
+        condition: service_healthy
+      api-gateway:
+        condition: service_started
+    volumes:
+      - ./backend/services/analyze:/app
+    networks:
+      - app-network  
+    command: sh -c "sleep 10 && python manage.py migrate --run-syncdb && python manage.py runserver 0.0.0.0:8003"
+
 volumes:
   gateway_postgres_data:
   configuration_postgres_data:
   collection_postgres_data:
   minio_data:
+  analyze_postgres_data:
 
 networks:
   app-network:

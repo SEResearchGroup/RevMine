@@ -54,6 +54,9 @@ export const workspaceApi = createApiInstance(
 export const collectionApi = createApiInstance(
   "http://localhost:8000/api/collections"
 );
+export const analysisApi = createApiInstance(
+  "http://localhost:8000/api/analysis"
+);
 
 export const authService = {
   register: (email, password, sendUpdates, firstName, lastName, position) => {
@@ -226,8 +229,84 @@ export const collectionService = {
   },
 };
 
+export const analyzeApi = createApiInstance(
+  "http://localhost:8003/api/analyze"
+);
+
+export const analyzeService = {
+  // Create new analysis
+  createAnalysis: async (formData) => {
+    const response = await analysisApi.post("/create/", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+    return response.data;
+  },
+
+  // Get all analyses with optional filters
+  getAnalyses: async (filters = {}) => {
+    const params = new URLSearchParams();
+    if (filters.workspace_id)
+      params.append("workspace_id", filters.workspace_id);
+    if (filters.repository_id)
+      params.append("repository_id", filters.repository_id);
+    if (filters.status) params.append("status", filters.status);
+
+    const response = await analysisApi.get(
+      `/${params.toString() ? "?" + params.toString() : ""}`
+    );
+    return response.data;
+  },
+
+  // Get specific analysis details with results
+  getAnalysisById: async (analysisId) => {
+    const response = await analysisApi.get(`/${analysisId}/`);
+    return response.data;
+  },
+
+  // Delete an analysis
+  deleteAnalysis: async (analysisId) => {
+    const response = await analysisApi.delete(`/${analysisId}/`);
+    return response.data;
+  },
+
+  // Get all datasets with optional filters
+  getDatasets: async (filters = {}) => {
+    const params = new URLSearchParams();
+    if (filters.workspace_id)
+      params.append("workspace_id", filters.workspace_id);
+    if (filters.repository_id)
+      params.append("repository_id", filters.repository_id);
+
+    const response = await analysisApi.get(
+      `/datasets/${params.toString() ? "?" + params.toString() : ""}`
+    );
+    return response.data;
+  },
+
+  // Get specific dataset
+  getDatasetById: async (datasetId) => {
+    const response = await analysisApi.get(`/datasets/${datasetId}/`);
+    return response.data;
+  },
+
+  // Delete a dataset
+  deleteDataset: async (datasetId) => {
+    const response = await analysisApi.delete(`/datasets/${datasetId}/`);
+    return response.data;
+  },
+
+  // Get specific result
+  getResultById: async (resultId) => {
+    const response = await analysisApi.get(`/results/${resultId}/`);
+    return response.data;
+  },
+};
+
 export default {
   auth: authService,
   workspace: workspaceService,
   collection: collectionService,
+  analyze: analyzeService,
 };
