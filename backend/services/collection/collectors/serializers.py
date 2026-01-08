@@ -1,10 +1,11 @@
 from rest_framework import serializers
-from .models import CollectionPlan, CollectedData
+from .models import Collection, CleanedData
 
 
 class StartCollectionSerializer(serializers.Serializer):
     """
-    Serializer for starting a collection
+    Serializer for starting a collection.
+    Only creates a new collection if no active one exists.
     """
     repository_id = serializers.IntegerField(required=True)
     workspace_id = serializers.IntegerField(required=True)
@@ -15,6 +16,7 @@ class StartCollectionSerializer(serializers.Serializer):
     platform = serializers.CharField(required=True)
     repository_url = serializers.URLField(required=False)
     default_branch = serializers.CharField(required=False)
+    external_id = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     
     # Token from workspace
     token = serializers.CharField(required=True, write_only=True)
@@ -53,14 +55,16 @@ class MetricsFilterSerializer(serializers.Serializer):
         return data
 
 
-class CollectionPlanSerializer(serializers.ModelSerializer):
+class CollectionSerializer(serializers.ModelSerializer):
     """
-    Serializer for CollectionPlan model
+    Serializer for Collection model 
     """
     progress_percentage = serializers.ReadOnlyField()
+    is_active = serializers.ReadOnlyField()
+    can_resume = serializers.ReadOnlyField()
     
     class Meta:
-        model = CollectionPlan
+        model = Collection
         fields = [
             'id',
             'user',
@@ -71,6 +75,7 @@ class CollectionPlanSerializer(serializers.ModelSerializer):
             'platform',
             'repository_url',
             'default_branch',
+            'external_id',
             'branch_name',
             'status',
             'created_at',
@@ -81,28 +86,72 @@ class CollectionPlanSerializer(serializers.ModelSerializer):
             'total_items',
             'collected_items',
             'progress_percentage',
+            'is_active',
+            'can_resume',
+            'last_collected_item_id',
             'stats',
             'error_message',
+            'raw_data_filename',
         ]
         read_only_fields = [
             'id', 
             'created_at', 
             'started_at', 
             'completed_at',
-            'progress_percentage'
+            'progress_percentage',
+            'is_active',
+            'can_resume',
+            'raw_data_filename',
         ]
 
 
-class CollectedDataSerializer(serializers.ModelSerializer):
+class CleanedDataSerializer(serializers.ModelSerializer):
     """
-    Serializer for CollectedData
+    Serializer for CleanedData model
     """
+    collection_id = serializers.IntegerField(source='collection.id', read_only=True)
+    
     class Meta:
-        model = CollectedData
+        model = CleanedData
         fields = [
-            'collection_plan',
-            'raw_data',
-            'collected_at',
-            'updated_at',
+            'id',
+            'collection_id',
+            'created_at',
+            'completed_at',
+            'start_date',
+            'end_date',
+            'filters',
+            'structured_csv_filename',
+            'statistics_csv_filename',
+            'stats',
+            'status',
+            'error_message',
         ]
-        read_only_fields = ['collected_at', 'updated_at']
+        read_only_fields = [
+            'id',
+            'created_at',
+            'completed_at',
+        ]
+
+
+class CreateCleanedDataSerializer(serializers.Serializer):
+    """
+    Serializer for creating a new cleaned data instance
+    """
+    collection_id = serializers.IntegerField(required=True)
+    start_date = serializers.DateField(required=False, allow_null=True)
+    end_date = serializers.DateField(required=False, allow_null=True)
+    filters = serializers.JSONField(required=False, default=dict)
+    
+    def validate(self, data):
+        """Validate cleaning parameters"""
+        start_date = data.get('start_date')
+        end_date = data.get('end_date')
+        
+        if start_date and end_date and end_date < start_date:
+            raise serializers.ValidationError(
+                "end_date must be after start_date"
+            )
+        
+        return data
+

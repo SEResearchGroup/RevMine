@@ -1,9 +1,9 @@
 from django.contrib import admin
-from .models import CollectionPlan, CollectedData
+from .models import Collection
 
 
-@admin.register(CollectionPlan)
-class CollectionPlanAdmin(admin.ModelAdmin):
+@admin.register(Collection)
+class CollectionAdmin(admin.ModelAdmin):
     list_display = [
         'id',
         'repository_full_name',
@@ -54,28 +54,4 @@ class CollectionPlanAdmin(admin.ModelAdmin):
     )
 
 
-@admin.register(CollectedData)
-class CollectedDataAdmin(admin.ModelAdmin):
-    list_display = [
-        'collection_plan',
-        'collected_at',
-        'updated_at'
-    ]
-    
-    list_filter = ['collected_at', 'updated_at']
-    
-    search_fields = [
-        'collection_plan__repository_full_name',
-        'collection_plan__id'
-    ]
-    
-    readonly_fields = ['collected_at', 'updated_at']
-    
-    fieldsets = (
-        ('Collection Info', {
-            'fields': ('collection_plan',)
-        }),
-        ('Stored Raw Data', {
-            'fields': ('raw_data', 'collected_at', 'updated_at')
-        }),
-    )
+

@@ -1,8 +1,17 @@
+import json
 import requests
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from django.conf import settings
-from rest_framework_simplejwt.tokens import AccessToken
 import logging
+
+from .token_utils import extract_token_from_header, validate_token, get_user_id_from_request
+from .service_clients import (
+    ConfigurationServiceClient,
+    CollectionServiceClient,
+    ServiceClientError,
+    build_collection_payload,
+    build_branches_payload,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -11,6 +20,11 @@ class ServiceProxyMiddleware:
     """
     Middleware that routes requests to the appropriate microservices
     after validating the JWT token.
+    
+    Responsibilities:
+    - Route requests to appropriate services
+    - Validate authentication
+    - Orchestrate service calls for complex operations
     """
     
     def __init__(self, get_response):
@@ -28,6 +42,10 @@ class ServiceProxyMiddleware:
             'http://collection-service:8002/api/collections'  
         )
         
+        # Initialize service clients
+        self.config_client = ConfigurationServiceClient(self.configuration_service_url)
+        self.collection_client = CollectionServiceClient(self.collection_service_url)
+        
         logger.info(f"ServiceProxyMiddleware initialized")
         logger.info(f"   Configuration Service: {self.configuration_service_url}")
         logger.info(f"   Collection Service: {self.collection_service_url}")
@@ -44,48 +62,90 @@ class ServiceProxyMiddleware:
     
     def handle_collection_request(self, request):
         """
-        Special handler for collection requests
+        Special handler for collection requests.
+        Validates authentication and routes to appropriate handler.
         """
-        # Extract JWT token
         auth_header = request.headers.get('Authorization', '')
-        if not auth_header.startswith('Bearer '):
+        token = extract_token_from_header(auth_header)
+        
+        if not token:
             return JsonResponse(
                 {'error': 'Authentication required'}, 
                 status=401
             )
         
-        token = auth_header.split(' ')[1]
-        
-        try:
-            access_token = AccessToken(token)
-            user_id = access_token['user_id']
-        except Exception as e:
-            logger.error(f"Token validation failed: {e}")
+        token_data = validate_token(token)
+        if not token_data:
             return JsonResponse(
                 {'error': 'Invalid or expired token'}, 
                 status=401
             )
         
+        user_id = token_data['user_id']
+        
         # Handle collection start endpoint (needs workspace token)
         if request.path == '/api/collections/start' and request.method == 'POST':
             return self.handle_start_collection(request, user_id)
         
+        # Handle branches endpoint (needs workspace token but doesn't create collection)
+        if request.path == '/api/collections/branches/' and request.method == 'POST':
+            return self.handle_get_branches(request, user_id)
+        
         # For other collection endpoints, proxy directly
         return self.proxy_request(request, self.collection_service_url, '/api/collections', user_id)
     
-    def handle_start_collection(self, request, user_id):
-  
-        import json
-        
+    def handle_get_branches(self, request, user_id):
+        """
+        Handle fetching branches for a repository.
+        Enriches the request with workspace token without creating a collection.
+        """
         try:
             body_data = json.loads(request.body)
         except json.JSONDecodeError:
+            return JsonResponse({'error': 'Invalid JSON'}, status=400)
+        
+        repository_id = body_data.get('repository_id')
+        workspace_id = body_data.get('workspace_id')
+        
+        if not repository_id or not workspace_id:
             return JsonResponse(
-                {'error': 'Invalid JSON'}, 
+                {'error': 'repository_id and workspace_id are required'}, 
                 status=400
             )
         
-        #getting repository_id and workspace_id from request body
+        logger.info(f"Fetching branches for repository {repository_id} in workspace {workspace_id}")
+        
+        try:
+            # Get repository details and workspace token
+            repository_details = self.config_client.get_repository(
+                workspace_id, repository_id, user_id
+            )
+            workspace_token = self.config_client.get_workspace_token(workspace_id, user_id)
+            
+            # Build payload and call collection service
+            branches_payload = build_branches_payload(repository_details, workspace_token)
+            response_data, status_code = self.collection_client.get_branches(
+                branches_payload, user_id
+            )
+            
+            return JsonResponse(response_data, status=status_code)
+            
+        except ServiceClientError as e:
+            error_response = {'error': e.message}
+            if e.detail:
+                error_response['detail'] = e.detail
+            return JsonResponse(error_response, status=e.status_code)
+
+    def handle_start_collection(self, request, user_id):
+        """
+        Handle starting a collection.
+        Orchestrates fetching repository details, workspace token, and starting collection.
+        """
+        try:
+            body_data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Invalid JSON'}, status=400)
+        
         repository_id = body_data.get('repository_id')
         workspace_id = body_data.get('workspace_id')
         
@@ -97,140 +157,51 @@ class ServiceProxyMiddleware:
         
         logger.info(f"Starting collection for repository {repository_id} in workspace {workspace_id}")
         
-        # Step 1: Get repository details
-        repo_url = f"{self.configuration_service_url.rstrip('/')}/{workspace_id}/repositories/{repository_id}/"
-        logger.info(f"Fetching repository details from: {repo_url}")
-        
         try:
-            repo_response = requests.get(
-                repo_url,
-                headers={'X-User-ID': str(user_id)},
-                timeout=10
+            # Get repository details and workspace token
+            repository_details = self.config_client.get_repository(
+                workspace_id, repository_id, user_id
+            )
+            workspace_token = self.config_client.get_workspace_token(workspace_id, user_id)
+            
+            # Build payload and start collection
+            collection_payload = build_collection_payload(
+                repository_details, workspace_token, repository_id, workspace_id
+            )
+            response_data, status_code = self.collection_client.start_collection(
+                collection_payload, user_id
             )
             
-            if repo_response.status_code != 200:
-                logger.error(f"Configuration service error: {repo_response.status_code}")
-                return JsonResponse(
-                    {
-                        'error': 'Failed to fetch repository details',
-                        'status': repo_response.status_code
-                    },
-                    status=repo_response.status_code
-                )
+            return JsonResponse(response_data, status=status_code)
             
-            repository_details = repo_response.json()
-            logger.info(f"Repository details fetched: {repository_details.get('full_name')}")
-            
-        except requests.RequestException as e:
-            logger.error(f"Error fetching repository: {e}")
-            return JsonResponse(
-                {'error': 'Configuration service unavailable', 'detail': str(e)},
-                status=503
-            )
-        
-        # Step 2: Get workspace token to prepare collection
-        workspace_token_url = f"{self.configuration_service_url.rstrip('/')}/{workspace_id}/token/"
-        logger.info(f"Fetching workspace token from: {workspace_token_url}")
-        
-        try:
-            workspace_response = requests.get(
-                workspace_token_url,
-                headers={'X-User-ID': str(user_id)},
-                timeout=10
-            )
-            
-            if workspace_response.status_code != 200:
-                logger.error(f"Failed to fetch workspace token: {workspace_response.status_code}")
-                return JsonResponse(
-                    {
-                        'error': 'Failed to fetch workspace token',
-                        'status': workspace_response.status_code
-                    },
-                    status=workspace_response.status_code
-                )
-            
-            workspace_data = workspace_response.json()
-            workspace_token = workspace_data.get('token')
-            
-            if not workspace_token:
-                logger.error("No token found in workspace response")
-                return JsonResponse(
-                    {'error': 'Workspace token not found'},
-                    status=500
-                )
-            
-            logger.info(f"Workspace token retrieved")
-            
-        except requests.RequestException as e:
-            logger.error(f"Error fetching workspace token: {e}")
-            return JsonResponse(
-                {'error': 'Configuration service unavailable', 'detail': str(e)},
-                status=503
-            )
-        
-        # Step 3: Forward to collection service with all details to execute collection
-        collection_payload = {
-            'repository_id': repository_id,
-            'workspace_id': workspace_id,
-            'repository_name': repository_details.get('name'),
-            'repository_full_name': repository_details.get('full_name'),
-            'platform': repository_details.get('platform'),
-            'repository_url': repository_details.get('web_url'),
-            'default_branch': repository_details.get('default_branch'),
-            'token': workspace_token,
-        }
-        
-        collection_url = f"{self.collection_service_url}/start/"
-        logger.info(f"Forwarding to collection service: {collection_url}")
-        
-        try:
-            collection_response = requests.post(
-                collection_url,
-                headers={
-                    'X-User-ID': str(user_id),
-                    'Content-Type': 'application/json'
-                },
-                json=collection_payload,
-                timeout=30
-            )
-            
-            logger.info(f"Collection service responded: {collection_response.status_code}")
-            
-            return JsonResponse(
-                collection_response.json(),
-                status=collection_response.status_code
-            )
-            
-        except requests.RequestException as e:
-            logger.error(f"Collection service error: {e}")
-            return JsonResponse(
-                {'error': 'Collection service unavailable', 'detail': str(e)},
-                status=503
-            )
+        except ServiceClientError as e:
+            error_response = {'error': e.message}
+            if e.detail:
+                error_response['detail'] = e.detail
+            return JsonResponse(error_response, status=e.status_code)
     
     def proxy_request(self, request, service_url, path_prefix, user_id=None):
-        """Proxy the request to the microservice"""
+        """Proxy the request to the microservice."""
         
         # Extract the JWT token if not already provided
         if user_id is None:
             auth_header = request.headers.get('Authorization', '')
-            if not auth_header.startswith('Bearer '):
+            token = extract_token_from_header(auth_header)
+            
+            if not token:
                 return JsonResponse(
                     {'error': 'Authentication required'}, 
                     status=401
                 )
             
-            token = auth_header.split(' ')[1]
-            
-            try:
-                access_token = AccessToken(token)
-                user_id = access_token['user_id']
-            except Exception as e:
-                logger.error(f"Token validation failed: {e}")
+            token_data = validate_token(token)
+            if not token_data:
                 return JsonResponse(
                     {'error': 'Invalid or expired token'}, 
                     status=401
                 )
+            
+            user_id = token_data['user_id']
         
         # Build the target URL
         relative_path = request.path.replace(path_prefix, '', 1)
@@ -265,7 +236,24 @@ class ServiceProxyMiddleware:
             
             logger.info(f"Response from service: {response.status_code}")
             
-            # Return the response
+            # Check if this is a file download (CSV, etc.)
+            content_type = response.headers.get('Content-Type', '')
+            content_disposition = response.headers.get('Content-Disposition', '')
+            
+            # If it's a file download, return raw content without JSON wrapping
+            if 'text/csv' in content_type or 'attachment' in content_disposition or '/download/' in target_url:
+                logger.info(f"Proxying file download: {content_type}")
+                http_response = HttpResponse(
+                    response.content,
+                    status=response.status_code,
+                    content_type=content_type
+                )
+                # Copy Content-Disposition header for proper filename
+                if content_disposition:
+                    http_response['Content-Disposition'] = content_disposition
+                return http_response
+            
+            # Return the response as JSON
             try:
                 response_data = response.json()
             except ValueError:

@@ -75,13 +75,6 @@ export const authService = {
   getUserInfo: () => {
     return authApi.get("/me");
   },
-  getGitHubAuthUrl: () => axios.get("/oauth/github"),
-
-  getGitLabAuthUrl: () => axios.get("/oauth/gitlab"),
-
-  githubCallback: (code) => axios.get(`/oauth/github/callback?code=${code}`),
-
-  gitlabCallback: (code) => axios.get(`/oauth/gitlab/callback?code=${code}`),
 };
 
 export const workspaceService = {
@@ -122,10 +115,21 @@ export const workspaceService = {
   },
 };
 
-
-
 export const collectionService = {
-  // Start collection plan
+  // Get available metrics WITHOUT creating a collection
+  getAvailableMetrics: (repositoryId, platform) => {
+    return collectionApi.get(`/metrics/?repository_id=${repositoryId}&platform=${platform}`);
+  },
+
+  // Get branches for a repository WITHOUT creating a collection
+  getBranchesForRepository: (workspaceId, repositoryId) => {
+    return collectionApi.post("/branches/", {
+      workspace_id: workspaceId,
+      repository_id: repositoryId,
+    });
+  },
+
+  // Start/create collection plan (only called when user clicks "Go to collect plan")
   startCollection: (workspaceId, repositoryId) => {
     return collectionApi.post("/start", {
       workspace_id: workspaceId,
@@ -133,7 +137,7 @@ export const collectionService = {
     });
   },
 
-  // Get branches for a collection plan
+  // Get branches for an existing collection plan
   getBranches: (planId) => {
     return collectionApi.get(`/plans/${planId}/branches/`);
   },
@@ -153,6 +157,11 @@ export const collectionService = {
     return collectionApi.post(`/plans/${planId}/execute/`);
   },
 
+  // Resume collection
+  resumeCollection: (planId) => {
+    return collectionApi.post(`/plans/${planId}/resume/`);
+  },
+
   // Get collection status
   getStatus: (planId) => {
     return collectionApi.get(`/plans/${planId}/status/`);
@@ -161,6 +170,15 @@ export const collectionService = {
   // Get collected data
   getData: (planId) => {
     return collectionApi.get(`/plans/${planId}/data/`);
+  },
+
+  // Data cleaning and structuring
+  getCleaningConfig: (planId) => {
+    return collectionApi.get(`/plans/${planId}/cleaning-config/`);
+  },
+
+  applyFilters: (planId, data) => {
+    return collectionApi.post(`/plans/${planId}/apply-filters/`, data);
   },
 
   // List all plans
@@ -172,10 +190,44 @@ export const collectionService = {
   getHistory: (repositoryId) => {
     return collectionApi.get(`/history/${repositoryId}/`);
   },
+
+  // Collection management
+  downloadCollectionJSON: (collectionId) => {
+    return collectionApi.get(`/collections/${collectionId}/download/`, {
+      responseType: 'blob'
+    });
+  },
+
+  deleteCollection: (collectionId) => {
+    return collectionApi.delete(`/collections/${collectionId}/delete/`);
+  },
+
+  // CleanedData operations
+  getCollectionCleanedData: (collectionId) => {
+    return collectionApi.get(`/collections/${collectionId}/cleaned-data/`);
+  },
+
+  createCleanedData: (data) => {
+    return collectionApi.post('/cleaned-data/', data);
+  },
+
+  getCleanedDataDetail: (cleanedDataId) => {
+    return collectionApi.get(`/cleaned-data/${cleanedDataId}/`);
+  },
+
+  deleteCleanedData: (cleanedDataId) => {
+    return collectionApi.delete(`/cleaned-data/${cleanedDataId}/`);
+  },
+
+  downloadCleanedDataCSV: (cleanedDataId, fileType) => {
+    return collectionApi.get(`/cleaned-data/${cleanedDataId}/download/${fileType}/`, {
+      responseType: 'blob'
+    });
+  },
 };
+
 export default {
   auth: authService,
   workspace: workspaceService,
   collection: collectionService,
 };
-
