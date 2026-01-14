@@ -227,6 +227,11 @@ export const collectionService = {
       responseType: 'blob'
     });
   },
+
+  getUserDatasets: async () => {
+    const response = await collectionApi.get('/datasets/');
+    return response.data;
+  },
 };
 
 export const analyzeApi = createApiInstance(
@@ -300,6 +305,16 @@ export const analyzeService = {
   // Get specific result
   getResultById: async (resultId) => {
     const response = await analysisApi.get(`/results/${resultId}/`);
+    return response.data;
+  },
+
+  exportSingleChart: async (analysisId) => {
+    const response = await analysisApi.get(`/analyses/${analysisId}/export/`);
+    return response.data;
+  },
+
+  exportPdfReport: async (analysisId) => {
+    const response = await analysisApi.get(`/analyses/${analysisId}/export/`);
     return response.data;
   },
 };

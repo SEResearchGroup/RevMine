@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Search, Settings, Plus } from "lucide-react";
 import { workspaceService } from "../../services/api";
 import { useNavigate } from "react-router-dom";
-import WorkspaceCard from "../../components/workspaces/WorkspaceCard";
+import WorkspaceCard from "../../components/workspaces/WorkSpaceCard";
 import WorkspaceModal from "../../components/workspaces/WorkspaceModal";
 import StatsCards from "../../components/workspaces/StatsCards";
 

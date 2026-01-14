@@ -1214,6 +1214,72 @@ class DeleteCollectionView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
+class UserDatasetsView(APIView):
+    """
+    Get all datasets (collections and cleaned data) for a user
+    """
+    def get(self, request):
+        user_id = request.headers.get('X-User-ID')
+        
+        if not user_id:
+            return Response(
+                {'error': 'X-User-ID header is required'},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+        
+        try:
+            user_id = int(user_id)
+        except (ValueError, TypeError):
+            return Response(
+                {'error': 'Invalid user_id format'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        logger.info(f"Fetching datasets for user {user_id}")
+        
+        collections_query = Collection.objects.filter(user=user_id)
+        
+        collections = collections_query.select_related().prefetch_related('cleaned_data')
+        
+        # Serialize data
+        collections_data = CollectionSerializer(collections, many=True).data
+        
+        response_data = {
+            'user_id': user_id,
+            'total_collections': collections.count(),
+            'collections': collections_data,
+        }
+        
+        cleaned_data_list = []
+        for collection in collections:
+            cleaned_items = collection.cleaned_data.all()
+            for cleaned in cleaned_items:
+                cleaned_data_list.append({
+                    **CleanedDataSerializer(cleaned).data,
+                    'collection_id': collection.id,
+                    'repository_name': collection.repository_name,
+                    'repository_full_name': collection.repository_full_name,
+                    'platform': collection.platform,
+                    'repository_url': collection.repository_url,
+                    'repository_id': collection.repository_id,
+                    'workspace_id': collection.workspace_id,
+                })
+        
+        response_data['total_cleaned_datasets'] = len(cleaned_data_list)
+        response_data['cleaned_datasets'] = cleaned_data_list
+        
+        # Global statistics
+        response_data['statistics'] = {
+            'total_items_collected': sum(c.collected_items for c in collections),
+            'active_collections': collections.filter(status__in=Collection.ACTIVE_STATUSES).count(),
+            'completed_collections': collections.filter(status='completed').count(),
+            'failed_collections': collections.filter(status='failed').count(),
+        }
+        
+        logger.info(f"Returning {collections.count()} collections for user {user_id}")
+        
+        return Response(response_data, status=status.HTTP_200_OK)
+
 
 # Backward compatibility aliases
 CollectionCleaningsListView = CollectionCleanedDataListView

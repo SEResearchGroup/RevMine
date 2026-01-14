@@ -8,8 +8,9 @@ import {
   CheckCircle2,
   Loader2,
   ArrowRight,
+  Github,
 } from "lucide-react";
-import { analyzeService } from "../../services/api";
+import { collectionService } from "../../services/api";
 
 const DatasetSelectionSection = ({ onSelectDataset, onFileSelect }) => {
   const [file, setFile] = useState(null);
@@ -23,11 +24,30 @@ const DatasetSelectionSection = ({ onSelectDataset, onFileSelect }) => {
     loadDatasets();
   }, []);
 
-  const loadDatasets = async () => {
+  const loadDatasets =  async () => {
     try {
       setLoading(true);
-      const data = await analyzeService.getAnalyses();
-      setDatasets(data);
+      const data =  await collectionService.getUserDatasets();
+      const cleaned = data.cleaned_datasets || [];
+      const mappedDatasets = cleaned.map((cd) => {
+        console.log("Mapping cleaned dataset:", cd);
+        return {
+          id: cd.id,
+          dataset_filename: cd.structured_csv_filename,
+          created_at: cd.created_at,
+          status: cd.status, 
+          results_count: cd.stats?.pull_requests_count ?? 0,
+          repository_name: cd.repository_name,
+          repository_full_name: cd.repository_full_name,
+          platform: cd.platform,
+          repository_url: cd.repository_url,
+          collection_id: cd.collection_id,
+          workspace_id: cd.workspace_id,
+          repository_id: cd.repository_id,
+        };
+      });
+
+      setDatasets(mappedDatasets);
     } catch (error) {
       console.error("Error loading datasets:", error);
     } finally {
@@ -80,7 +100,15 @@ const DatasetSelectionSection = ({ onSelectDataset, onFileSelect }) => {
   };
 
   const filteredDatasets = datasets.filter((dataset) =>
-    dataset.dataset_filename.toLowerCase().includes(searchTerm.toLowerCase())
+    dataset.dataset_filename
+      ?.toLowerCase()
+      .includes(searchTerm.toLowerCase()) ||
+    dataset.repository_name
+      ?.toLowerCase()
+      .includes(searchTerm.toLowerCase()) ||
+    dataset.repository_full_name
+      ?.toLowerCase()
+      .includes(searchTerm.toLowerCase())
   );
 
   const formatDate = (dateString) => {
@@ -95,7 +123,6 @@ const DatasetSelectionSection = ({ onSelectDataset, onFileSelect }) => {
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
-      {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-slate-800 mb-2">
           Data Analysis
@@ -216,7 +243,16 @@ const DatasetSelectionSection = ({ onSelectDataset, onFileSelect }) => {
             {filteredDatasets.map((dataset) => (
               <div
                 key={dataset.id}
-                onClick={() => onSelectDataset(dataset)}
+                onClick={() => {
+                  console.log("Dataset clicked:", {
+                    id: dataset.id,
+                    collection_id: dataset.collection_id,
+                    workspace_id: dataset.workspace_id,
+                    repository_id: dataset.repository_id
+                  });
+                  onSelectDataset(dataset);
+                }}
+
                 className="bg-white rounded-lg border border-slate-200 p-5 hover:shadow-md hover:border-blue-300 transition-all cursor-pointer group"
               >
                 <div className="flex items-start justify-between mb-3">
@@ -229,6 +265,33 @@ const DatasetSelectionSection = ({ onSelectDataset, onFileSelect }) => {
                 <h3 className="font-semibold text-slate-800 mb-2 group-hover:text-blue-600 transition-colors truncate">
                   {dataset.dataset_filename}
                 </h3>
+
+                {/* Infos repo une sous l'autre */}
+                <div className="space-y-1 text-sm text-slate-600 mb-3">
+                  <div className="flex items-center space-x-2">
+                    <Github className="w-4 h-4 text-slate-500" />
+                    <span className="font-medium truncate">
+                      {dataset.repository_name}
+                    </span>
+                  </div>
+                  <p className="text-slate-500 text-xs truncate">
+                    {dataset.repository_full_name}
+                  </p>
+                  <p className="text-slate-500 text-xs capitalize">
+                    Platform: {dataset.platform}
+                  </p>
+                  {dataset.repository_url && (
+                    <a
+                      href={dataset.repository_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-xs text-blue-600 hover:underline break-all"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {dataset.repository_url}
+                    </a>
+                  )}
+                </div>
 
                 <div className="space-y-2 text-sm text-slate-600">
                   <div className="flex items-center space-x-2">

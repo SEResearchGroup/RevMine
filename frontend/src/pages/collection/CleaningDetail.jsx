@@ -278,6 +278,25 @@ function CleaningDetail() {
                 </button>
               </div>
             </div>
+            <div className="flex flex-col justify-center items-center border border-gray-200 rounded-lg p-4 hover:border-green-300 transition-colors mt-6">
+                <div className="flex items-center items-center gap-3 mb-3">
+                  <FileSpreadsheet className="w-6 h-6 text-green-600" />
+                  <div className="text-center">
+                    <h3 className="font-medium text-gray-900">Analyze the results</h3>
+                    <p className="text-sm text-gray-600">
+                      {cleanedData.structured_csv_filename || "structured_data.csv"}
+                    </p>
+                  </div>
+                </div>
+                <button
+                // TODO : change here and implement the revmine analysis link
+                  onClick={() => handleDownloadCSV('structured')}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                >
+                  <span>📊</span>
+                  Analyze in Revmine
+                </button>
+              </div>
           </div>
         )}
       </div>

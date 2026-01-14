@@ -1,6 +1,7 @@
 from django.urls import path
 from rest_framework.response import Response
 from .views import (
+    AnalysisExportView,
     AnalysisListView,
     AnalysisDetailView,
     DatasetListView,
@@ -19,4 +20,7 @@ urlpatterns = [
     path('datasets/<uuid:dataset_id>/', DatasetDetailView.as_view(), name='dataset-detail'),    # GET
 
     path('results/<uuid:result_id>/', AnalysisResultDetailView.as_view(), name='result-detail'), # GET
+
+    path('analyses/<uuid:analysis_id>/export/', AnalysisExportView.as_view(), name='analysis-export'),  # NEW
+
 ]
