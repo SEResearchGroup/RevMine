@@ -8,6 +8,11 @@ import {
   Clock,
   Database,
   Settings,
+  Filter,
+  User,
+  FileCode,
+  Search,
+  Tag,
 } from "lucide-react";
 import { collectionService } from "../../services/api";
 import { DomPlatform } from "chart.js";
@@ -174,43 +179,113 @@ function CleaningDetail() {
           )}
         </div>
 
-        {/* Date Range Filter */}
+        {/* Applied Filters */}
         <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
           <div className="flex items-center gap-2 mb-4">
-            <Calendar className="w-5 h-5 text-gray-700" />
-            <h2 className="text-xl font-semibold text-gray-900">Date Range Filter</h2>
+            <Filter className="w-5 h-5 text-gray-700" />
+            <h2 className="text-xl font-semibold text-gray-900">Applied Filters</h2>
           </div>
 
-          {cleanedData.start_date || cleanedData.end_date ? (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600 mb-1">Start Date</p>
-                  <p className="text-lg font-medium text-gray-900">
-                    {cleanedData.start_date
-                      ? new Date(cleanedData.start_date).toLocaleDateString()
-                      : "Not set"}
-                  </p>
-                </div>
-                <div className="text-gray-400 text-2xl px-4">→</div>
-                <div>
-                  <p className="text-sm text-gray-600 mb-1">End Date</p>
-                  <p className="text-lg font-medium text-gray-900">
-                    {cleanedData.end_date
-                      ? new Date(cleanedData.end_date).toLocaleDateString()
-                      : "Not set"}
-                  </p>
-                </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Date Range */}
+            <div className="bg-gray-50 rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Calendar className="w-4 h-4 text-blue-600" />
+                <h3 className="font-medium text-gray-900">Date Range</h3>
               </div>
-              <p className="text-sm text-gray-600 mt-3">
-                Data has been filtered to include only items within this date range
-              </p>
+              {cleanedData.start_date || cleanedData.end_date ? (
+                <p className="text-gray-700">
+                  {cleanedData.start_date
+                    ? new Date(cleanedData.start_date).toLocaleDateString()
+                    : "Beginning"}{" "}
+                  →{" "}
+                  {cleanedData.end_date
+                    ? new Date(cleanedData.end_date).toLocaleDateString()
+                    : "Now"}
+                </p>
+              ) : (
+                <p className="text-gray-500 italic">All time (no filter applied)</p>
+              )}
             </div>
-          ) : (
-            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-              <p className="text-gray-600">No date range filter applied - all data included</p>
+
+            {/* Authors */}
+            <div className="bg-gray-50 rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <User className="w-4 h-4 text-green-600" />
+                <h3 className="font-medium text-gray-900">Authors</h3>
+              </div>
+              {cleanedData.filters?.authors && cleanedData.filters.authors.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {cleanedData.filters.authors.map((author, idx) => (
+                    <span
+                      key={idx}
+                      className="px-2 py-1 bg-green-100 text-green-700 rounded text-sm"
+                    >
+                      {author}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-gray-500 italic">All authors (no filter applied)</p>
+              )}
             </div>
-          )}
+
+            {/* File Extensions */}
+            <div className="bg-gray-50 rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <FileCode className="w-4 h-4 text-orange-600" />
+                <h3 className="font-medium text-gray-900">File Extensions</h3>
+              </div>
+              {cleanedData.filters?.file_extensions && cleanedData.filters.file_extensions.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {cleanedData.filters.file_extensions.map((ext, idx) => (
+                    <span
+                      key={idx}
+                      className="px-2 py-1 bg-orange-100 text-orange-700 rounded text-sm"
+                    >
+                      {ext}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-gray-500 italic">All file types (no filter applied)</p>
+              )}
+            </div>
+
+            {/* Keyword Filters */}
+            <div className="bg-gray-50 rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Search className="w-4 h-4 text-purple-600" />
+                <h3 className="font-medium text-gray-900">Keyword Filters</h3>
+              </div>
+              {cleanedData.filters?.keyword_filters && cleanedData.filters.keyword_filters.length > 0 ? (
+                <div className="space-y-2">
+                  {cleanedData.filters.keyword_filters.map((filter, idx) => (
+                    <div key={idx} className="flex items-start gap-2">
+                      <Tag className="w-4 h-4 text-purple-500 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <span className="font-medium text-purple-700 capitalize">
+                          {filter.field.replace('_', ' ')}:
+                        </span>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {filter.keywords.map((keyword, kidx) => (
+                            <span
+                              key={kidx}
+                              className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded text-sm"
+                            >
+                              {keyword}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-gray-500 italic">No keyword filters applied</p>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* Configuration */}

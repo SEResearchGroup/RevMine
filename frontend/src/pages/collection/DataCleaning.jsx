@@ -11,9 +11,44 @@ import {
   Github,
   GitBranch,
   FolderGit2,
-  Calendar
+  Calendar,
+  Plus,
+  Tag,
+  BarChart3,
+  Check,
+  Square,
+  CheckSquare
 } from "lucide-react";
 import { collectionService, workspaceService } from "../../services/api";
+
+// Feature definitions with descriptions
+const FEATURES_CONFIG = [
+  { id: 'Creation_Date', label: 'Creation Date', description: 'When the PR/MR was created', category: 'Basic Info' },
+  { id: 'Lead_Time', label: 'Lead Time', description: 'Time from creation to close/merge (in minutes)', category: 'Time Metrics' },
+  { id: '#Discussions', label: 'Discussions Count', description: 'Number of discussion threads or comments', category: 'Collaboration' },
+  { id: '#Commits', label: 'Commits Count', description: 'Total number of commits in the PR/MR', category: 'Basic Info' },
+  { id: 'Mean_Time_between_commits', label: 'Mean Time Between Commits', description: 'Average time interval between consecutive commits (seconds)', category: 'Time Metrics' },
+  { id: 'Commiters', label: 'Committers List', description: 'Set of unique committer names', category: 'Collaboration' },
+  { id: '#UniqueCommiters', label: 'Unique Committers', description: 'Number of unique people who made commits', category: 'Collaboration' },
+  { id: 'nb_minor_author', label: 'Minor Authors', description: 'Authors who contributed <50% of commits', category: 'Collaboration' },
+  { id: 'nb_major_author', label: 'Major Authors', description: 'Authors who contributed ≥50% of commits', category: 'Collaboration' },
+  { id: 'delta_time', label: 'Delta Time', description: 'Days since Unix epoch (for time-series analysis)', category: 'Time Metrics' },
+  { id: 'churn_addition', label: 'Churn Additions', description: 'Total lines added across all commits', category: 'Code Metrics' },
+  { id: 'churn_deletions', label: 'Churn Deletions', description: 'Total lines deleted across all commits', category: 'Code Metrics' },
+  { id: 'initial_size', label: 'Initial Size', description: 'Total size of PR/MR (additions + deletions)', category: 'Code Metrics' },
+  { id: 'hist_entropy', label: 'Historical Entropy', description: 'Shannon entropy of file change distribution (code spread)', category: 'Code Metrics' },
+  { id: 'modified_files', label: 'Modified Files', description: 'Number of files changed in the PR/MR', category: 'Code Metrics' },
+  { id: 'filetypes', label: 'File Types', description: 'Number of unique file extensions modified', category: 'Code Metrics' },
+  { id: 'state', label: 'State', description: 'Current state of PR/MR (open, merged, closed)', category: 'Basic Info' },
+  { id: 'rework_size', label: 'Rework Size', description: 'Estimated lines changed after review feedback', category: 'Code Metrics' },
+  { id: '#people', label: 'People Count', description: 'Total unique people involved (authors, reviewers, discussers)', category: 'Collaboration' },
+  { id: '#reviewers', label: 'Reviewers Count', description: 'Number of unique reviewers', category: 'Collaboration' },
+  { id: '#commiters', label: 'Committers Count', description: 'Number of unique committers', category: 'Collaboration' },
+  { id: '#discussionners', label: 'Discussers Count', description: 'Number of unique users in discussions', category: 'Collaboration' },
+  { id: 'additions', label: 'Total Additions', description: 'Total lines added in the PR/MR', category: 'Code Metrics' },
+  { id: 'deletions', label: 'Total Deletions', description: 'Total lines deleted in the PR/MR', category: 'Code Metrics' },
+  { id: 'comments', label: 'Comments Count', description: 'Total number of comments', category: 'Collaboration' },
+];
 
 function DataCleaning() {
   const { workspaceId, repositoryId, collectionId } = useParams();
@@ -33,12 +68,27 @@ function DataCleaning() {
   // Selected filters
   const [selectedExtensions, setSelectedExtensions] = useState([]);
   const [selectedAuthors, setSelectedAuthors] = useState([]);
-  const [keywordField, setKeywordField] = useState("title");
-  const [keywords, setKeywords] = useState("");
+  
+  // Keyword filters - now an array of {field, keywords}
+  const [keywordFilters, setKeywordFilters] = useState([]);
+  const [currentKeywordField, setCurrentKeywordField] = useState("");
+  const [currentKeywords, setCurrentKeywords] = useState("");
+  
+  // Available keyword fields for selection
+  const allKeywordFields = ["title", "description", "comments", "commit_message"];
+  const availableKeywordFields = allKeywordFields.filter(
+    field => !keywordFilters.some(filter => filter.field === field)
+  );
   
   // Date range for cleaning (subset of collection data)
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+
+  // Feature selection
+  const [selectedFeatures, setSelectedFeatures] = useState(
+    FEATURES_CONFIG.map(f => f.id) // All selected by default
+  );
+  const [featureSearchQuery, setFeatureSearchQuery] = useState("");
 
   // Results
   const [previewData, setPreviewData] = useState(null);
@@ -97,14 +147,67 @@ function DataCleaning() {
     }
   };
 
+  const handleAddKeywordFilter = () => {
+    if (!currentKeywordField || !currentKeywords.trim()) return;
+    
+    const keywordsList = currentKeywords
+      .split(",")
+      .map((k) => k.trim())
+      .filter((k) => k);
+    
+    if (keywordsList.length === 0) return;
+    
+    setKeywordFilters([
+      ...keywordFilters,
+      { field: currentKeywordField, keywords: keywordsList }
+    ]);
+    setCurrentKeywordField("");
+    setCurrentKeywords("");
+  };
+
+  const handleRemoveKeywordFilter = (fieldToRemove) => {
+    setKeywordFilters(keywordFilters.filter(f => f.field !== fieldToRemove));
+  };
+
+  const getFieldLabel = (field) => {
+    const labels = {
+      title: "Title",
+      description: "Description",
+      comments: "Comments",
+      commit_message: "Commit Message"
+    };
+    return labels[field] || field;
+  };
+
+  // Feature selection helpers
+  const filteredFeatures = FEATURES_CONFIG.filter(feature =>
+    feature.label.toLowerCase().includes(featureSearchQuery.toLowerCase()) ||
+    feature.description.toLowerCase().includes(featureSearchQuery.toLowerCase()) ||
+    feature.category.toLowerCase().includes(featureSearchQuery.toLowerCase())
+  );
+
+  const toggleFeature = (featureId) => {
+    if (selectedFeatures.includes(featureId)) {
+      setSelectedFeatures(selectedFeatures.filter(f => f !== featureId));
+    } else {
+      setSelectedFeatures([...selectedFeatures, featureId]);
+    }
+  };
+
+  const toggleAllFeatures = () => {
+    if (selectedFeatures.length === FEATURES_CONFIG.length) {
+      setSelectedFeatures([]);
+    } else {
+      setSelectedFeatures(FEATURES_CONFIG.map(f => f.id));
+    }
+  };
+
+  const isAllSelected = selectedFeatures.length === FEATURES_CONFIG.length;
+  const isSomeSelected = selectedFeatures.length > 0 && selectedFeatures.length < FEATURES_CONFIG.length;
+
   const handleApplyFilters = async () => {
     try {
       setProcessing(true);
-
-      const keywordsList = keywords
-        .split(",")
-        .map((k) => k.trim())
-        .filter((k) => k);
 
       const response = await collectionService.createCleanedData({
         collection_id: parseInt(collectionId),
@@ -113,9 +216,9 @@ function DataCleaning() {
         filters: {
           file_extensions: selectedExtensions,
           authors: selectedAuthors,
-          keyword_field: keywordField,
-          keywords: keywordsList,
-        }
+          keyword_filters: keywordFilters,
+        },
+        selected_features: selectedFeatures,
       });
 
       // Show success message instead of redirecting
@@ -361,45 +464,232 @@ function DataCleaning() {
                 <h3 className="text-lg font-semibold">Filter by Keywords</h3>
               </div>
               <p className="text-sm text-gray-600 mb-4">
-                Search in {itemTerm} titles, descriptions, or commit messages
+                Search in {itemTerm} titles, descriptions, comments, or commit messages. You can add multiple filters.
               </p>
 
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Search in:
+              {/* Applied Keyword Filters */}
+              {keywordFilters.length > 0 && (
+                <div className="mb-6">
+                  <label className="block text-sm font-medium text-gray-700 mb-3">
+                    Applied Filters:
                   </label>
-                  <div className="flex gap-4">
-                    {["title", "description", "comments"].map((field) => (
-                      <label key={field} className="flex items-center gap-2">
-                        <input
-                          type="radio"
-                          name="keyword_field"
-                          value={field}
-                          checked={keywordField === field}
-                          onChange={(e) => setKeywordField(e.target.value)}
-                          className="w-4 h-4 text-blue-600"
-                        />
-                        <span className="text-gray-700 capitalize">{field}</span>
-                      </label>
+                  <div className="flex flex-wrap gap-3">
+                    {keywordFilters.map((filter) => (
+                      <div
+                        key={filter.field}
+                        className="bg-purple-50 border border-purple-200 rounded-lg p-3 flex items-start gap-3"
+                      >
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Tag className="w-4 h-4 text-purple-600" />
+                            <span className="font-medium text-purple-900">
+                              {getFieldLabel(filter.field)}
+                            </span>
+                          </div>
+                          <div className="flex flex-wrap gap-1">
+                            {filter.keywords.map((keyword, idx) => (
+                              <span
+                                key={idx}
+                                className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded text-sm"
+                              >
+                                {keyword}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => handleRemoveKeywordFilter(filter.field)}
+                          className="text-purple-400 hover:text-purple-600 transition-colors"
+                        >
+                          <X className="w-5 h-5" />
+                        </button>
+                      </div>
                     ))}
                   </div>
                 </div>
+              )}
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Keywords (comma-separated):
-                  </label>
-                  <input
-                    type="text"
-                    value={keywords}
-                    onChange={(e) => setKeywords(e.target.value)}
-                    placeholder="e.g., bug, feature, refactor"
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+              {/* Add New Filter */}
+              {availableKeywordFields.length > 0 && (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Select field to search in:
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {availableKeywordFields.map((field) => (
+                        <button
+                          key={field}
+                          onClick={() => setCurrentKeywordField(field)}
+                          className={`px-4 py-2 rounded-lg border transition-colors ${
+                            currentKeywordField === field
+                              ? "bg-purple-100 border-purple-300 text-purple-700"
+                              : "bg-gray-50 border-gray-300 text-gray-700 hover:bg-gray-100"
+                          }`}
+                        >
+                          {getFieldLabel(field)}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {currentKeywordField && (
+                    <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Keywords for {getFieldLabel(currentKeywordField)} (comma-separated):
+                      </label>
+                      <div className="flex gap-3">
+                        <input
+                          type="text"
+                          value={currentKeywords}
+                          onChange={(e) => setCurrentKeywords(e.target.value)}
+                          placeholder="e.g., bug, feature, refactor"
+                          className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              handleAddKeywordFilter();
+                            }
+                          }}
+                        />
+                        {currentKeywords.trim() && (
+                          <button
+                            onClick={handleAddKeywordFilter}
+                            className="px-4 py-2.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2"
+                          >
+                            <Plus className="w-4 h-4" />
+                            Apply
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
+              )}
+
+              {availableKeywordFields.length === 0 && keywordFilters.length > 0 && (
+                <p className="text-sm text-gray-500 italic">
+                  All keyword filter fields have been applied.
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Feature Selection Section */}
+        <div className="mb-6">
+          <div className="bg-white rounded-xl border border-gray-200 p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <BarChart3 className="w-5 h-5 text-indigo-600" />
+              <h3 className="text-lg font-semibold">Feature Selection</h3>
+              <span className="ml-auto text-sm text-gray-500">
+                {selectedFeatures.length} of {FEATURES_CONFIG.length} selected
+              </span>
+            </div>
+            <p className="text-sm text-gray-600 mb-4">
+              Select which metrics to include in the statistics CSV. Only selected features will be calculated.
+            </p>
+
+            {/* Search and Select All */}
+            <div className="flex flex-col sm:flex-row gap-4 mb-4">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input
+                  type="text"
+                  value={featureSearchQuery}
+                  onChange={(e) => setFeatureSearchQuery(e.target.value)}
+                  placeholder="Search features..."
+                  className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+              <button
+                onClick={toggleAllFeatures}
+                className="flex items-center gap-2 px-4 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                {isAllSelected ? (
+                  <CheckSquare className="w-5 h-5 text-indigo-600" />
+                ) : isSomeSelected ? (
+                  <div className="w-5 h-5 border-2 border-indigo-600 rounded flex items-center justify-center">
+                    <div className="w-2 h-0.5 bg-indigo-600" />
+                  </div>
+                ) : (
+                  <Square className="w-5 h-5 text-gray-400" />
+                )}
+                <span className="font-medium">
+                  {isAllSelected ? "Deselect All" : "Select All"}
+                </span>
+              </button>
+            </div>
+
+            {/* Features Table */}
+            <div className="border border-gray-200 rounded-lg overflow-hidden">
+              <div className="max-h-80 overflow-y-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50 sticky top-0">
+                    <tr>
+                      <th className="w-12 px-4 py-3 text-left"></th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">Feature</th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900 hidden md:table-cell">Description</th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900 hidden lg:table-cell">Category</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {filteredFeatures.map((feature) => (
+                      <tr
+                        key={feature.id}
+                        onClick={() => toggleFeature(feature.id)}
+                        className={`cursor-pointer transition-colors ${
+                          selectedFeatures.includes(feature.id)
+                            ? "bg-indigo-50 hover:bg-indigo-100"
+                            : "hover:bg-gray-50"
+                        }`}
+                      >
+                        <td className="px-4 py-3">
+                          <div className="flex items-center justify-center">
+                            {selectedFeatures.includes(feature.id) ? (
+                              <CheckSquare className="w-5 h-5 text-indigo-600" />
+                            ) : (
+                              <Square className="w-5 h-5 text-gray-300" />
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`text-sm font-medium ${
+                            selectedFeatures.includes(feature.id)
+                              ? "text-indigo-900"
+                              : "text-gray-900"
+                          }`}>
+                            {feature.label}
+                          </span>
+                          <p className="text-xs text-gray-500 md:hidden mt-1">
+                            {feature.description}
+                          </p>
+                        </td>
+                        <td className="px-4 py-3 hidden md:table-cell">
+                          <span className="text-sm text-gray-600">{feature.description}</span>
+                        </td>
+                        <td className="px-4 py-3 hidden lg:table-cell">
+                          <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
+                            feature.category === 'Time Metrics' ? 'bg-blue-100 text-blue-700' :
+                            feature.category === 'Code Metrics' ? 'bg-green-100 text-green-700' :
+                            feature.category === 'Collaboration' ? 'bg-purple-100 text-purple-700' :
+                            'bg-gray-100 text-gray-700'
+                          }`}>
+                            {feature.category}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
+
+            {filteredFeatures.length === 0 && (
+              <p className="text-center text-gray-500 py-4">
+                No features match your search.
+              </p>
+            )}
           </div>
         </div>
 

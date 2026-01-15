@@ -123,6 +123,7 @@ class CleanedDataSerializer(serializers.ModelSerializer):
             'start_date',
             'end_date',
             'filters',
+            'selected_features',
             'structured_csv_filename',
             'statistics_csv_filename',
             'stats',
@@ -149,6 +150,12 @@ class CreateCleanedDataSerializer(serializers.Serializer):
     start_date = serializers.DateField(required=False, allow_null=True)
     end_date = serializers.DateField(required=False, allow_null=True)
     filters = serializers.JSONField(required=False, default=dict)
+    selected_features = serializers.ListField(
+        child=serializers.CharField(),
+        required=False,
+        default=list,
+        help_text="List of feature IDs to include in statistics CSV"
+    )
     
     def validate(self, data):
         """Validate cleaning parameters"""
