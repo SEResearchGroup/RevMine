@@ -225,7 +225,7 @@ const ResultsDisplay = ({ results = [], onExportAll, onExportSingle, exportLoadi
               />
             </div>
 
-            {fullscreenChart.chart_data?.stats && (
+            {/* {fullscreenChart.chart_data?.stats && (
               <div className="bg-white rounded-lg p-6 mt-4">
                 <h3 className="text-lg font-semibold text-slate-800 mb-3">
                   Statistiques Détaillées
@@ -243,7 +243,7 @@ const ResultsDisplay = ({ results = [], onExportAll, onExportSingle, exportLoadi
                   ))}
                 </div>
               </div>
-            )}
+            )} */}
           </div>
 
           {/* Chart Counter */}
