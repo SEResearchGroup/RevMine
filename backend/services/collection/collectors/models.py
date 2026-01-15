@@ -165,6 +165,10 @@ class CleanedData(models.Model):
     
     # Cleaning configuration
     filters = models.JSONField(default=dict, help_text="Cleaning filters configuration")
+    selected_features = models.JSONField(
+        default=list,
+        help_text="List of feature IDs to include in statistics CSV"
+    )
     
     # Output files in MinIO
     structured_csv_filename = models.CharField(

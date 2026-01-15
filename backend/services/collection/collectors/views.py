@@ -860,6 +860,7 @@ class CreateCleanedDataView(APIView):
             start_date=validated_data.get('start_date'),
             end_date=validated_data.get('end_date'),
             filters=validated_data.get('filters', {}),
+            selected_features=validated_data.get('selected_features', []),
             status='in_progress'
         )
         
@@ -887,7 +888,12 @@ class CreateCleanedDataView(APIView):
             structured_csv = csv_generator.generate_csv(filtered_data)
             
             stats_generator = StatisticsCSVGenerator(collection.platform)
-            statistics_csv = stats_generator.generate_statistics_csv(filtered_data, collection)
+            selected_features = validated_data.get('selected_features', [])
+            statistics_csv = stats_generator.generate_statistics_csv(
+                filtered_data, 
+                collection,
+                selected_features=selected_features if selected_features else None
+            )
             
             # Generate filenames for CSV files
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')

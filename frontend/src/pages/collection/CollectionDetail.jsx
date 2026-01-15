@@ -229,7 +229,7 @@ function CollectionDetail() {
             Collection Details
           </h1>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <div>
               <div className="flex items-center gap-2 text-gray-600 mb-2">
                 <Calendar className="w-4 h-4" />
@@ -263,20 +263,40 @@ function CollectionDetail() {
               </span>
             </div>
 
-            {collection.filters?.start_date && (
-              <div>
-                <div className="flex items-center gap-2 text-gray-600 mb-2">
-                  <Clock className="w-4 h-4" />
-                  <span className="text-sm font-medium">Data Range</span>
-                </div>
-                <p className="text-gray-900">
-                  {new Date(collection.filters.start_date).toLocaleDateString()} → {" "}
-                  {collection.filters.end_date 
-                    ? new Date(collection.filters.end_date).toLocaleDateString()
-                    : "Now"}
-                </p>
+            <div>
+              <div className="flex items-center gap-2 text-gray-600 mb-2">
+                <Clock className="w-4 h-4" />
+                <span className="text-sm font-medium">Data Range</span>
               </div>
-            )}
+              <p className="text-gray-900">
+                {(() => {
+                  const parseDate = (dateStr) => {
+                    if (!dateStr) return null;
+                    // Handle DD/MM/YYYY format
+                    if (dateStr.includes('/')) {
+                      const parts = dateStr.split('/');
+                      if (parts.length === 3) {
+                        // Assume DD/MM/YYYY format
+                        return new Date(parts[2], parts[1] - 1, parts[0]);
+                      }
+                    }
+                    // Handle ISO format or other standard formats
+                    return new Date(dateStr);
+                  };
+                  
+                  const startDate = collection.filters?.start_date || collection.stats?.start_date;
+                  const endDate = collection.filters?.end_date || collection.stats?.end_date;
+                  if (startDate) {
+                    const parsedStart = parseDate(startDate);
+                    const parsedEnd = parseDate(endDate);
+                    const startStr = parsedStart && !isNaN(parsedStart) ? parsedStart.toLocaleDateString() : startDate;
+                    const endStr = parsedEnd && !isNaN(parsedEnd) ? parsedEnd.toLocaleDateString() : (endDate || "Now");
+                    return `${startStr} → ${endStr}`;
+                  }
+                  return "All time";
+                })()}
+              </p>
+            </div>
           </div>
 
           {/* Statistics */}
