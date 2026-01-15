@@ -9,7 +9,7 @@ class Dataset(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     workspace_id = models.IntegerField(null=True, blank=True, db_index=True)
     repository_id = models.IntegerField(null=True, blank=True, db_index=True)
-
+    platform = models.CharField(max_length=50, default='gitlab')
     
     filename = models.CharField(max_length=255)
     file_path = models.CharField(max_length=500)

@@ -55,35 +55,6 @@ const AnalysisConfigurationSection = ({
     setPollInterval(interval);
   };
 
-  // const handleStartAnalysis = async (config) => {
-  //   setLoading(true);
-  //   setAnalysisStatus("processing");
-
-  //   try {
-  //     const formData = new FormData();
-
-  //     if (uploadedFile) {
-  //       formData.append("csv_file", uploadedFile);
-  //     }
-
-  //     if (config.type === 'metrics') {
-  //       for (const metric of config.metrics) {
-  //         formData.append("requested_charts", metric);
-  //       }
-  //     } else {
-  //       formData.append("llm_query", config.query);
-  //     }
-
-  //     const response = await analyzeService.createAnalysis(formData);
-  //     setAnalysisId(response.id);
-  //     setAnalysisStatus(response.status);
-  //     startPolling(response.id);
-  //   } catch (error) {
-  //     console.error("Analysis error:", error);
-  //     setLoading(false);
-  //     setAnalysisStatus("failed");
-  //   }
-  // };
   const handleStartAnalysis = async (config) => {
   setLoading(true);
   setAnalysisStatus("processing");
@@ -94,19 +65,18 @@ const AnalysisConfigurationSection = ({
       formData.append("csv_file", uploadedFile);
       console.log("Using uploaded file");
     } 
-    // Sinon, utiliser le dataset sélectionné
     else if (dataset) {
       console.log("Using existing dataset:", dataset);
-      // Ajouter les IDs du dataset
       formData.append("cleaned_data_id", dataset.id);
       formData.append("collection_id", dataset.collection_id);
       
-      // Ajouter workspace_id et repository_id
       formData.append("workspace_id", dataset.workspace_id);
       formData.append("repository_id", dataset.repository_id);
       
-      // Optionnel: spécifier le type de fichier à télécharger
-      formData.append("file_type", "structured"); // ou "statistics"
+      formData.append("file_type", "structured"); 
+      if (dataset.platform) {
+        formData.append("platform", dataset.platform);
+      }
     }
 
     // Ajouter la configuration d'analyse

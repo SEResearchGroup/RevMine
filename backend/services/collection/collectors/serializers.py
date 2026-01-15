@@ -110,12 +110,14 @@ class CleanedDataSerializer(serializers.ModelSerializer):
     Serializer for CleanedData model
     """
     collection_id = serializers.IntegerField(source='collection.id', read_only=True)
-    
+    platform = serializers.SerializerMethodField()
+
     class Meta:
         model = CleanedData
         fields = [
             'id',
             'collection_id',
+            'platform',  # <-- ici
             'created_at',
             'completed_at',
             'start_date',
@@ -132,6 +134,11 @@ class CleanedDataSerializer(serializers.ModelSerializer):
             'created_at',
             'completed_at',
         ]
+
+    def get_platform(self, obj):
+        if obj.collection:
+            return obj.collection.platform
+        return None
 
 
 class CreateCleanedDataSerializer(serializers.Serializer):

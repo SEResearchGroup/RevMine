@@ -10,6 +10,7 @@ import {
   Settings,
 } from "lucide-react";
 import { collectionService } from "../../services/api";
+import { DomPlatform } from "chart.js";
 
 function CleaningDetail() {
   const { workspaceId, repositoryId, collectionId, cleanedDataId } = useParams();
@@ -289,13 +290,26 @@ function CleaningDetail() {
                   </div>
                 </div>
                 <button
-                // TODO : change here and implement the revmine analysis link
-                  onClick={() => handleDownloadCSV('structured')}
+                  onClick={() => {
+                    navigate(`/workspaces/${workspaceId}/repositories/${repositoryId}/revmine/analyze`, {
+                      state: {
+                        dataset: {
+                          id: cleanedData.id,
+                          collection_id: cleanedData.collection_id,
+                          workspace_id: workspaceId,
+                          repository_id: repositoryId,
+                          dataset_filename: cleanedData.structured_csv_filename || 'Dataset',
+                          platform: cleanedData.platform,
+                        }
+                      }
+                    });
+                  }}
                   className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
                 >
                   <span>📊</span>
                   Analyze in Revmine
                 </button>
+
               </div>
           </div>
         )}
