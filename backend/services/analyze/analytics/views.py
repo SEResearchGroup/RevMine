@@ -216,8 +216,8 @@ class AnalysisCreateView(APIView):
                         AnalysisResult.objects.create(
                             analysis=analysis,
                             chart_type=chart_type,
-                            chart_data=result.get('data'),  # JSON data for frontend
-                            chart_image=static_image  # Static image for export
+                            chart_data=result.get('data'),  
+                            chart_image=static_image  
                         )
                         
                     except Exception as chart_error:

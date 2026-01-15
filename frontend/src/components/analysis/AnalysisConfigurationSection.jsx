@@ -73,13 +73,12 @@ const AnalysisConfigurationSection = ({
       formData.append("workspace_id", dataset.workspace_id);
       formData.append("repository_id", dataset.repository_id);
       
-      formData.append("file_type", "structured"); 
+      formData.append("file_type", "statistics"); 
       if (dataset.platform) {
         formData.append("platform", dataset.platform);
       }
     }
 
-    // Ajouter la configuration d'analyse
     if (config.type === 'metrics') {
       for (const metric of config.metrics) {
         formData.append("requested_charts", metric);

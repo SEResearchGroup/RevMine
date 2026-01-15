@@ -373,7 +373,7 @@ function CleaningDetail() {
                           collection_id: cleanedData.collection_id,
                           workspace_id: workspaceId,
                           repository_id: repositoryId,
-                          dataset_filename: cleanedData.structured_csv_filename || 'Dataset',
+                          dataset_filename: cleanedData.statistics_csv_filename || 'Dataset',
                           platform: cleanedData.platform,
                         }
                       }
