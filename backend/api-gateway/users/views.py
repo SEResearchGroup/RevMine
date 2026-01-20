@@ -12,6 +12,8 @@ from .schemas import (
     register_view_schema,
     login_view_schema,
     me_view_schema,
+    update_user_schema,
+    change_password_schema,
     github_login_schema,
     github_callback_schema,
     gitlab_login_schema,
@@ -89,6 +91,7 @@ class MeView(generics.RetrieveAPIView):
     def get_object(self):
         return self.request.user
 
+@update_user_schema
 class UpdateUserView(generics.UpdateAPIView):
     """
     Update the authenticated user's information
@@ -107,13 +110,13 @@ class UpdateUserView(generics.UpdateAPIView):
         """Full update of user information"""
         return self.update(request, *args, **kwargs)
 
-
 class ChangePasswordView(APIView):
     """
     Change user password
     """
     permission_classes = [IsAuthenticated]
-
+    
+    @change_password_schema
     def post(self, request):
         serializer = ChangePasswordSerializer(
             data=request.data,
