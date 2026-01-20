@@ -14,6 +14,4 @@ urlpatterns = [
     path('oauth/gitlab/callback', GitLabCallbackView.as_view(), name='gitlab_callback'),
     path('oauth/google', GoogleLoginView.as_view(), name='google_login'),
     path('oauth/google/callback', GoogleCallbackView.as_view(), name='google_callback'),
-
-
 ]
