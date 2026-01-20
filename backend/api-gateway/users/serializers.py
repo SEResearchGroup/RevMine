@@ -43,6 +43,8 @@ class RegisterSerializer(serializers.ModelSerializer):
         user.save()
         return user
 
+
+
 class LoginSerializer(serializers.Serializer):
     email = serializers.EmailField(help_text="User's email address")
     password = serializers.CharField(
