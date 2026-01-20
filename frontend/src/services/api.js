@@ -151,6 +151,22 @@ export const authService = {
   getUserInfo: () => {
     return authApi.get("/me");
   },
+  updateProfile: (data) => {
+    return authApi.patch('/me/update/', data);
+  },
+  replaceProfile: (data) => {
+      return authApi.put('/me/update/', data);
+  },
+  changePassword: (oldPassword, newPassword, newPasswordConfirm) => {
+    return authApi.post('/me/change-password/', {
+      old_password: oldPassword,
+      new_password: newPassword,
+      new_password_confirm: newPasswordConfirm,
+    });
+  },
+  deleteAccount: () => {
+    return authApi.delete('/me/delete/');
+  },
 };
 
 export const workspaceService = {
