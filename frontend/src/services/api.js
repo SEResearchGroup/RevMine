@@ -1,4 +1,25 @@
-import axios from "axios";
+import axios from 'axios';
+import { 
+  getToken, 
+  setToken, 
+  getRefreshToken, 
+  clearTokens,
+  isTokenExpired 
+} from '../utils/jwt';
+
+let isRefreshing = false;
+let failedQueue = [];
+
+const processQueue = (error, token = null) => {
+  failedQueue.forEach(prom => {
+    if (error) {
+      prom.reject(error);
+    } else {
+      prom.resolve(token);
+    }
+  });
+  failedQueue = [];
+};
 
 const createApiInstance = (baseURL) => {
   const instance = axios.create({
@@ -11,7 +32,7 @@ const createApiInstance = (baseURL) => {
 
   instance.interceptors.request.use(
     (config) => {
-      const token = localStorage.getItem("jwt");
+      const token = getToken();
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
       }
@@ -24,22 +45,73 @@ const createApiInstance = (baseURL) => {
 
   instance.interceptors.response.use(
     (response) => response,
-    (error) => {
-      if (error.response?.status === 401) {
-        const currentPath = window.location.pathname;
-        const isAuthEndpoint =
-          error.config?.url?.includes("/login") ||
-          error.config?.url?.includes("/register");
+    async (error) => {
+      const originalRequest = error.config;
 
-        if (
-          !isAuthEndpoint &&
-          currentPath !== "/login" &&
-          currentPath !== "/register"
-        ) {
-          localStorage.removeItem("jwt");
+      if (originalRequest._retry) {
+        clearTokens();
+        window.location.href = "/login";
+        return Promise.reject(error);
+      }
+
+      if (error.response?.status === 401) {
+        const isAuthEndpoint =
+          originalRequest?.url?.includes("/login") ||
+          originalRequest?.url?.includes("/register") ||
+          originalRequest?.url?.includes("/token/refresh");
+
+        if (isAuthEndpoint) {
+          return Promise.reject(error);
+        }
+
+        if (isRefreshing) {
+          return new Promise((resolve, reject) => {
+            failedQueue.push({ resolve, reject });
+          })
+            .then(token => {
+              originalRequest.headers.Authorization = `Bearer ${token}`;
+              return instance(originalRequest);
+            })
+            .catch(err => {
+              return Promise.reject(err);
+            });
+        }
+
+        originalRequest._retry = true;
+        isRefreshing = true;
+
+        const refreshToken = getRefreshToken();
+
+        if (!refreshToken || isTokenExpired(refreshToken)) {
+          clearTokens();
           window.location.href = "/login";
+          return Promise.reject(error);
+        }
+
+        try {
+          const response = await axios.post(`${baseURL}/token/refresh/`, {
+            refresh: refreshToken
+          });
+
+          const { access } = response.data;
+          setToken(access);
+          
+          instance.defaults.headers.common['Authorization'] = `Bearer ${access}`;
+          originalRequest.headers.Authorization = `Bearer ${access}`;
+          
+          processQueue(null, access);
+          
+          return instance(originalRequest);
+        } catch (refreshError) {
+          processQueue(refreshError, null);
+          clearTokens();
+          window.location.href = "/login";
+          return Promise.reject(refreshError);
+        } finally {
+          isRefreshing = false;
         }
       }
+
       return Promise.reject(error);
     }
   );
@@ -48,6 +120,7 @@ const createApiInstance = (baseURL) => {
 };
 
 export const authApi = createApiInstance("http://localhost:8000/api/auth");
+export const api = createApiInstance(import.meta.env.VITE_API_URL || 'http://localhost:8000/api');
 export const workspaceApi = createApiInstance(
   "http://localhost:8000/api/workspaces"
 );
