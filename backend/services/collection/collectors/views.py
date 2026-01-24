@@ -28,6 +28,29 @@ from .services import (
     CollectionValidationError,
     StorageError,
 )
+from .schema import (
+    available_metrics_schema,
+    branches_for_repository_schema,
+    collection_branches_schema,
+    start_collection_schema,
+    configure_metrics_schema,
+    validate_collection_schema,
+    execute_collection_schema,
+    collection_status_schema,
+    resume_collection_schema,
+    collection_plans_list_schema,
+    collection_history_schema,
+    delete_collection_schema,
+    collected_data_schema,
+    download_collection_json_schema,
+    data_cleaning_config_schema,
+    apply_filters_csv_schema,
+    collection_cleaned_data_list_schema,
+    create_cleaned_data_schema,
+    cleaned_data_detail_get_schema,
+    cleaned_data_detail_delete_schema,
+    download_cleaned_data_csv_schema,
+)
 
 import logging
 import json
@@ -65,6 +88,7 @@ class UserIdRequiredMixin:
 class GetAvailableMetricsView(UserIdRequiredMixin, APIView):
     """Get available metrics for a platform."""
 
+    @available_metrics_schema
     def get(self, request):
         user_id = self.get_user_id(request)
         if not user_id:
@@ -103,6 +127,7 @@ class GetAvailableMetricsView(UserIdRequiredMixin, APIView):
 class GetBranchesForRepositoryView(UserIdRequiredMixin, APIView):
     """Get branches for a repository using provided token."""
 
+    @branches_for_repository_schema
     def post(self, request):
         user_id = self.get_user_id(request)
         if not user_id:
@@ -143,6 +168,7 @@ class GetBranchesForRepositoryView(UserIdRequiredMixin, APIView):
 class GetBranchesView(UserIdRequiredMixin, APIView):
     """Get branches for a collection repository."""
     
+    @collection_branches_schema
     def get(self, request, plan_id):
         user_id = self.get_user_id(request)
         if not user_id:
@@ -178,6 +204,7 @@ class GetBranchesView(UserIdRequiredMixin, APIView):
 class StartCollectionView(UserIdRequiredMixin, APIView):
     """Create or retrieve a collection for a repository (idempotent)."""
 
+    @start_collection_schema
     def post(self, request):
         user_id = self.get_user_id(request)
         if not user_id:
@@ -220,6 +247,7 @@ class StartCollectionView(UserIdRequiredMixin, APIView):
 class ConfigureMetricsView(UserIdRequiredMixin, APIView):
     """Configure metrics, filters, and branch for a collection"""
     
+    @configure_metrics_schema
     def post(self, request, plan_id):
         user_id = self.get_user_id(request)
         if not user_id:
@@ -261,6 +289,7 @@ class ConfigureMetricsView(UserIdRequiredMixin, APIView):
 class ValidateCollectionPlanView(UserIdRequiredMixin, APIView):
     """Show collection summary before starting collection"""
     
+    @validate_collection_schema
     def get(self, request, plan_id):
         user_id = self.get_user_id(request)
         if not user_id:
@@ -283,6 +312,7 @@ class ValidateCollectionPlanView(UserIdRequiredMixin, APIView):
 class ExecuteCollectionView(UserIdRequiredMixin, APIView):
     """Start the actual data collection in background"""
     
+    @execute_collection_schema
     def post(self, request, plan_id):
         user_id = self.get_user_id(request)
         if not user_id:
@@ -313,6 +343,7 @@ class ExecuteCollectionView(UserIdRequiredMixin, APIView):
 class CollectionStatusView(UserIdRequiredMixin, APIView):
     """Get the status of a collection"""
     
+    @collection_status_schema
     def get(self, request, plan_id=None, collection_id=None):
         user_id = self.get_user_id(request)
         if not user_id:
@@ -338,6 +369,7 @@ class CollectionStatusView(UserIdRequiredMixin, APIView):
 class ResumeCollectionView(UserIdRequiredMixin, APIView):
     """Resume a paused or failed collection"""
     
+    @resume_collection_schema
     def post(self, request, plan_id):
         user_id = self.get_user_id(request)
         if not user_id:
@@ -368,6 +400,7 @@ class ResumeCollectionView(UserIdRequiredMixin, APIView):
 class CollectionPlanListView(UserIdRequiredMixin, APIView):
     """List all collections for a user"""
     
+    @collection_plans_list_schema
     def get(self, request):
         user_id = self.get_user_id(request)
         if not user_id:
@@ -382,6 +415,7 @@ class CollectionPlanListView(UserIdRequiredMixin, APIView):
 class CollectionHistoryView(UserIdRequiredMixin, APIView):
     """Get collection history for a specific repository"""
     
+    @collection_history_schema
     def get(self, request, repository_id):
         user_id = self.get_user_id(request)
         if not user_id:
@@ -404,6 +438,7 @@ class CollectionHistoryView(UserIdRequiredMixin, APIView):
 class DeleteCollectionView(UserIdRequiredMixin, APIView):
     """Delete a collection and all its related data"""
     
+    @delete_collection_schema
     def delete(self, request, collection_id):
         user_id = self.get_user_id(request)
         if not user_id:
@@ -437,6 +472,7 @@ class DeleteCollectionView(UserIdRequiredMixin, APIView):
 class CollectedDataView(UserIdRequiredMixin, APIView):
     """Get collected data for a collection from MinIO"""
     
+    @collected_data_schema
     def get(self, request, plan_id):
         user_id = self.get_user_id(request)
         if not user_id:
@@ -466,6 +502,7 @@ class CollectedDataView(UserIdRequiredMixin, APIView):
 class DownloadCollectionJSONView(UserIdRequiredMixin, APIView):
     """Download raw JSON data from a collection"""
     
+    @download_collection_json_schema
     def get(self, request, collection_id):
         user_id = self.get_user_id(request)
         if not user_id:
@@ -507,6 +544,7 @@ class DownloadCollectionJSONView(UserIdRequiredMixin, APIView):
 class DataCleaningConfigView(UserIdRequiredMixin, APIView):
     """Get current data for cleaning configuration"""
     
+    @data_cleaning_config_schema
     def get(self, request, plan_id):
         user_id = self.get_user_id(request)
         if not user_id:
@@ -541,6 +579,7 @@ class DataCleaningConfigView(UserIdRequiredMixin, APIView):
 class ApplyFiltersAndCreateCSVView(UserIdRequiredMixin, APIView):
     """Apply filters and create structured CSV"""
     
+    @apply_filters_csv_schema
     def post(self, request, plan_id):
         user_id = self.get_user_id(request)
         if not user_id:
@@ -592,6 +631,7 @@ class ApplyFiltersAndCreateCSVView(UserIdRequiredMixin, APIView):
 class CollectionCleanedDataListView(UserIdRequiredMixin, APIView):
     """Get all cleaned data for a collection"""
     
+    @collection_cleaned_data_list_schema
     def get(self, request, collection_id):
         user_id = self.get_user_id(request)
         if not user_id:
@@ -620,6 +660,7 @@ class CollectionCleanedDataListView(UserIdRequiredMixin, APIView):
 class CreateCleanedDataView(UserIdRequiredMixin, APIView):
     """Create a new cleaned data instance"""
     
+    @create_cleaned_data_schema
     def post(self, request):
         user_id = self.get_user_id(request)
         if not user_id:
@@ -667,6 +708,7 @@ class CreateCleanedDataView(UserIdRequiredMixin, APIView):
 class CleanedDataDetailView(UserIdRequiredMixin, APIView):
     """Get details of a specific cleaned data instance"""
     
+    @cleaned_data_detail_get_schema
     def get(self, request, cleaned_data_id):
         user_id = self.get_user_id(request)
         if not user_id:
@@ -683,6 +725,7 @@ class CleanedDataDetailView(UserIdRequiredMixin, APIView):
         serializer = CleanedDataSerializer(cleaned_data)
         return Response(serializer.data)
     
+    @cleaned_data_detail_delete_schema
     def delete(self, request, cleaned_data_id):
         """Delete a cleaned data instance"""
         user_id = self.get_user_id(request)
@@ -715,6 +758,7 @@ class CleanedDataDetailView(UserIdRequiredMixin, APIView):
 class DownloadCleanedDataCSVView(View):
     """Download CSV file from a cleaned data instance."""
     
+    @download_cleaned_data_csv_schema
     def get(self, request, cleaned_data_id, file_type):
         user_id = request.headers.get('X-User-ID')
         if not user_id:
