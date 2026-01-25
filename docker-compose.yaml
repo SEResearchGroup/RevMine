@@ -1,0 +1,225 @@
+version: '3.8'
+
+services:
+
+  # Service de stockage d'objets MinIO
+  minio:
+      image: minio/minio:latest
+      container_name: minio
+      ports:
+        - "9000:9000"
+        - "9001:9001"
+      hostname: minio
+      env_file:
+        - ./backend/services/collection/.env
+      volumes:
+        - minio_data:/data
+      command: server /data --console-address ":9001"
+      healthcheck:
+        test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+        interval: 10s
+        timeout: 5s
+        retries: 5
+      networks:
+        - app-network
+  # Base de données pour API Gateway
+  gateway-db:
+    image: postgres:15
+    container_name: gateway-db
+    environment:
+      POSTGRES_DB: gateway_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - gateway_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
+
+  # Database for Configuration Service
+  configuration-db:
+    image: postgres:15
+    container_name: configuration-db
+    environment:
+      POSTGRES_DB: configuration_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5433:5432"
+    volumes:
+      - configuration_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
+
+
+  # Database for Collection Service
+  collection-db:
+    image: postgres:15
+    container_name: collection-db
+    environment:
+      POSTGRES_DB: collection_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5434:5432"
+    volumes:
+      - collection_postgres_data:/var/lib/postgresql/data
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  analyze-db:
+      image: postgres:15
+      container_name: analyze-db
+      environment:
+        POSTGRES_DB: analyze_db
+        POSTGRES_USER: postgres
+        POSTGRES_PASSWORD: postgres
+      ports:
+        - "5435:5432"
+      volumes:
+        - analyze_postgres_data:/var/lib/postgresql/data
+      networks:
+        - app-network
+      healthcheck:
+        test: ["CMD-SHELL", "pg_isready -U postgres"]
+        interval: 5s
+        timeout: 5s
+        retries: 5
+
+  # API Gateway
+  api-gateway:
+    build:
+      context: ./backend/api-gateway
+    container_name: api-gateway
+    hostname: api-gateway  
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./backend/api-gateway/.env
+    environment:
+      DATABASE_HOST: gateway-db
+      DATABASE_NAME: gateway_db
+      DATABASE_USER: postgres
+      DATABASE_PASSWORD: postgres
+      DATABASE_PORT: 5432
+      CONFIGURATION_SERVICE_URL: http://configuration-service:8001/api/workspaces
+    depends_on:
+      gateway-db:
+        condition: service_healthy
+    volumes:
+      - ./backend/api-gateway:/app
+    networks:
+      - app-network  
+    command: sh -c "sleep 5 && python manage.py migrate && python manage.py runserver 0.0.0.0:8000"
+    restart: unless-stopped
+
+  # Configuration Service
+  configuration-service:
+    build:
+      context: ./backend/services/configuration
+    container_name: configuration-service
+    hostname: configuration-service 
+    ports:
+      - "8001:8001"
+    env_file:
+      - ./backend/services/configuration/.env
+    environment:
+      DATABASE_HOST: configuration-db
+      DATABASE_NAME: configuration_db
+      DATABASE_USER: postgres
+      DATABASE_PASSWORD: postgres
+      DATABASE_PORT: 5432
+    depends_on:
+      configuration-db:
+        condition: service_healthy
+      api-gateway:
+        condition: service_started
+    volumes:
+      - ./backend/services/configuration:/app
+    networks:
+      - app-network  
+    command: sh -c "sleep 10 && python manage.py migrate --run-syncdb && python manage.py runserver 0.0.0.0:8001"
+    restart: unless-stopped
+
+  # Collection Service
+  collection-service:
+    build:
+      context: ./backend/services/collection
+    container_name: collection-service
+    hostname: collection-service  
+    ports:
+      - "8002:8002"
+    env_file:
+      - ./backend/services/collection/.env
+    environment:
+      DATABASE_HOST: collection-db
+      DATABASE_NAME: collection_db
+      DATABASE_USER: postgres
+      DATABASE_PASSWORD: postgres
+      DATABASE_PORT: 5432
+    depends_on:
+      collection-db:
+        condition: service_healthy
+      api-gateway:
+        condition: service_started
+    volumes:
+      - ./backend/services/collection:/app
+    networks:
+      - app-network  
+    command: sh -c "sleep 10 && python manage.py migrate --run-syncdb && python manage.py runserver 0.0.0.0:8002"
+    restart: unless-stopped
+
+
+  analyze-service:
+    build:
+      context: ./backend/services/analyze
+    container_name: analyze-service
+    hostname: analyze-service  
+    ports:
+      - "8003:8003"
+    env_file:
+      - ./backend/services/analyze/.env
+    environment:
+      DATABASE_HOST: analyze-db
+      DATABASE_NAME: analyze_db
+      DATABASE_USER: postgres
+      DATABASE_PASSWORD: postgres
+      DATABASE_PORT: 5432
+    depends_on:
+      analyze-db:
+        condition: service_healthy
+      api-gateway:
+        condition: service_started
+    volumes:
+      - ./backend/services/analyze:/app
+    networks:
+      - app-network  
+    command: sh -c "sleep 10 && python manage.py migrate --run-syncdb && python manage.py runserver 0.0.0.0:8003"
+
+volumes:
+  gateway_postgres_data:
+  configuration_postgres_data:
+  collection_postgres_data:
+  minio_data:
+  analyze_postgres_data:
+
+networks:
+  app-network:
+    driver: bridge
+    name: revmine-network  
