@@ -29,7 +29,6 @@ const Register = () => {
   const handleSubmit = async () => {
     setError("");
 
-    // Validation du mot de passe
     if (password !== confirmPassword) {
       setError("Passwords do not match");
       return;
