@@ -31,10 +31,10 @@ class WorkspaceSerializer(serializers.ModelSerializer):
         url = data.get('url')
 
         if platform == 'gitlab_self' and not url:
-            raise serializers.ValidationError({"url": "L'URL est obligatoire pour GitLab self-hosted."})
+            raise serializers.ValidationError({"url": "URL is required for GitLab self-hosted."})
 
         if platform in ('github', 'gitlab') and url:
-            raise serializers.ValidationError({"url": "L'URL ne doit pas être fournie pour GitHub ou GitLab.com."})
+            raise serializers.ValidationError({"url": "URL should be empty for GitHub and GitLab.com."})
 
         return data
 
@@ -55,7 +55,7 @@ class TestConnectionSerializer(serializers.Serializer):
     def validate(self, data):
         platform = data['platform']
         if platform == 'gitlab_self' and not data.get('url'):
-            raise serializers.ValidationError({"url": "URL requise pour GitLab self-hosted"})
+            raise serializers.ValidationError({"url": "URL is required for GitLab self-hosted."})
         return data
     
 class RepositorySerializer(serializers.ModelSerializer):
@@ -102,7 +102,7 @@ class RepositorySerializer(serializers.ModelSerializer):
 
 
 class RepositoryMinimalSerializer(serializers.ModelSerializer):
-    """Version allégée pour les listes"""
+    """Lightweight version for lists"""
     platform = serializers.CharField(source='workspace.platform', read_only=True)
     
     class Meta:
