@@ -17,4 +17,4 @@ class TokenEncryption:
         encrypted = base64.b64decode(encrypted_token.encode())
         return self.cipher.decrypt(encrypted).decode()
 
-token_encryptor = TokenEncryption()
+token_encryption = TokenEncryption()

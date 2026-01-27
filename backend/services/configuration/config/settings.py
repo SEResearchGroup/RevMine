@@ -90,6 +90,7 @@ DATABASES = {
 }
 
 REST_FRAMEWORK = {
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     'DEFAULT_AUTHENTICATION_CLASSES': [],  
     'DEFAULT_PERMISSION_CLASSES': [],
 }
@@ -103,9 +104,8 @@ SPECTACULAR_SETTINGS = {
     'COMPONENT_SPLIT_REQUEST': True,
     'SCHEMA_PATH_PREFIX': '/api/',
     'SERVERS': [
-        {'url': 'http://localhost:8000', 'description': 'Development server'},
+        {'url': 'http://localhost:8001', 'description': 'Development server'},
     ],
-    # Ajoutez ces lignes pour éviter les conflits
     'SWAGGER_UI_SETTINGS': {
         'deepLinking': True,
         'persistAuthorization': True,
