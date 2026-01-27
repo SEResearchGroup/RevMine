@@ -1,7 +1,3 @@
-"""
-Service client utilities.
-Handles communication with microservices (configuration, collection).
-"""
 import requests
 import logging
 from typing import Any

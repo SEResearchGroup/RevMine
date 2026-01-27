@@ -9,9 +9,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-RUN chmod +x wait-for-db.sh
+# RUN chmod +x wait-for-db.sh
 
 EXPOSE 8000
 
-CMD ["./wait-for-db.sh", "sh", "-c", "python manage.py makemigrations --noinput && python manage.py migrate --noinput && python manage.py runserver 0.0.0.0:8000"]
+CMD ["python", "manage.py", "makemigrations", "--noinput"]
+CMD ["python", "manage.py", "migrate", "--noinput"]
+CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
 

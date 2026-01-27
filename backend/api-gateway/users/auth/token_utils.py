@@ -1,7 +1,4 @@
-"""
-Token validation utilities.
-Handles JWT token extraction and validation.
-"""
+from django.http import JsonResponse
 from rest_framework_simplejwt.tokens import AccessToken
 import logging
 
@@ -62,3 +59,33 @@ def get_user_id_from_request(request) -> int | None:
     
     token_data = validate_token(token)
     return token_data['user_id'] if token_data else None
+
+def extract_user_from_request(request):
+    """
+    Extracts and validates the user_id from the request.
+    
+    Args:
+        request: Django request
+    
+    Returns:
+        tuple: (user_id, error_response)
+               - On success: (user_id, None)
+               - On error: (None, JsonResponse)
+    """
+    auth_header = request.headers.get('Authorization', '')
+    token = extract_token_from_header(auth_header)
+    
+    if not token:
+        return None, JsonResponse(
+            {'error': 'Authentication required'}, 
+            status=401
+        )
+    
+    token_data = validate_token(token)
+    if not token_data:
+        return None, JsonResponse(
+            {'error': 'Invalid or expired token'}, 
+            status=401
+        )
+    
+    return token_data['user_id'], None
