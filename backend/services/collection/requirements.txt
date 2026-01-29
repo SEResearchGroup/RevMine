@@ -4,6 +4,7 @@ charset-normalizer==3.4.4
 Django==5.2.8
 django-cors-headers==4.9.0
 djangorestframework==3.16.1
+drf-spectacular==0.28.0
 dotenv==0.9.9
 idna==3.11
 psycopg2-binary==2.9.11

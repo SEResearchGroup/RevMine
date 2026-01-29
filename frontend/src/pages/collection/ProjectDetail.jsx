@@ -26,6 +26,7 @@ import {
   AlertTriangle,
   Play,
   X,
+  Loader2,
 } from "lucide-react";
 import { workspaceService, collectionService } from "../../services/api";
 import CollectPlanModal from "../../components/collection/CollectPlanModal";
@@ -89,9 +90,13 @@ function ProjectDetail() {
   // Loading state for creating collection
   const [creatingCollection, setCreatingCollection] = useState(false);
 
-  // Interrupted collection notification
+  // Interrupted collection notification (only for paused/failed, NOT in_progress)
   const [interruptedNotifications, setInterruptedNotifications] = useState([]);
   const [resumingCollection, setResumingCollection] = useState(null);
+
+  // Track running collections for real-time status updates
+  const [runningCollections, setRunningCollections] = useState(new Set());
+  const pollingIntervalRef = useRef(null);
 
   // Prevent duplicate data fetching
   const dataFetchedRef = useRef(false);
@@ -146,6 +151,28 @@ function ProjectDetail() {
       dataFetchedRef.current = false;
     };
   }, [workspaceId, repositoryId]);
+
+  // Poll running collections to update their progress in real-time
+  useEffect(() => {
+    if (runningCollections.size > 0) {
+      // Start polling every 3 seconds when there are running collections
+      pollingIntervalRef.current = setInterval(() => {
+        fetchCollectionHistory();
+      }, 3000);
+    } else {
+      // Clear polling when no running collections
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+        pollingIntervalRef.current = null;
+      }
+    }
+
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+      }
+    };
+  }, [runningCollections.size]);
 
   const fetchData = async () => {
     try {
@@ -228,16 +255,22 @@ function ProjectDetail() {
       const collections = res.data.collections || [];
       setCollectionHistory(collections);
       
-      // Load incomplete collections as notifications (paused, failed, in_progress)
+      // Track running collections (in_progress) - no notifications for these
+      const runningIds = new Set(
+        collections.filter(c => c.status === 'in_progress').map(c => c.id)
+      );
+      setRunningCollections(runningIds);
+      
+      // Load interrupted collections as notifications (paused, failed ONLY - not in_progress)
       const dismissed = getDismissedNotifications();
-      const incompleteCollections = collections.filter(
-        c => ['paused', 'failed', 'in_progress'].includes(c.status) && !dismissed.includes(c.id)
+      const interruptedCollections = collections.filter(
+        c => ['paused', 'failed'].includes(c.status) && !dismissed.includes(c.id)
       );
       
       // Add to notifications without duplicates
       setInterruptedNotifications(prev => {
         const existingIds = new Set(prev.map(n => n.id));
-        const newNotifications = incompleteCollections
+        const newNotifications = interruptedCollections
           .filter(c => !existingIds.has(c.id))
           .map(c => ({
             id: c.id,
@@ -499,8 +532,13 @@ function ProjectDetail() {
     }
   };
 
-  const handleViewCollection = (collectionId) => {
-    navigate(`/workspaces/${workspaceId}/repositories/${repositoryId}/collection/${collectionId}`);
+  const handleViewCollection = (collection) => {
+    // For in-progress collections, navigate to progress page instead of details
+    if (collection.status === 'in_progress') {
+      navigate(`/workspaces/${workspaceId}/repositories/${repositoryId}/collection/${collection.id}/progress`);
+    } else {
+      navigate(`/workspaces/${workspaceId}/repositories/${repositoryId}/collection/${collection.id}`);
+    }
   };
 
   // Resume interrupted collection
@@ -557,6 +595,20 @@ function ProjectDetail() {
     }
     return "-";
   };
+
+  // Check if collection is actively running
+  const isCollectionRunning = (collection) => {
+    return collection.status === 'in_progress';
+  };
+
+  // Animated progress indicator component for in-progress collections
+  const InProgressIndicator = () => (
+    <div className="relative w-full h-1 bg-blue-100 rounded-full overflow-hidden">
+      <div 
+        className="absolute h-full w-1/3 bg-gradient-to-r from-blue-400 via-blue-600 to-blue-400 rounded-full animate-slide-progress"
+      />
+    </div>
+  );
 
   if (loading) {
     return (
@@ -691,13 +743,21 @@ function ProjectDetail() {
                                 })}
                               </div>
                             </>
-                          ) : ['in_progress', 'paused', 'failed'].includes(collection.status) ? (
+                          ) : isCollectionRunning(collection) ? (
+                            <div className="space-y-1.5">
+                              <span className="inline-flex items-center gap-1.5 text-blue-600 font-medium">
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                                In Progress
+                              </span>
+                              <InProgressIndicator />
+                            </div>
+                          ) : ['paused', 'failed'].includes(collection.status) ? (
                             <span className="inline-flex items-center gap-1 text-red-600">
                               <AlertCircle className="w-3 h-3" />
                               Interrupted
                             </span>
                           ) : (
-                            <span className="text-blue-600">In Progress</span>
+                            <span className="text-blue-600">Pending</span>
                           )}
                         </div>
                       </td>
@@ -723,8 +783,8 @@ function ProjectDetail() {
                       </td>
                       <td className="py-3 px-4">
                         <div className="flex items-center justify-center gap-2">
-                          {/* Resume button for paused/failed collections */}
-                          {collection.can_resume && (
+                          {/* Resume button for paused/failed collections (NOT for in_progress) */}
+                          {collection.can_resume && !isCollectionRunning(collection) && (
                             <button
                               onClick={() => handleResumeCollection(collection.id)}
                               disabled={resumingCollection === collection.id}
@@ -746,11 +806,15 @@ function ProjectDetail() {
                             <Download className="w-4 h-4" />
                           </button>
                           <button
-                            onClick={() => handleViewCollection(collection.id)}
+                            onClick={() => handleViewCollection(collection)}
                             className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                            title="View details"
+                            title={isCollectionRunning(collection) ? "View progress" : "View details"}
                           >
-                            <Eye className="w-4 h-4" />
+                            {isCollectionRunning(collection) ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Eye className="w-4 h-4" />
+                            )}
                           </button>
                           <button
                             disabled

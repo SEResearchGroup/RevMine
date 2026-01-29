@@ -4,6 +4,7 @@ import math
 from datetime import datetime, timezone
 from typing import Dict, List, Optional, Tuple, Set
 import logging
+import math
 
 logger = logging.getLogger(__name__)
 
@@ -993,11 +994,27 @@ class GitLabAdapter(PlatformAdapter):
         return len(item.get('discussions', []))
     
     def get_reviewers(self, item: dict) -> set:
+        """
+        Pour GitLab: compte les reviewers via les approbations et notes de review
+        Évite le double comptage avec discussioners
+        """
         reviewers = set()
+        
+        # Approbations explicites
+        details = item.get('details', {})
+        approved_by = details.get('approved_by', [])
+        for approval in approved_by:
+            user = approval.get('user', {}).get('username')
+            if user:
+                reviewers.add(user)
+        
+        # Notes de type review (non-system)
         for note in item.get('notes', []):
-            author = note.get('author', {}).get('username')
-            if author:
-                reviewers.add(author)
+            if not note.get('system', False):  # Ignorer notes système
+                author = note.get('author', {}).get('username')
+                if author:
+                    reviewers.add(author)
+        
         return reviewers
     
     def get_discussioners(self, item: dict) -> set:
@@ -1261,6 +1278,21 @@ class StatisticsCSVGenerator:
         modified_files_count = len(files)
         filetypes = self._count_filetypes(files)
         
+        # Calculate commit author statistics (minor/major)
+        nb_minor, nb_major = self._calculate_author_contributions(commits)
+        
+        # Calculate delta_time (time from first commit to MR creation)
+        delta_time = self._calculate_delta_time(commits, created_at)
+        
+        # Calculate churn (from MR total changes)
+        churn_add, churn_del = self._calculate_churn(item)
+        
+        # Calculate entropy (normalized file changes)
+        hist_entropy = self._calculate_entropy(files)
+        
+        # Calculate rework size (lines changed after initial review)
+        rework_size = self._calculate_rework_size(item)
+        
         # Count unique people involved
         people = set(committers)
         people.update(discussioners)
@@ -1305,6 +1337,147 @@ class StatisticsCSVGenerator:
             'comments': discussions_count
         }
     
+    def _parse_date(self, date_str: str):
+        """Parse ISO date string"""
+        if not date_str:
+            return None
+        try:
+            return datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+        except:
+            return None
+    
+    def _calculate_lead_time(self, created_at, closed_at):
+        """
+        Calculate lead time in HOURS (CORRIGÉ).
+        Lead Time = temps entre création et merge/close du PR/MR
+        Retourne en heures selon les standards DORA
+        """
+        if not created_at or not closed_at:
+            return 0
+        delta = closed_at - created_at
+        return round(delta.total_seconds() / 3600, 2)  # HEURES au lieu de minutes
+    
+    def _calculate_mean_time_between_commits(self, commits: List):
+        """Calculate mean time between commits in seconds"""
+        if len(commits) < 2:
+            return 0
+        
+        dates = []
+        for commit in commits:
+            date_str = self.adapter.get_commit_date(commit)
+            if date_str:
+                try:
+                    dates.append(datetime.fromisoformat(date_str.replace('Z', '+00:00')))
+                except:
+                    pass
+        
+        if len(dates) < 2:
+            return 0
+        
+        dates.sort()
+        time_diffs = [(dates[i+1] - dates[i]).total_seconds() for i in range(len(dates)-1)]
+        return round(sum(time_diffs) / len(time_diffs), 2)
+    
+    def _get_committers(self, commits: List) -> set:
+        """Get unique committers"""
+        committers = set()
+        for commit in commits:
+            author = self.adapter.get_commit_author(commit)
+            if author:
+                committers.add(author)
+        return committers
+    
+    def _calculate_author_contributions(self, commits: List) -> tuple:
+        """
+        Calculate minor and major author counts (CORRIGÉ).
+        Major author: contributed > 50% of commits (strictement supérieur)
+        Minor author: contributed <= 50% of commits
+        """
+        if not commits:
+            return 0, 0
+        
+        author_counts = {}
+        for commit in commits:
+            author = self.adapter.get_commit_author(commit)
+            if author:
+                author_counts[author] = author_counts.get(author, 0) + 1
+        
+        total_commits = len(commits)
+        if total_commits == 0:
+            return 0, 0
+        
+        nb_minor = 0
+        nb_major = 0
+        
+        for author, count in author_counts.items():
+            contribution_pct = count / total_commits
+            if contribution_pct > 0.5:  # STRICTEMENT supérieur à 50%
+                nb_major += 1
+            else:
+                nb_minor += 1
+        
+        return nb_minor, nb_major
+    
+    def _calculate_delta_time(self, commits: List, created_at) -> float:
+        """
+        Calculate delta time (CORRIGÉ):
+        Temps en SECONDES entre le premier commit et la création du MR/PR.
+        Indique si le travail a été fait en avance ou juste avant l'ouverture.
+        """
+        if not commits or not created_at:
+            return 0.0
+        
+        # Trouver le premier commit
+        commit_dates = []
+        for commit in commits:
+            date_str = self.adapter.get_commit_date(commit)
+            if date_str:
+                try:
+                    commit_dates.append(
+                        datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+                    )
+                except:
+                    pass
+        
+        if not commit_dates:
+            return 0.0
+        
+        first_commit = min(commit_dates)
+        delta = created_at - first_commit
+        
+        # Retourne en secondes (peut être négatif si le commit est après la création)
+        return round(delta.total_seconds(), 2)
+    
+    def _calculate_churn(self, item: dict) -> tuple:
+        """
+        Calculate churn (CORRIGÉ):
+        Utilise directement les totaux du MR/PR au lieu des commits individuels.
+        Churn = total des lignes ajoutées et supprimées dans le MR/PR.
+        """
+        details = item.get('details', {})
+        
+        # Utiliser les totaux du MR/PR directement via l'adapter
+        additions = self.adapter.get_additions(details)
+        deletions = self.adapter.get_deletions(details)
+        
+        # Si pas de données au niveau MR, essayer de les calculer des commits
+        if additions == 0 and deletions == 0:
+            for commit in item.get('commits', []):
+                # Essayer d'obtenir les stats du commit
+                commit_details = commit.get('details', {})
+                stats = commit_details.get('stats', {})
+                if stats:
+                    additions += stats.get('additions', 0) or 0
+                    deletions += stats.get('deletions', 0) or 0
+                
+                # Essayer le format 'changes'
+                changes = commit.get('changes', [])
+                for change in changes:
+                    additions += change.get('additions', 0) or 0
+                    deletions += change.get('deletions', 0) or 0
+        
+        return float(additions), float(deletions)
+    
     def _count_filetypes(self, files: List) -> int:
         """Count unique file types/extensions"""
         extensions = set()
@@ -1314,3 +1487,126 @@ class StatisticsCSVGenerator:
                 ext = filename.rsplit('.', 1)[-1].lower()
                 extensions.add(ext)
         return len(extensions)
+    
+    def _calculate_entropy(self, files: List) -> float:
+        """
+        Calculate historical entropy based on file modifications.
+        Uses Shannon entropy formula on file change distribution.
+        H = -Σ(p * log2(p)) où p = changements_fichier / total_changements
+        """
+        if not files:
+            return 0.0
+        
+        # Get changes per file
+        changes = []
+        for file in files:
+            file_changes = (file.get('additions', 0) or 0) + (file.get('deletions', 0) or 0)
+            if file_changes > 0:
+                changes.append(file_changes)
+        
+        if not changes:
+            return 0.0
+        
+        total = sum(changes)
+        if total == 0:
+            return 0.0
+        
+        # Shannon entropy formula
+        entropy = 0.0
+        for c in changes:
+            if c > 0:
+                p = c / total
+                entropy -= p * math.log2(p)
+        
+        return round(entropy, 6)
+    
+    def _calculate_rework_size(self, item: dict) -> float:
+        """
+        Calculate rework size (CORRIGÉ):
+        Rework = changements faits APRÈS la première revue/discussion.
+        Compare les commits avant et après la première revue.
+        """
+        details = item.get('details', {})
+        created_at = self._parse_date(details.get('created_at'))
+        
+        # Trouver la date de première revue/discussion
+        first_review_date = None
+        
+        # GitHub: chercher dans les reviews
+        for review in item.get('reviews', []):
+            review_date = self._parse_date(review.get('submitted_at'))
+            if review_date:
+                if first_review_date is None or review_date < first_review_date:
+                    first_review_date = review_date
+        
+        # GitHub: chercher dans les review comments
+        for rc in item.get('review_comments', []):
+            comment_date = self._parse_date(rc.get('created_at'))
+            if comment_date:
+                if first_review_date is None or comment_date < first_review_date:
+                    first_review_date = comment_date
+        
+        # GitLab: chercher dans les discussions
+        for discussion in item.get('discussions', []):
+            for note in discussion.get('notes', []):
+                note_date = self._parse_date(note.get('created_at'))
+                if note_date:
+                    if first_review_date is None or note_date < first_review_date:
+                        first_review_date = note_date
+        
+        # GitLab: chercher dans les notes
+        for note in item.get('notes', []):
+            note_date = self._parse_date(note.get('created_at'))
+            if note_date:
+                if first_review_date is None or note_date < first_review_date:
+                    first_review_date = note_date
+        
+        # Si pas de revue trouvée, rework = 0
+        if not first_review_date or not created_at:
+            return 0.0
+        
+        # Compter les changements dans les commits après la première revue
+        rework_additions = 0
+        rework_deletions = 0
+        
+        for commit in item.get('commits', []):
+            commit_date = self._parse_date(self.adapter.get_commit_date(commit))
+            
+            if commit_date and commit_date > first_review_date:
+                # Obtenir les stats du commit
+                commit_details = commit.get('details', {})
+                stats = commit_details.get('stats', {})
+                
+                if stats:
+                    rework_additions += stats.get('additions', 0) or 0
+                    rework_deletions += stats.get('deletions', 0) or 0
+                
+                # Essayer aussi le format 'changes'
+                changes = commit.get('changes', [])
+                for change in changes:
+                    rework_additions += change.get('additions', 0) or 0
+                    rework_deletions += change.get('deletions', 0) or 0
+        
+        return float(rework_additions + rework_deletions)
+    
+    def _count_unique_people(self, item: dict, committers: set, discussioners: set) -> int:
+        """Count total unique people involved in the MR/PR"""
+        people = set()
+        
+        # Add committers
+        people.update(committers)
+        
+        # Add discussioners
+        people.update(discussioners)
+        
+        # Add author using adapter
+        details = item.get('details', {})
+        author = self.adapter.get_author(details)
+        if author:
+            people.add(author)
+        
+        # Add reviewers
+        reviewers = self.adapter.get_reviewers(item)
+        people.update(reviewers)
+        
+        return len(people)

@@ -3,14 +3,10 @@ from .models import Collection, CleanedData
 
 
 class StartCollectionSerializer(serializers.Serializer):
-    """
-    Serializer for starting a collection.
-    Only creates a new collection if no active one exists.
-    """
+    """Serializer for starting a collection."""
+    
     repository_id = serializers.IntegerField(required=True)
     workspace_id = serializers.IntegerField(required=True)
-    
-    # Repository details from Configuration Service
     repository_name = serializers.CharField(required=True)
     repository_full_name = serializers.CharField(required=True)
     platform = serializers.CharField(required=True)
@@ -18,14 +14,11 @@ class StartCollectionSerializer(serializers.Serializer):
     default_branch = serializers.CharField(required=False)
     external_id = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     
-    # Token from workspace
     token = serializers.CharField(required=True, write_only=True)
 
 
 class MetricsFilterSerializer(serializers.Serializer):
-    """
-    Serializer for metrics selection and filters
-    """
+    """Serializer for metrics and filters configuration."""
     selected_metrics = serializers.ListField(
         child=serializers.CharField(),
         required=True,
@@ -56,9 +49,7 @@ class MetricsFilterSerializer(serializers.Serializer):
 
 
 class CollectionSerializer(serializers.ModelSerializer):
-    """
-    Serializer for Collection model 
-    """
+    """Serializer for Collection model."""
     progress_percentage = serializers.ReadOnlyField()
     is_active = serializers.ReadOnlyField()
     can_resume = serializers.ReadOnlyField()
@@ -106,9 +97,7 @@ class CollectionSerializer(serializers.ModelSerializer):
 
 
 class CleanedDataSerializer(serializers.ModelSerializer):
-    """
-    Serializer for CleanedData model
-    """
+    """Serializer for CleanedData model."""
     collection_id = serializers.IntegerField(source='collection.id', read_only=True)
     platform = serializers.SerializerMethodField()
 
@@ -143,9 +132,7 @@ class CleanedDataSerializer(serializers.ModelSerializer):
 
 
 class CreateCleanedDataSerializer(serializers.Serializer):
-    """
-    Serializer for creating a new cleaned data instance
-    """
+    """Serializer for creating cleaned data."""
     collection_id = serializers.IntegerField(required=True)
     start_date = serializers.DateField(required=False, allow_null=True)
     end_date = serializers.DateField(required=False, allow_null=True)

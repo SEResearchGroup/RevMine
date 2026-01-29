@@ -127,6 +127,15 @@ function CollectionProgress() {
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-4xl mx-auto">
+        {/* Back button */}
+        <button
+          onClick={() => navigate(`/workspaces/${workspaceId}/repositories/${repositoryId}/collect`)}
+          className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-6"
+        >
+          <ArrowLeft className="w-5 h-5" />
+          <span>Back to Project</span>
+        </button>
+
         {/* Project Details Card */}
         <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
           <div className="flex items-start gap-4">
