@@ -99,17 +99,20 @@ class CollectionSerializer(serializers.ModelSerializer):
 class CleanedDataSerializer(serializers.ModelSerializer):
     """Serializer for CleanedData model."""
     collection_id = serializers.IntegerField(source='collection.id', read_only=True)
-    
+    platform = serializers.SerializerMethodField()
+
     class Meta:
         model = CleanedData
         fields = [
             'id',
             'collection_id',
+            'platform',  # <-- ici
             'created_at',
             'completed_at',
             'start_date',
             'end_date',
             'filters',
+            'selected_features',
             'structured_csv_filename',
             'statistics_csv_filename',
             'stats',
@@ -122,6 +125,11 @@ class CleanedDataSerializer(serializers.ModelSerializer):
             'completed_at',
         ]
 
+    def get_platform(self, obj):
+        if obj.collection:
+            return obj.collection.platform
+        return None
+
 
 class CreateCleanedDataSerializer(serializers.Serializer):
     """Serializer for creating cleaned data."""
@@ -129,6 +137,12 @@ class CreateCleanedDataSerializer(serializers.Serializer):
     start_date = serializers.DateField(required=False, allow_null=True)
     end_date = serializers.DateField(required=False, allow_null=True)
     filters = serializers.JSONField(required=False, default=dict)
+    selected_features = serializers.ListField(
+        child=serializers.CharField(),
+        required=False,
+        default=list,
+        help_text="List of feature IDs to include in statistics CSV"
+    )
     
     def validate(self, data):
         """Validate cleaning parameters"""

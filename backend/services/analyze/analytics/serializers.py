@@ -15,6 +15,7 @@ class DatasetSerializer(serializers.ModelSerializer):
             'filename', 
             'rows_count', 
             'columns_count',
+            'platform',
             'uploaded_at', 
             'updated_at'
         ]
@@ -72,8 +73,9 @@ class AnalysisCreateSerializer(serializers.Serializer):
     Serializer for creating a new analysis request
     """
     csv_file = serializers.FileField(required=True)
-    workspace_id = serializers.UUIDField(required=False, allow_null=True)
-    repository_id = serializers.UUIDField(required=False, allow_null=True)
+    workspace_id = serializers.IntegerField(required=False, allow_null=True)
+    platform = serializers.ChoiceField(choices=['gitlab', 'github'], default='gitlab')
+    repository_id = serializers.IntegerField(required=False, allow_null=True)
     requested_charts = serializers.ListField(
         child=serializers.CharField(max_length=100),
         required=True,

@@ -71,6 +71,10 @@ const AppRoutes = () => {
           path="/workspaces/:workspaceId/repositories/:repositoryId/collection/:collectionId/cleaned-data/:cleanedDataId" 
           element={<CleaningDetail />} 
         />
+          <Route 
+          path="/workspaces/:workspaceId/repositories/:repositoryId/revmine/analyze" 
+          element={<AnalysisPage />} 
+        />
         <Route path="/analysis" element={<AnalysisPage />} />
         <Route path="/analysis/history" element={<AnalysisHistoryPage />} />
 
