@@ -104,12 +104,15 @@ const Profile = () => {
       }
 
       await authService.updateProfile(updateData);
+      if(newPassword){
+        await authService.changePassword(currentPassword, newPassword, confirmPassword);
+      }
       setSuccess("Profile updated successfully!");
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
 
-      // Rafraîchir les infos
+      // Refresh user info
       const response = await authService.getUserInfo();
       setUserInfo(response.data);
     } catch (err) {
