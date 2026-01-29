@@ -33,4 +33,17 @@
       transform: translateY(0);
     }
   }
+
+  .animate-slide-progress {
+    animation: slideProgress 1.5s ease-in-out infinite;
+  }
+
+  @keyframes slideProgress {
+    0% {
+      left: -33%;
+    }
+    100% {
+      left: 100%;
+    }
+  }
 }
