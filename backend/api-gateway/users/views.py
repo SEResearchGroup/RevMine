@@ -4,7 +4,7 @@ from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import get_user_model
-from .serializers import ChangePasswordSerializer, RegisterSerializer, LoginSerializer, UpdateUserSerializer, UserSerializer
+from .serializers import RegisterSerializer, LoginSerializer, UserSerializer
 import requests
 from django.conf import settings
 
@@ -12,8 +12,6 @@ from .schemas import (
     register_view_schema,
     login_view_schema,
     me_view_schema,
-    update_user_schema,
-    change_password_schema,
     github_login_schema,
     github_callback_schema,
     gitlab_login_schema,
@@ -90,62 +88,6 @@ class MeView(generics.RetrieveAPIView):
 
     def get_object(self):
         return self.request.user
-
-@update_user_schema
-class UpdateUserView(generics.UpdateAPIView):
-    """
-    Update the authenticated user's information
-    """
-    permission_classes = [IsAuthenticated]
-    serializer_class = UpdateUserSerializer
-
-    def get_object(self):
-        return self.request.user
-
-    def patch(self, request, *args, **kwargs):
-        """Partial update of user information"""
-        return self.partial_update(request, *args, **kwargs)
-
-    def put(self, request, *args, **kwargs):
-        """Full update of user information"""
-        return self.update(request, *args, **kwargs)
-
-class ChangePasswordView(APIView):
-    """
-    Change user password
-    """
-    permission_classes = [IsAuthenticated]
-    
-    @change_password_schema
-    def post(self, request):
-        serializer = ChangePasswordSerializer(
-            data=request.data,
-            context={'request': request}
-        )
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
-        
-        return Response({
-            'message': 'Password updated successfully'
-        }, status=status.HTTP_200_OK)
-
-
-class DeleteUserView(APIView):
-    """
-    Delete user account
-    """
-    permission_classes = [IsAuthenticated]
-
-    def delete(self, request):
-        user = request.user
-        # user.is_active = False  # Soft delete
-        # user.save()
-        user.delete()
-        
-        return Response({
-            'message': 'Account deleted successfully'
-        }, status=status.HTTP_204_NO_CONTENT)
-
 
 class GitHubLoginView(APIView):
     """

@@ -1,5 +1,5 @@
 from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiExample
-from .serializers import ChangePasswordSerializer, RegisterSerializer, LoginSerializer, UpdateUserSerializer, UserSerializer, LoginResponseSerializer
+from .serializers import RegisterSerializer, LoginSerializer, UserSerializer, LoginResponseSerializer
 
 
 register_view_schema = extend_schema(
@@ -84,64 +84,6 @@ me_view_schema = extend_schema(
     ],
     tags=['User']
 )
-
-update_user_schema = extend_schema(
-    tags=["User"],
-    summary="Update authenticated user",
-    description=(
-        "Update the authenticated user's personal information.\n\n"
-        "- **PATCH**: Partial update (recommended)\n"
-        "- **PUT**: Full update"
-    ),
-    request=UpdateUserSerializer,
-    responses={
-        200: UpdateUserSerializer,
-        400: OpenApiResponse(description="Validation error"),
-        401: OpenApiResponse(description="Authentication required"),
-    },
-    examples=[
-        OpenApiExample(
-            "Partial update example",
-            value={
-                "first_name": "Oussama",
-                "last_name": "Cherguelaine",
-                "position": "Backend Developer"
-            },
-            request_only=True,
-        )
-    ],
-)
-
-
-change_password_schema = extend_schema(
-    tags=["User"],
-    summary="Change password",
-    description=(
-        "Change the authenticated user's password.\n\n"
-        "- Requires the current password\n"
-        "- New passwords must match"
-    ),
-    request=ChangePasswordSerializer,
-    responses={
-        200: OpenApiResponse(description="Password updated successfully"),
-        400: OpenApiResponse(description="Validation error"),
-        401: OpenApiResponse(description="Authentication required"),
-    },
-    examples=[
-        OpenApiExample(
-            "Change password example",
-            value={
-                "old_password": "old_password_123",
-                "new_password": "new_password_123",
-                "new_password_confirm": "new_password_123",
-            },
-            request_only=True,
-        )
-    ],
-)
-
-
-
 
 
 github_login_schema = extend_schema(
