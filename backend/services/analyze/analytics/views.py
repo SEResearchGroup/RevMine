@@ -56,18 +56,17 @@ class AnalysisCreateView(APIView):
     parser_classes = (MultiPartParser, FormParser)
     
     def post(self, request):
-        
         serializer = AnalysisCreateSerializer(data=request.data)
         if not serializer.is_valid():
             return Response(
                 serializer.errors,
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
         csv_file = serializer.validated_data['csv_file']
         workspace_id = serializer.validated_data.get('workspace_id')
         repository_id = serializer.validated_data.get('repository_id')
         requested_charts = serializer.validated_data['requested_charts']
+        platform = serializer.validated_data.get('platform', 'gitlab')
         try:
             # Save CSV file
             file_path = default_storage.save(
@@ -87,7 +86,8 @@ class AnalysisCreateView(APIView):
                     filename=csv_file.name,
                     file_path=full_path,
                     rows_count=len(df),
-                    columns_count=len(df.columns)
+                    columns_count=len(df.columns),
+                    platform=platform
                 )
                 
                 # Create analysis record
@@ -96,7 +96,7 @@ class AnalysisCreateView(APIView):
                     requested_charts=requested_charts,
                     status='pending'
                 )
-            self._process_analysis(analysis, full_path, requested_charts)
+            self._process_analysis(analysis, full_path, requested_charts, platform)
             
             response_serializer = AnalysisSerializer(analysis)
             return Response(
@@ -110,9 +110,66 @@ class AnalysisCreateView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
     
-    def _process_analysis(self, analysis, file_path, requested_charts):
+    def _generate_static_chart(self, df, chart_type, chart_data):
         """
-        Process the analysis and generate charts
+        Generate static matplotlib chart for export
+        """
+        try:
+            plt.figure(figsize=(12, 6))
+            
+            chart_info = chart_data.get('data', {})
+            chart_plot_type = chart_info.get('type', 'bar')
+            
+            if chart_plot_type == 'line':
+                plt.plot(chart_info.get('labels', []), chart_info.get('values', []), marker='o')
+                plt.xlabel(chart_info.get('xLabel', ''))
+                plt.ylabel(chart_info.get('yLabel', ''))
+                
+            elif chart_plot_type == 'bar':
+                plt.bar(chart_info.get('labels', []), chart_info.get('values', []))
+                plt.xlabel(chart_info.get('xLabel', ''))
+                plt.ylabel(chart_info.get('yLabel', ''))
+                plt.xticks(rotation=45)
+                
+            elif chart_plot_type == 'histogram':
+                plt.hist(chart_info.get('values', []), bins=30, edgecolor='black')
+                plt.xlabel(chart_info.get('xLabel', ''))
+                plt.ylabel(chart_info.get('yLabel', ''))
+                
+            elif chart_plot_type == 'scatter':
+                plt.scatter(chart_info.get('x', []), chart_info.get('y', []), alpha=0.5)
+                plt.xlabel(chart_info.get('xLabel', ''))
+                plt.ylabel(chart_info.get('yLabel', ''))
+                
+            elif chart_plot_type == 'pie':
+                plt.pie(chart_info.get('values', []), labels=chart_info.get('labels', []), autopct='%1.1f%%')
+                
+            elif chart_plot_type == 'horizontal_bar':
+                plt.barh(chart_info.get('labels', []), chart_info.get('values', []))
+                plt.xlabel(chart_info.get('xLabel', ''))
+                plt.ylabel(chart_info.get('yLabel', ''))
+            
+            plt.title(chart_info.get('title', ''), fontsize=14, fontweight='bold')
+            plt.grid(True, alpha=0.3)
+            plt.tight_layout()
+            
+            # Convert to base64
+            buffer = BytesIO()
+            plt.savefig(buffer, format='png', bbox_inches='tight', dpi=100)
+            buffer.seek(0)
+            image_base64 = base64.b64encode(buffer.read()).decode()
+            plt.close()
+            
+            return image_base64
+            
+        except Exception as e:
+            print(f"Error generating static chart for {chart_type}: {str(e)}")
+            plt.close()
+            return None
+    
+    def _process_analysis(self, analysis, file_path, requested_charts, platform='gitlab'):
+        """
+        Process the analysis and generate chart data + static images
         """
         try:
             analysis.status = 'processing'
@@ -149,21 +206,18 @@ class AnalysisCreateView(APIView):
                 if chart_type in chart_functions:
                     try:
                         print(f"Generating chart: {chart_type}")
-                        # Execute the chart function
-                        chart_functions[chart_type]()
+                        # Execute the chart function - returns {'data': {...}}
+                        result = chart_functions[chart_type]()
                         
-                        # Convert plot to base64 image
-                        buffer = BytesIO()
-                        plt.savefig(buffer, format='png', bbox_inches='tight', dpi=100)
-                        buffer.seek(0)
-                        image_base64 = base64.b64encode(buffer.read()).decode()
-                        plt.close()
+                        # Generate static image for export
+                        static_image = self._generate_static_chart(df, chart_type, result)
                         
-                        # Save result
+                        # Save result with both data and image
                         AnalysisResult.objects.create(
                             analysis=analysis,
                             chart_type=chart_type,
-                            chart_image=image_base64
+                            chart_data=result.get('data'),  
+                            chart_image=static_image  
                         )
                         
                     except Exception as chart_error:
@@ -237,6 +291,31 @@ class AnalysisDetailView(APIView):
             {'message': 'Analysis deleted successfully'},
             status=status.HTTP_204_NO_CONTENT
         )
+
+
+class AnalysisExportView(APIView):
+    """
+    API endpoint to export analysis results with static images
+    GET: Generate PDF/ZIP with matplotlib charts
+    """
+    def get(self, request, analysis_id):
+        analysis = get_object_or_404(Analysis, id=analysis_id)
+        results = analysis.results.all()
+        
+        # Return static images for export
+        export_data = []
+        for result in results:
+            export_data.append({
+                'chart_type': result.chart_type,
+                'chart_image': result.chart_image,  # Static matplotlib image
+                'created_at': result.created_at
+            })
+        
+        return Response({
+            'analysis_id': str(analysis.id),
+            'status': analysis.status,
+            'charts': export_data
+        }, status=status.HTTP_200_OK)
 
 
 class DatasetListView(APIView):

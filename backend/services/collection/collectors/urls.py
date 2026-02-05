@@ -5,6 +5,7 @@ from .views import (
     StartCollectionView,
     GetBranchesView,
     ConfigureMetricsView,
+    UserDatasetsView,
     ValidateCollectionPlanView,
     ExecuteCollectionView,
     CollectionStatusView,
@@ -57,4 +58,7 @@ urlpatterns = [
     # Lists and history
     path('plans/', CollectionPlanListView.as_view(), name='collection-plans'),
     path('history/<int:repository_id>/', CollectionHistoryView.as_view(), name='collection-history'),
+
+    # get all user datasets
+    path('datasets/', UserDatasetsView.as_view(), name='user-datasets'),
 ]

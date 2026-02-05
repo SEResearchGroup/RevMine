@@ -17,6 +17,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
+    'drf_spectacular',
     'corsheaders',
     'collectors',
 ]
@@ -64,8 +65,37 @@ DATABASES = {
 }
 
 REST_FRAMEWORK = {
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     'DEFAULT_AUTHENTICATION_CLASSES': [],
     'DEFAULT_PERMISSION_CLASSES': [],
+}
+
+# drf-spectacular configuration
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Collection Service API',
+    'DESCRIPTION': 'API for collecting data from Git repositories (GitHub, GitLab). '
+                   'Supports metrics collection, data cleaning, and CSV export.',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    'COMPONENT_SPLIT_REQUEST': True,
+    'SCHEMA_PATH_PREFIX': '/api/',
+    'SERVERS': [
+        {'url': 'http://localhost:8002', 'description': 'Development server'},
+    ],
+    'SWAGGER_UI_SETTINGS': {
+        'deepLinking': True,
+        'persistAuthorization': True,
+        'displayOperationId': True,
+    },
+    'COMPONENT_NO_READ_ONLY_REQUIRED': True,
+    'TAGS': [
+        {'name': 'Metrics & Branches', 'description': 'Get available metrics and repository branches'},
+        {'name': 'Collection Workflow', 'description': 'Start, configure, and execute data collections'},
+        {'name': 'Collection Management', 'description': 'Manage collection status, history, and lifecycle'},
+        {'name': 'Collected Data', 'description': 'Access raw collected data'},
+        {'name': 'Data Cleaning', 'description': 'Configure and apply data cleaning filters'},
+        {'name': 'Cleaned Data', 'description': 'Manage cleaned data instances and CSV exports'},
+    ],
 }
 
 CORS_ALLOWED_ORIGINS = config('CORS_ALLOWED_ORIGINS', default='').split(',')

@@ -1,18 +1,37 @@
-// AnalysisPage.jsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import { analyzeService } from "../../services/api";
 import DatasetSelectionSection from "../../components/analysis/DatasetSelectionSection";
 import AnalysisConfigurationSection from "../../components/analysis/AnalysisConfigurationSection";
 
 const AnalysisPage = () => {
-  const [selectedDataset, setSelectedDataset] = useState(null);
+  const location = useLocation();
+  const [selectedDataset, setSelectedDataset] = useState(location.state?.dataset || null);
   const [uploadedFile, setUploadedFile] = useState(null);
   const [analysisResults, setAnalysisResults] = useState(null);
 
+  useEffect(() => {
+    const loadInitialResults = async () => {
+      if (location.state?.dataset?.analysis_id) {
+        try {
+          const results = await analyzeService.getAnalysisById(location.state.dataset.analysis_id);
+          setAnalysisResults(results);
+        } catch (error) {
+          console.error("Error loading analysis results:", error);
+        }
+      }
+    };
+
+    loadInitialResults();
+  }, []); 
+
   const handleDatasetSelect = (dataset) => {
+    console.log("Dataset selected:", dataset);
     setSelectedDataset(dataset);
     setUploadedFile(null);
-    loadAnalysisResults(dataset.id);
+    if (dataset.analysis_id) {
+      loadAnalysisResults(dataset.analysis_id);
+    }
   };
 
   const handleNewFileSelect = (file) => {
@@ -21,9 +40,9 @@ const AnalysisPage = () => {
     setAnalysisResults(null);
   };
 
-  const loadAnalysisResults = async (datasetId) => {
+  const loadAnalysisResults = async (analysisId) => {
     try {
-      const results = await analyzeService.getAnalysisById(datasetId);
+      const results = await analyzeService.getAnalysisById(analysisId);
       setAnalysisResults(results);
     } catch (error) {
       console.error("Error loading analysis results:", error);

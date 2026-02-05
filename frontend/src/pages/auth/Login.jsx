@@ -61,7 +61,8 @@ const Login = () => {
 
     try {
       const response = await authService.login(email, password);
-      login(response.data.access);
+      const { access, refresh } = response.data;
+      login(access, refresh);
       navigate("/workspaces");
     } catch (err) {
       setError(err.response?.data?.message || "Incorrect email or password");

@@ -3,16 +3,25 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
-from django.contrib.auth import authenticate, get_user_model
-from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiExample
-from drf_spectacular.types import OpenApiTypes
-from rest_framework import serializers
-from .serializers import RegisterSerializer, LoginSerializer, UserSerializer, LoginResponseSerializer
+from django.contrib.auth import get_user_model
+from .serializers import ChangePasswordSerializer, RegisterSerializer, LoginSerializer, UpdateUserSerializer, UserSerializer
 import requests
-from django.shortcuts import redirect
 from django.conf import settings
-from rest_framework.decorators import api_view, permission_classes
 
+from .schemas import ( 
+    register_view_schema,
+    login_view_schema,
+    me_view_schema,
+    update_user_schema,
+    change_password_schema,
+    github_login_schema,
+    github_callback_schema,
+    gitlab_login_schema,
+    gitlab_callback_schema,
+    google_login_schema,
+    google_callback_schema,
+)
+User = get_user_model()
 
 class RegisterView(generics.CreateAPIView):
     """
@@ -21,37 +30,9 @@ class RegisterView(generics.CreateAPIView):
     permission_classes = [AllowAny]
     serializer_class = RegisterSerializer
     
-    @extend_schema(
-    summary="Register a new user",
-    description="Creates a new user account with email and password",
-    request=RegisterSerializer,
-    responses={
-        201: RegisterSerializer,
-        400: OpenApiResponse(description='Invalid data'),
-    },
-    examples=[
-        OpenApiExample(
-            'Registration example',
-            value={
-                'email': 'user@example.com',
-                'password': 'password123', 
-                'first_name': 'John',
-                'last_name': 'Doe'
-            },
-            request_only=True,
-        ),
-    ],
-    tags=['Authentication']
-    )
-
+    @register_view_schema
     def post(self, request, *args, **kwargs):
         return super().post(request, *args, **kwargs)
-
-class LoginResponseSerializer(serializers.Serializer):
-    access = serializers.CharField(help_text="JWT access token")
-    refresh = serializers.CharField(help_text="JWT refresh token")
-    user = UserSerializer(help_text="Authenticated user information")
-
 
 class LoginView(APIView):
     """
@@ -59,40 +40,7 @@ class LoginView(APIView):
     """
     permission_classes = [AllowAny]
 
-    @extend_schema(
-        summary="User login",
-        description="Authenticates a user with email and password and returns JWT tokens",
-        request=LoginSerializer,
-        responses={
-            200: LoginResponseSerializer,
-            401: OpenApiResponse(description='Invalid credentials'),
-        },
-        examples=[
-            OpenApiExample(
-                'Login example',
-                value={
-                    'email': 'user@example.com',
-                    'password': 'password123'
-                },
-                request_only=True,
-            ),
-            OpenApiExample(
-                'Successful response',
-                value={
-                    'access': 'eyJ0eXAiOiJKV1QiLCJhbGc...',
-                    'refresh': 'eyJ0eXAiOiJKV1QiLCJhbGc...',
-                    'user': {
-                        'id': 1,
-                        'email': 'user@example.com',
-                        'date_joined': '2024-01-01T00:00:00Z'
-                    }
-                },
-                response_only=True,
-                status_codes=['200']
-            ),
-        ],
-        tags=['Authentication']
-    )
+    @login_view_schema
     def post(self, request):
         serializer = LoginSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -136,36 +84,68 @@ class MeView(generics.RetrieveAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = UserSerializer
 
-    @extend_schema(
-        summary="User profile",
-        description="Returns the information of the currently authenticated user",
-        responses={
-            200: UserSerializer,
-            401: OpenApiResponse(description='Unauthenticated - Missing or invalid token'),
-        },
-        examples=[
-            OpenApiExample(
-                'User profile response',
-                value={
-                    'id': 1,
-                    'email': 'user@example.com',
-                    'first_name': 'John',
-                    'last_name': 'Doe',
-                    'date_joined': '2024-01-01T00:00:00Z'
-                },
-                response_only=True,
-            ),
-        ],
-        tags=['User']
-    )
+    @me_view_schema
     def get(self, request, *args, **kwargs):
         return super().get(request, *args, **kwargs)
 
     def get_object(self):
         return self.request.user
-    
 
-User = get_user_model()
+@update_user_schema
+class UpdateUserView(generics.UpdateAPIView):
+    """
+    Update the authenticated user's information
+    """
+    permission_classes = [IsAuthenticated]
+    serializer_class = UpdateUserSerializer
+
+    def get_object(self):
+        return self.request.user
+
+    def patch(self, request, *args, **kwargs):
+        """Partial update of user information"""
+        return self.partial_update(request, *args, **kwargs)
+
+    def put(self, request, *args, **kwargs):
+        """Full update of user information"""
+        return self.update(request, *args, **kwargs)
+
+class ChangePasswordView(APIView):
+    """
+    Change user password
+    """
+    permission_classes = [IsAuthenticated]
+    
+    @change_password_schema
+    def post(self, request):
+        serializer = ChangePasswordSerializer(
+            data=request.data,
+            context={'request': request}
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        
+        return Response({
+            'message': 'Password updated successfully'
+        }, status=status.HTTP_200_OK)
+
+
+class DeleteUserView(APIView):
+    """
+    Delete user account
+    """
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request):
+        user = request.user
+        # user.is_active = False  # Soft delete
+        # user.save()
+        user.delete()
+        
+        return Response({
+            'message': 'Account deleted successfully'
+        }, status=status.HTTP_204_NO_CONTENT)
+
 
 class GitHubLoginView(APIView):
     """
@@ -173,12 +153,7 @@ class GitHubLoginView(APIView):
     """
     permission_classes = [AllowAny]
     
-    @extend_schema(
-        summary="GitHub OAuth Login",
-        description="Redirects to GitHub for OAuth authentication",
-        responses={302: OpenApiResponse(description='Redirect to GitHub')},
-        tags=['OAuth']
-    )
+    @github_login_schema
     def get(self, request):
         github_auth_url = (
             f"https://github.com/login/oauth/authorize"
@@ -195,15 +170,7 @@ class GitHubCallbackView(APIView):
     """
     permission_classes = [AllowAny]
     
-    @extend_schema(
-        summary="GitHub OAuth Callback",
-        description="Handles the callback from GitHub OAuth",
-        responses={
-            200: LoginResponseSerializer,
-            400: OpenApiResponse(description='OAuth error'),
-        },
-        tags=['OAuth']
-    )
+    @github_callback_schema
     def get(self, request):
         code = request.GET.get('code')
         
@@ -268,7 +235,6 @@ class GitHubCallbackView(APIView):
             if not email:
                 return Response({'error': 'No email found'}, status=status.HTTP_400_BAD_REQUEST)
             
-            # Créer ou récupérer l'utilisateur avec provider GitHub
             user, created = User.objects.get_or_create(
                 oauth_provider='github',
                 oauth_id=github_id,
@@ -279,7 +245,6 @@ class GitHubCallbackView(APIView):
                 }
             )
             
-            # Mettre à jour l'email si changé
             if not created and user.email != email:
                 user.email = email
                 user.save()
@@ -303,12 +268,7 @@ class GitLabLoginView(APIView):
     """
     permission_classes = [AllowAny]
     
-    @extend_schema(
-        summary="GitLab OAuth Login",
-        description="Redirects to GitLab for OAuth authentication",
-        responses={302: OpenApiResponse(description='Redirect to GitLab')},
-        tags=['OAuth']
-    )
+    @gitlab_login_schema
     def get(self, request):
         gitlab_auth_url = (
             f"https://gitlab.com/oauth/authorize"
@@ -319,23 +279,13 @@ class GitLabLoginView(APIView):
         )
         return Response({'url': gitlab_auth_url})
 
-
-
 class GitLabCallbackView(APIView):
     """
     Handle GitLab OAuth callback
     """
     permission_classes = [AllowAny]
     
-    @extend_schema(
-        summary="GitLab OAuth Callback",
-        description="Handles the callback from GitLab OAuth",
-        responses={
-            200: LoginResponseSerializer,
-            400: OpenApiResponse(description='OAuth error'),
-        },
-        tags=['OAuth']
-    )
+    @gitlab_callback_schema
     def get(self, request):
         code = request.GET.get('code')
         
@@ -410,16 +360,10 @@ class GitLabCallbackView(APIView):
         except Exception as e:
             return Response({'error': f'Authentication failed: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
 
-
 class GoogleLoginView(APIView):
     permission_classes = [AllowAny]
     
-    @extend_schema(
-        summary="Google OAuth Login",
-        description="Redirects to Google for OAuth authentication",
-        responses={302: OpenApiResponse(description='Redirect to Google')},
-        tags=['OAuth']
-    )
+    @google_login_schema
     def get(self, request):
         google_auth_url = (
             f"https://accounts.google.com/o/oauth2/v2/auth"
@@ -434,15 +378,7 @@ class GoogleLoginView(APIView):
 class GoogleCallbackView(APIView):
     permission_classes = [AllowAny]
     
-    @extend_schema(
-        summary="Google OAuth Callback",
-        description="Handles the callback from Google OAuth",
-        responses={
-            200: LoginResponseSerializer,
-            400: OpenApiResponse(description='OAuth error'),
-        },
-        tags=['OAuth']
-    )
+    @google_callback_schema
     def get(self, request):
         code = request.GET.get('code')
         

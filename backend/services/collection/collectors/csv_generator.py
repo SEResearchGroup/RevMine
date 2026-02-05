@@ -1,10 +1,631 @@
 import csv
 import io
-from datetime import datetime
-from typing import Dict, List
+import math
+from datetime import datetime, timezone
+from typing import Dict, List, Optional, Tuple, Set
 import logging
+import math
 
 logger = logging.getLogger(__name__)
+
+
+# =============================================================================
+# DATA EXTRACTION LAYER - Low-level functions to extract data from JSON
+# =============================================================================
+
+class DataExtractor:
+    """
+    Low-level data extraction functions.
+    These functions ONLY extract raw data from the JSON structure without any calculations.
+    They handle the differences between GitHub and GitLab JSON formats.
+    """
+    
+    @staticmethod
+    def parse_iso_date(date_str: Optional[str]) -> Optional[datetime]:
+        """Parse ISO 8601 date string to datetime object"""
+        if not date_str:
+            return None
+        try:
+            # Handle both 'Z' suffix and '+00:00' timezone formats
+            return datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+        except (ValueError, AttributeError):
+            return None
+    
+    @staticmethod
+    def format_date(date_str: Optional[str]) -> str:
+        """Format ISO date to readable string"""
+        if not date_str:
+            return ''
+        try:
+            dt = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+            return dt.strftime('%Y-%m-%d %H:%M:%S')
+        except:
+            return date_str
+
+
+class GitHubDataExtractor(DataExtractor):
+    """Extract data from GitHub Pull Request JSON format"""
+    
+    @staticmethod
+    def get_item_key() -> str:
+        return 'pull_requests'
+    
+    @staticmethod
+    def get_item_id(details: dict) -> Optional[int]:
+        """Get PR number"""
+        return details.get('number')
+    
+    @staticmethod
+    def get_title(details: dict) -> str:
+        return details.get('title', '')
+    
+    @staticmethod
+    def get_author(details: dict) -> str:
+        """Get PR author login"""
+        return details.get('user', {}).get('login', '')
+    
+    @staticmethod
+    def get_state(details: dict) -> str:
+        """Get PR state (open, closed, merged)"""
+        if details.get('merged'):
+            return 'merged'
+        return details.get('state', '')
+    
+    @staticmethod
+    def get_created_at(details: dict) -> Optional[str]:
+        return details.get('created_at')
+    
+    @staticmethod
+    def get_merged_at(details: dict) -> Optional[str]:
+        return details.get('merged_at')
+    
+    @staticmethod
+    def get_closed_at(details: dict) -> Optional[str]:
+        return details.get('closed_at')
+    
+    @staticmethod
+    def get_merged_by(details: dict) -> str:
+        merged_by = details.get('merged_by')
+        return merged_by.get('login', '') if merged_by else ''
+    
+    @staticmethod
+    def get_commits(item: dict) -> List[dict]:
+        """Get list of commits from PR"""
+        return item.get('commits', [])
+    
+    @staticmethod
+    def get_commit_sha(commit: dict) -> str:
+        """Get commit SHA"""
+        return commit.get('commit_sha', '') or commit.get('sha', '')
+    
+    @staticmethod
+    def get_commit_author_name(commit: dict) -> str:
+        """Extract commit author name from GitHub commit structure"""
+        # Structure: commit.details.commit.author.name
+        details = commit.get('details', {})
+        return details.get('commit', {}).get('author', {}).get('name', '')
+    
+    @staticmethod
+    def get_commit_author_login(commit: dict) -> str:
+        """Extract commit author login from GitHub commit structure"""
+        # Structure: commit.details.author.login
+        details = commit.get('details', {})
+        return details.get('author', {}).get('login', '')
+    
+    @staticmethod
+    def get_commit_date(commit: dict) -> Optional[str]:
+        """Extract commit date from GitHub commit structure"""
+        # Structure: commit.details.commit.author.date
+        details = commit.get('details', {})
+        return details.get('commit', {}).get('author', {}).get('date')
+    
+    @staticmethod
+    def get_commit_message(commit: dict) -> str:
+        """Extract commit message from GitHub commit structure"""
+        details = commit.get('details', {})
+        return details.get('commit', {}).get('message', '')
+    
+    @staticmethod
+    def get_commit_additions(commit: dict) -> int:
+        """Get additions from commit changes"""
+        changes = commit.get('changes', [])
+        return sum(c.get('additions', 0) or 0 for c in changes)
+    
+    @staticmethod
+    def get_commit_deletions(commit: dict) -> int:
+        """Get deletions from commit changes"""
+        changes = commit.get('changes', [])
+        return sum(c.get('deletions', 0) or 0 for c in changes)
+    
+    @staticmethod
+    def get_files(item: dict) -> List[dict]:
+        """Get list of modified files"""
+        return item.get('files', [])
+    
+    @staticmethod
+    def get_file_name(file: dict) -> str:
+        return file.get('filename', '')
+    
+    @staticmethod
+    def get_file_additions(file: dict) -> int:
+        return file.get('additions', 0) or 0
+    
+    @staticmethod
+    def get_file_deletions(file: dict) -> int:
+        return file.get('deletions', 0) or 0
+    
+    @staticmethod
+    def get_pr_additions(details: dict) -> int:
+        """Get total additions from PR details"""
+        return details.get('additions', 0) or 0
+    
+    @staticmethod
+    def get_pr_deletions(details: dict) -> int:
+        """Get total deletions from PR details"""
+        return details.get('deletions', 0) or 0
+    
+    @staticmethod
+    def get_comments(item: dict) -> List[dict]:
+        """Get issue comments"""
+        return item.get('comments', [])
+    
+    @staticmethod
+    def get_reviews(item: dict) -> List[dict]:
+        """Get PR reviews"""
+        return item.get('reviews', [])
+    
+    @staticmethod
+    def get_review_comments(item: dict) -> List[dict]:
+        """Get review comments (inline code comments)"""
+        return item.get('review_comments', [])
+    
+    @staticmethod
+    def get_comment_author(comment: dict) -> str:
+        return comment.get('user', {}).get('login', '')
+    
+    @staticmethod
+    def get_review_author(review: dict) -> str:
+        return review.get('user', {}).get('login', '')
+    
+    @staticmethod
+    def get_unique_reviewers(item: dict) -> Set[str]:
+        """Get set of unique reviewers"""
+        reviewers = set()
+        for review in item.get('reviews', []):
+            user = review.get('user', {}).get('login')
+            if user:
+                reviewers.add(user)
+        return reviewers
+    
+    @staticmethod
+    def get_unique_discussioners(item: dict) -> Set[str]:
+        """Get set of unique users who participated in discussions"""
+        discussioners = set()
+        
+        for comment in item.get('comments', []):
+            user = comment.get('user', {}).get('login')
+            if user:
+                discussioners.add(user)
+        
+        for review in item.get('reviews', []):
+            user = review.get('user', {}).get('login')
+            if user:
+                discussioners.add(user)
+        
+        for rc in item.get('review_comments', []):
+            user = rc.get('user', {}).get('login')
+            if user:
+                discussioners.add(user)
+        
+        return discussioners
+
+
+class GitLabDataExtractor(DataExtractor):
+    """Extract data from GitLab Merge Request JSON format"""
+    
+    @staticmethod
+    def get_item_key() -> str:
+        return 'merge_requests'
+    
+    @staticmethod
+    def get_item_id(details: dict) -> Optional[int]:
+        """Get MR IID"""
+        return details.get('iid')
+    
+    @staticmethod
+    def get_title(details: dict) -> str:
+        return details.get('title', '')
+    
+    @staticmethod
+    def get_author(details: dict) -> str:
+        """Get MR author username"""
+        return details.get('author', {}).get('username', '')
+    
+    @staticmethod
+    def get_state(details: dict) -> str:
+        """Get MR state"""
+        return details.get('state', '')
+    
+    @staticmethod
+    def get_created_at(details: dict) -> Optional[str]:
+        return details.get('created_at')
+    
+    @staticmethod
+    def get_merged_at(details: dict) -> Optional[str]:
+        return details.get('merged_at')
+    
+    @staticmethod
+    def get_closed_at(details: dict) -> Optional[str]:
+        return details.get('closed_at')
+    
+    @staticmethod
+    def get_merged_by(details: dict) -> str:
+        merged_by = details.get('merged_by')
+        return merged_by.get('username', '') if merged_by else ''
+    
+    @staticmethod
+    def get_commits(item: dict) -> List[dict]:
+        """Get list of commits from MR"""
+        return item.get('commits', [])
+    
+    @staticmethod
+    def get_commit_sha(commit: dict) -> str:
+        """Get commit SHA"""
+        return commit.get('commit_id', '') or commit.get('id', '')
+    
+    @staticmethod
+    def get_commit_author_name(commit: dict) -> str:
+        """Extract commit author name from GitLab commit structure"""
+        # Structure: commit.details.author_name
+        details = commit.get('details', {})
+        return details.get('author_name', '')
+    
+    @staticmethod
+    def get_commit_author_login(commit: dict) -> str:
+        """GitLab doesn't have login in commits, return author_name"""
+        details = commit.get('details', {})
+        return details.get('author_name', '')
+    
+    @staticmethod
+    def get_commit_date(commit: dict) -> Optional[str]:
+        """Extract commit date from GitLab commit structure"""
+        # Structure: commit.details.authored_date or commit.details.created_at
+        details = commit.get('details', {})
+        return details.get('authored_date') or details.get('created_at')
+    
+    @staticmethod
+    def get_commit_message(commit: dict) -> str:
+        """Extract commit message from GitLab commit structure"""
+        details = commit.get('details', {})
+        return details.get('message', '') or details.get('title', '')
+    
+    @staticmethod
+    def get_commit_additions(commit: dict) -> int:
+        """
+        Get additions from commit changesHist by parsing the diff.
+        
+        GitLab stores diffs in unified format. Lines starting with '+' 
+        (but not '+++') are additions.
+        """
+        total_additions = 0
+        for change in commit.get('changesHist', []):
+            diff = change.get('diff', '')
+            for line in diff.split('\n'):
+                # Count lines that start with '+' but not '+++' (file header)
+                if line.startswith('+') and not line.startswith('+++'):
+                    total_additions += 1
+        return total_additions
+    
+    @staticmethod
+    def get_commit_deletions(commit: dict) -> int:
+        """
+        Get deletions from commit changesHist by parsing the diff.
+        
+        Lines starting with '-' (but not '---') are deletions.
+        """
+        total_deletions = 0
+        for change in commit.get('changesHist', []):
+            diff = change.get('diff', '')
+            for line in diff.split('\n'):
+                # Count lines that start with '-' but not '---' (file header)
+                if line.startswith('-') and not line.startswith('---'):
+                    total_deletions += 1
+        return total_deletions
+    
+    @staticmethod
+    def get_files(item: dict) -> List[dict]:
+        """Get list of modified files from changes"""
+        changes = item.get('changes', {})
+        if isinstance(changes, dict):
+            return changes.get('changes', []) or changes.get('diffs', [])
+        return []
+    
+    @staticmethod
+    def get_file_name(file: dict) -> str:
+        return file.get('new_path', '') or file.get('old_path', '')
+    
+    @staticmethod
+    def get_file_additions(file: dict) -> int:
+        """Parse additions from file diff"""
+        diff = file.get('diff', '')
+        additions = 0
+        for line in diff.split('\n'):
+            if line.startswith('+') and not line.startswith('+++'):
+                additions += 1
+        return additions
+    
+    @staticmethod
+    def get_file_deletions(file: dict) -> int:
+        """Parse deletions from file diff"""
+        diff = file.get('diff', '')
+        deletions = 0
+        for line in diff.split('\n'):
+            if line.startswith('-') and not line.startswith('---'):
+                deletions += 1
+        return deletions
+    
+    @staticmethod
+    def get_mr_additions(details: dict) -> int:
+        """Get total additions - GitLab stores this differently"""
+        # GitLab may not have direct additions count
+        return 0
+    
+    @staticmethod
+    def get_mr_deletions(details: dict) -> int:
+        """Get total deletions"""
+        return 0
+    
+    @staticmethod
+    def get_discussions(item: dict) -> List[dict]:
+        """Get discussions"""
+        return item.get('discussions', [])
+    
+    @staticmethod
+    def get_notes(item: dict) -> List[dict]:
+        """Get notes (comments)"""
+        return item.get('notes', [])
+    
+    @staticmethod
+    def get_note_author(note: dict) -> str:
+        return note.get('author', {}).get('username', '')
+    
+    @staticmethod
+    def get_unique_reviewers(item: dict) -> Set[str]:
+        """Get set of unique reviewers from notes"""
+        reviewers = set()
+        for note in item.get('notes', []):
+            author = note.get('author', {}).get('username')
+            if author:
+                reviewers.add(author)
+        return reviewers
+    
+    @staticmethod
+    def get_unique_discussioners(item: dict) -> Set[str]:
+        """Get set of unique users who participated in discussions"""
+        discussioners = set()
+        
+        for discussion in item.get('discussions', []):
+            for note in discussion.get('notes', []):
+                author = note.get('author', {}).get('username')
+                if author:
+                    discussioners.add(author)
+        
+        for note in item.get('notes', []):
+            author = note.get('author', {}).get('username')
+            if author:
+                discussioners.add(author)
+        
+        return discussioners
+
+
+def get_data_extractor(platform: str):
+    """Factory function to get the appropriate data extractor"""
+    extractors = {
+        'github': GitHubDataExtractor,
+        'gitlab': GitLabDataExtractor,
+    }
+    extractor_class = extractors.get(platform.lower())
+    if not extractor_class:
+        raise ValueError(f"Unsupported platform: {platform}")
+    return extractor_class()
+
+
+# =============================================================================
+# METRICS CALCULATION LAYER - Pure calculation functions
+# =============================================================================
+
+class MetricsCalculator:
+    """
+    Pure calculation functions for code review metrics.
+    These functions take already-extracted data and compute metrics.
+    They are platform-agnostic and work with normalized data.
+    
+    Metrics Reference:
+    - Lead Time: Time from PR/MR creation to close/merge (in minutes)
+    - Churn: Total lines added and deleted across commits
+    - Entropy: Shannon entropy measuring distribution of changes across files
+    - Mean Time Between Commits: Average time interval between consecutive commits
+    - Author Contributions: Count of major (>=50% commits) vs minor (<50%) contributors
+    - Delta Time: Days since Unix epoch (for time-series analysis)
+    - Rework Size: Estimated lines changed after code review feedback
+    """
+    
+    @staticmethod
+    def calculate_lead_time(created_at: Optional[datetime], closed_at: Optional[datetime]) -> float:
+        """
+        Calculate lead time in minutes.
+        
+        Lead Time = (closed_at - created_at) in minutes
+        
+        Args:
+            created_at: When the PR/MR was created
+            closed_at: When the PR/MR was closed/merged
+            
+        Returns:
+            Lead time in minutes, or 0 if dates are invalid
+        """
+        if not created_at or not closed_at:
+            return 0.0
+        delta = closed_at - created_at
+        return round(delta.total_seconds() / 60, 2)
+    
+    @staticmethod
+    def calculate_mean_time_between_commits(commit_dates: List[datetime]) -> float:
+        """
+        Calculate mean time between consecutive commits in seconds.
+        
+        Formula: sum(time_diffs) / count(time_diffs)
+        where time_diffs[i] = dates[i+1] - dates[i]
+        
+        Args:
+            commit_dates: List of parsed datetime objects for each commit
+            
+        Returns:
+            Mean time between commits in seconds, or 0 if < 2 commits
+        """
+        if len(commit_dates) < 2:
+            return 0.0
+        
+        sorted_dates = sorted(commit_dates)
+        time_diffs = [
+            (sorted_dates[i + 1] - sorted_dates[i]).total_seconds()
+            for i in range(len(sorted_dates) - 1)
+        ]
+        
+        if not time_diffs:
+            return 0.0
+        
+        return round(sum(time_diffs) / len(time_diffs), 2)
+    
+    @staticmethod
+    def calculate_churn(commit_additions: List[int], commit_deletions: List[int]) -> Tuple[float, float]:
+        """
+        Calculate code churn (total additions and deletions across all commits).
+        
+        Churn represents the total volume of code changes.
+        
+        Args:
+            commit_additions: List of additions per commit
+            commit_deletions: List of deletions per commit
+            
+        Returns:
+            Tuple of (total_additions, total_deletions)
+        """
+        total_additions = sum(a for a in commit_additions if a)
+        total_deletions = sum(d for d in commit_deletions if d)
+        return float(total_additions), float(total_deletions)
+    
+    @staticmethod
+    def calculate_entropy(file_changes: List[int]) -> float:
+        """
+        Calculate Shannon entropy based on file modification distribution.
+        
+        Entropy measures how evenly changes are distributed across files.
+        - Low entropy: changes concentrated in few files
+        - High entropy: changes spread across many files
+        
+        Formula: -Σ(p_i * log2(p_i))
+        where p_i = changes_in_file_i / total_changes
+        
+        Args:
+            file_changes: List of (additions + deletions) per file
+            
+        Returns:
+            Shannon entropy value (0 to log2(n) where n = number of files)
+        """
+        if not file_changes:
+            return 0.0
+        
+        # Filter out zero changes
+        changes = [c for c in file_changes if c > 0]
+        if not changes:
+            return 0.0
+        
+        total = sum(changes)
+        if total == 0:
+            return 0.0
+        
+        entropy = 0.0
+        for c in changes:
+            p = c / total
+            if p > 0:
+                entropy -= p * math.log2(p)
+        
+        return round(entropy, 6)
+    
+    @staticmethod
+    def calculate_author_contributions(author_commit_counts: Dict[str, int]) -> Tuple[int, int]:
+        """
+        Calculate minor and major author counts.
+        
+        - Major author: contributed >= 50% of commits
+        - Minor author: contributed < 50% of commits
+        
+        Args:
+            author_commit_counts: Dict mapping author name to commit count
+            
+        Returns:
+            Tuple of (nb_minor, nb_major)
+        """
+        if not author_commit_counts:
+            return 0, 0
+        
+        total_commits = sum(author_commit_counts.values())
+        if total_commits == 0:
+            return 0, 0
+        
+        nb_minor = 0
+        nb_major = 0
+        
+        for author, count in author_commit_counts.items():
+            contribution_pct = count / total_commits
+            if contribution_pct >= 0.5:
+                nb_major += 1
+            else:
+                nb_minor += 1
+        
+        return nb_minor, nb_major
+    
+    @staticmethod
+    def calculate_delta_time(created_at: Optional[datetime]) -> float:
+        """
+        Calculate delta time as fractional days since Unix epoch.
+        
+        This metric is useful for time-series analysis.
+        
+        Args:
+            created_at: When the PR/MR was created
+            
+        Returns:
+            Fractional days since 1970-01-01
+        """
+        if not created_at:
+            return 0.0
+        
+        # Ensure timezone awareness
+        if created_at.tzinfo is None:
+            created_at = created_at.replace(tzinfo=timezone.utc)
+        
+        epoch = datetime(1970, 1, 1, tzinfo=timezone.utc)
+        delta = created_at - epoch
+        return round(delta.total_seconds() / 86400, 6)
+    
+    @staticmethod
+    def calculate_rework_size(review_comment_count: int, diff_note_count: int) -> float:
+        """
+        Estimate rework size based on review comments.
+        
+        Rework represents changes made in response to code review feedback.
+        Each review comment with code suggestions is estimated as ~10 lines of rework.
+        
+        Args:
+            review_comment_count: Number of review comments with suggestions
+            diff_note_count: Number of diff notes (GitLab)
+            
+        Returns:
+            Estimated lines of rework
+        """
+        return float(review_comment_count * 10 + diff_note_count * 10)
 
 
 class CSVGenerator:
@@ -44,21 +665,34 @@ class CSVGenerator:
                 if author not in filters['authors']:
                     continue
             
-            # Filter by keywords
-            if filters.get('keywords') and filters.get('keyword_field'):
+            # Filter by keyword_filters (new format: array of {field, keywords})
+            keyword_filters = filters.get('keyword_filters', [])
+            if keyword_filters:
+                passes_all_keyword_filters = True
+                
+                for kf in keyword_filters:
+                    keyword_field = kf.get('field')
+                    keywords = kf.get('keywords', [])
+                    
+                    if not keyword_field or not keywords:
+                        continue
+                    
+                    text_to_search = self._get_text_for_keyword_field(item, keyword_field)
+                    has_keyword = any(keyword.lower() in text_to_search for keyword in keywords)
+                    
+                    if not has_keyword:
+                        passes_all_keyword_filters = False
+                        break
+                
+                if not passes_all_keyword_filters:
+                    continue
+            
+            # Legacy support: Filter by keywords (old format: single keyword_field + keywords)
+            elif filters.get('keywords') and filters.get('keyword_field'):
                 keyword_field = filters['keyword_field']
                 keywords = filters['keywords']
                 
-                text_to_search = ""
-                
-                if keyword_field == 'title':
-                    text_to_search = item.get('details', {}).get('title', '').lower()
-                elif keyword_field == 'description':
-                    text_to_search = item.get('details', {}).get('body', '').lower()
-                elif keyword_field == 'comments':
-                    comments = item.get('comments', []) + item.get('notes', [])
-                    text_to_search = " ".join([c.get('body', '').lower() for c in comments])
-                
+                text_to_search = self._get_text_for_keyword_field(item, keyword_field)
                 has_keyword = any(keyword.lower() in text_to_search for keyword in keywords)
                 
                 if not has_keyword:
@@ -67,6 +701,37 @@ class CSVGenerator:
             filtered_items.append(item)
         
         return {self.item_key: filtered_items}
+    
+    def _get_text_for_keyword_field(self, item: dict, keyword_field: str) -> str:
+        """Extract text to search based on keyword field"""
+        if keyword_field == 'title':
+            return item.get('details', {}).get('title', '').lower()
+        elif keyword_field == 'description':
+            return item.get('details', {}).get('body', '').lower()
+        elif keyword_field == 'comments':
+            comments = item.get('comments', []) + item.get('notes', [])
+            return " ".join([c.get('body', '').lower() for c in comments])
+        elif keyword_field == 'commit_message':
+            commits = item.get('commits', [])
+            commit_messages = []
+            for commit in commits:
+                # GitHub format - nested under details.commit.message
+                if 'details' in commit:
+                    details = commit.get('details', {})
+                    if 'commit' in details and 'message' in details.get('commit', {}):
+                        commit_messages.append(details['commit']['message'].lower())
+                    elif 'message' in details:
+                        commit_messages.append(details['message'].lower())
+                # Alternative GitHub format - directly under commit.message
+                elif 'commit' in commit and 'message' in commit.get('commit', {}):
+                    commit_messages.append(commit['commit']['message'].lower())
+                # GitLab format - message directly in commit
+                elif 'message' in commit:
+                    commit_messages.append(commit['message'].lower())
+                elif 'title' in commit:
+                    commit_messages.append(commit['title'].lower())
+            return " ".join(commit_messages)
+        return ""
     
     def generate_csv(self, data: dict) -> str:
         """Generate CSV content from filtered data"""
@@ -329,11 +994,27 @@ class GitLabAdapter(PlatformAdapter):
         return len(item.get('discussions', []))
     
     def get_reviewers(self, item: dict) -> set:
+        """
+        Pour GitLab: compte les reviewers via les approbations et notes de review
+        Évite le double comptage avec discussioners
+        """
         reviewers = set()
+        
+        # Approbations explicites
+        details = item.get('details', {})
+        approved_by = details.get('approved_by', [])
+        for approval in approved_by:
+            user = approval.get('user', {}).get('username')
+            if user:
+                reviewers.add(user)
+        
+        # Notes de type review (non-system)
         for note in item.get('notes', []):
-            author = note.get('author', {}).get('username')
-            if author:
-                reviewers.add(author)
+            if not note.get('system', False):  # Ignorer notes système
+                author = note.get('author', {}).get('username')
+                if author:
+                    reviewers.add(author)
+        
         return reviewers
     
     def get_discussioners(self, item: dict) -> set:
@@ -398,65 +1079,201 @@ def get_platform_adapter(platform: str) -> PlatformAdapter:
 
 
 class StatisticsCSVGenerator:
-    """Generate project statistics CSV"""
+    """
+    Generate project statistics CSV with metrics per PR/MR.
+    
+    Uses DataExtractor for platform-specific data access and
+    MetricsCalculator for pure metric calculations.
+    """
+    
+    # All available features with their internal column names
+    ALL_FEATURES = [
+        'Creation_Date', 'Lead_Time', '#Discussions', '#Commits',
+        'Mean_Time_between_commits', 'Commiters', '#UniqueCommiters',
+        'nb_minor_author', 'nb_major_author', 'delta_time',
+        'churn_addition', 'churn_deletions', 'initial_size',
+        'hist_entropy', 'modified_files', 'filetypes', 'state',
+        'rework_size', '#people', '#reviewers', '#commiters',
+        '#discussionners', 'additions', 'deletions', 'comments'
+    ]
     
     def __init__(self, platform: str):
         self.platform = platform
-        self.adapter = get_platform_adapter(platform)
-        self.item_key = self.adapter.get_item_key()
+        self.extractor = get_data_extractor(platform)
+        self.adapter = get_platform_adapter(platform)  # Keep for compatibility
+        self.item_key = self.extractor.get_item_key()
         self.item_id_column = 'PR_ID' if platform == 'github' else 'MR_ID'
         self.initial_size_column = 'initial_pr_size' if platform == 'github' else 'initial_mr_size'
     
-    def generate_statistics_csv(self, data: dict, collection_plan) -> str:
-        """Generate statistics CSV with metrics per PR/MR"""
+    def generate_statistics_csv(self, data: dict, collection_plan, selected_features: List[str] = None) -> str:
+        """
+        Generate statistics CSV with metrics per PR/MR.
+        
+        Args:
+            data: The filtered PR/MR data
+            collection_plan: The collection plan with repository info
+            selected_features: Optional list of feature IDs to include.
+                             If None or empty, all features are included.
+        """
         items = data.get(self.item_key, [])
         
         output = io.StringIO()
         
-        # Headers matching the target format with dynamic column names
-        headers = [
-            'Project_ID', self.item_id_column, 'Creation_Date', 'Lead_Time',
-            '#Discussions', '#Commits', 'Mean_Time_between_commits',
-            'Commiters', '#UniqueCommiters', 'nb_minor_author', 'nb_major_author',
-            'delta_time', 'churn_addition', 'churn_deletions', self.initial_size_column,
+        # Build headers based on selected features
+        # Always include Project_ID and item ID column
+        base_headers = ['Project_ID', self.item_id_column]
+        
+        # All feature headers (with dynamic column name for initial_size)
+        all_feature_headers = [
+            'Creation_Date', 'Lead_Time', '#Discussions', '#Commits',
+            'Mean_Time_between_commits', 'Commiters', '#UniqueCommiters',
+            'nb_minor_author', 'nb_major_author', 'delta_time',
+            'churn_addition', 'churn_deletions', self.initial_size_column,
             'hist_entropy', 'modified_files', 'filetypes', 'state',
             'rework_size', '#people', '#reviewers', '#commiters',
             '#discussionners', 'additions', 'deletions', 'comments'
         ]
         
+        # Feature ID to header mapping (handle initial_size special case)
+        feature_to_header = {f: f for f in self.ALL_FEATURES}
+        feature_to_header['initial_size'] = self.initial_size_column
+        
+        # Filter headers based on selected features
+        if selected_features:
+            feature_headers = []
+            for feature in self.ALL_FEATURES:
+                if feature in selected_features:
+                    feature_headers.append(feature_to_header[feature])
+        else:
+            # If no selection, include all features
+            feature_headers = all_feature_headers
+        
+        headers = base_headers + feature_headers
+        
         writer = csv.DictWriter(output, fieldnames=headers)
         writer.writeheader()
         
         for item in items:
-            row = self._build_row(item, collection_plan)
+            full_row = self._build_row(item, collection_plan)
+            # Filter row to only include selected headers
+            row = {k: v for k, v in full_row.items() if k in headers}
             writer.writerow(row)
         
         return output.getvalue()
     
     def _build_row(self, item: dict, collection_plan) -> dict:
-        """Build a single row using the platform adapter"""
+        """
+        Build a single row using DataExtractor for extraction 
+        and MetricsCalculator for calculations.
+        """
         details = item.get('details', {})
-        commits = item.get('commits', [])
+        commits = self.extractor.get_commits(item)
+        
+        # =====================================================================
+        # STEP 1: DATA EXTRACTION (using DataExtractor)
+        # =====================================================================
+        
+        # Basic item info
+        item_id = self.extractor.get_item_id(details)
+        state = self.extractor.get_state(details)
+        created_at_str = self.extractor.get_created_at(details)
+        closed_at_str = self.extractor.get_closed_at(details) or self.extractor.get_merged_at(details)
         
         # Parse dates
-        created_at = self._parse_date(details.get('created_at'))
-        closed_at = self._parse_date(details.get('closed_at') or details.get('merged_at'))
+        created_at = DataExtractor.parse_iso_date(created_at_str)
+        closed_at = DataExtractor.parse_iso_date(closed_at_str)
         
-        # Calculate metrics
-        lead_time = self._calculate_lead_time(created_at, closed_at)
-        mean_time_commits = self._calculate_mean_time_between_commits(commits)
-        committers = self._get_committers(commits)
+        # Extract commit dates for time-based metrics
+        commit_dates = []
+        for commit in commits:
+            date_str = self.extractor.get_commit_date(commit)
+            parsed_date = DataExtractor.parse_iso_date(date_str)
+            if parsed_date:
+                commit_dates.append(parsed_date)
         
-        # Platform-specific data extraction via adapter
-        item_id = self.adapter.get_item_id(details)
-        discussions_count = self.adapter.get_discussions_count(item)
+        # Extract commit author counts
+        author_counts = {}
+        for commit in commits:
+            author = self.extractor.get_commit_author_name(commit)
+            if author:
+                author_counts[author] = author_counts.get(author, 0) + 1
+        committers = set(author_counts.keys())
+        
+        # Extract commit churn (additions/deletions per commit)
+        commit_additions = [self.extractor.get_commit_additions(c) for c in commits]
+        commit_deletions = [self.extractor.get_commit_deletions(c) for c in commits]
+        
+        # Extract files and file-level changes
+        files = self.extractor.get_files(item)
+        file_changes = []
+        for f in files:
+            adds = self.extractor.get_file_additions(f)
+            dels = self.extractor.get_file_deletions(f)
+            file_changes.append(adds + dels)
+        
+        # Extract PR/MR level additions/deletions (from details)
+        if self.platform == 'github':
+            additions = self.extractor.get_pr_additions(details)
+            deletions = self.extractor.get_pr_deletions(details)
+        else:
+            # For GitLab, sum from files or use 0
+            additions = sum(self.extractor.get_file_additions(f) for f in files)
+            deletions = sum(self.extractor.get_file_deletions(f) for f in files)
+        
+        # Extract reviewers and discussioners (using adapter for now)
         reviewers = self.adapter.get_reviewers(item)
         discussioners = self.adapter.get_discussioners(item)
-        files = self.adapter.get_files(item)
-        additions = self.adapter.get_additions(details)
-        deletions = self.adapter.get_deletions(details)
+        discussions_count = self.adapter.get_discussions_count(item)
         
-        # Calculate additional metrics
+        # Count review comments with suggestions (for rework estimation)
+        review_comment_count = 0
+        diff_note_count = 0
+        
+        # GitHub: check review_comments
+        for rc in item.get('review_comments', []):
+            body = rc.get('body', '')
+            if 'suggestion' in body.lower() or '```' in body:
+                review_comment_count += 1
+        
+        # GitLab: check diff notes
+        for discussion in item.get('discussions', []):
+            for note in discussion.get('notes', []):
+                if note.get('type') == 'DiffNote':
+                    diff_note_count += 1
+        
+        # =====================================================================
+        # STEP 2: METRICS CALCULATION (using MetricsCalculator)
+        # =====================================================================
+        
+        # Lead time
+        lead_time = MetricsCalculator.calculate_lead_time(created_at, closed_at)
+        
+        # Mean time between commits
+        mean_time_commits = MetricsCalculator.calculate_mean_time_between_commits(commit_dates)
+        
+        # Author contributions (minor/major)
+        nb_minor, nb_major = MetricsCalculator.calculate_author_contributions(author_counts)
+        
+        # Delta time (days since epoch)
+        delta_time = MetricsCalculator.calculate_delta_time(created_at)
+        
+        # Churn (from commits)
+        churn_add, churn_del = MetricsCalculator.calculate_churn(commit_additions, commit_deletions)
+        
+        # If commit-level churn is 0, use PR/MR level additions/deletions
+        if churn_add == 0 and churn_del == 0:
+            churn_add, churn_del = float(additions), float(deletions)
+        
+        # Entropy (file change distribution)
+        hist_entropy = MetricsCalculator.calculate_entropy(file_changes)
+        
+        # Rework size
+        rework_size = MetricsCalculator.calculate_rework_size(review_comment_count, diff_note_count)
+        
+        # =====================================================================
+        # STEP 3: BUILD OUTPUT ROW
+        # =====================================================================
+        
         initial_size = additions + deletions
         modified_files_count = len(files)
         filetypes = self._count_filetypes(files)
@@ -464,23 +1281,27 @@ class StatisticsCSVGenerator:
         # Calculate commit author statistics (minor/major)
         nb_minor, nb_major = self._calculate_author_contributions(commits)
         
-        # Calculate delta_time (time from first commit to MR creation in seconds)
+        # Calculate delta_time (time from first commit to MR creation)
         delta_time = self._calculate_delta_time(commits, created_at)
         
-        # Calculate churn (from commit changes)
-        churn_add, churn_del = self._calculate_churn(commits)
+        # Calculate churn (from MR total changes)
+        churn_add, churn_del = self._calculate_churn(item)
         
         # Calculate entropy (normalized file changes)
         hist_entropy = self._calculate_entropy(files)
         
-        # Calculate rework size (lines changed in review after initial submission)
+        # Calculate rework size (lines changed after initial review)
         rework_size = self._calculate_rework_size(item)
         
         # Count unique people involved
-        people_count = self._count_unique_people(item, committers, discussioners)
+        people = set(committers)
+        people.update(discussioners)
+        author = self.extractor.get_author(details)
+        if author:
+            people.add(author)
+        people_count = len(people)
         
-        # State - show 'open' for non-merged/non-closed
-        state = details.get('state', '')
+        # Handle open PRs/MRs
         if state in ['opened', 'open']:
             lead_time_display = 'open'
         else:
@@ -489,7 +1310,7 @@ class StatisticsCSVGenerator:
         return {
             'Project_ID': collection_plan.repository_id,
             self.item_id_column: item_id,
-            'Creation_Date': details.get('created_at', ''),
+            'Creation_Date': created_at_str or '',
             'Lead_Time': lead_time_display,
             '#Discussions': discussions_count,
             '#Commits': len(commits),
@@ -526,11 +1347,15 @@ class StatisticsCSVGenerator:
             return None
     
     def _calculate_lead_time(self, created_at, closed_at):
-        """Calculate lead time in minutes"""
+        """
+        Calculate lead time in HOURS (CORRIGÉ).
+        Lead Time = temps entre création et merge/close du PR/MR
+        Retourne en heures selon les standards DORA
+        """
         if not created_at or not closed_at:
             return 0
         delta = closed_at - created_at
-        return round(delta.total_seconds() / 60, 2)  # Return in minutes like the example
+        return round(delta.total_seconds() / 3600, 2)  # HEURES au lieu de minutes
     
     def _calculate_mean_time_between_commits(self, commits: List):
         """Calculate mean time between commits in seconds"""
@@ -564,9 +1389,9 @@ class StatisticsCSVGenerator:
     
     def _calculate_author_contributions(self, commits: List) -> tuple:
         """
-        Calculate minor and major author counts.
-        Major author: contributed >= 50% of commits
-        Minor author: contributed < 50% of commits
+        Calculate minor and major author counts (CORRIGÉ).
+        Major author: contributed > 50% of commits (strictement supérieur)
+        Minor author: contributed <= 50% of commits
         """
         if not commits:
             return 0, 0
@@ -586,7 +1411,7 @@ class StatisticsCSVGenerator:
         
         for author, count in author_counts.items():
             contribution_pct = count / total_commits
-            if contribution_pct >= 0.5:
+            if contribution_pct > 0.5:  # STRICTEMENT supérieur à 50%
                 nb_major += 1
             else:
                 nb_minor += 1
@@ -594,48 +1419,70 @@ class StatisticsCSVGenerator:
         return nb_minor, nb_major
     
     def _calculate_delta_time(self, commits: List, created_at) -> float:
-        """Calculate delta time - typically days since epoch or similar metric"""
-        if not created_at:
-            return 0
+        """
+        Calculate delta time (CORRIGÉ):
+        Temps en SECONDES entre le premier commit et la création du MR/PR.
+        Indique si le travail a été fait en avance ou juste avant l'ouverture.
+        """
+        if not commits or not created_at:
+            return 0.0
         
-        # Calculate as fractional days since a reference point (epoch)
-        epoch = datetime(1970, 1, 1, tzinfo=created_at.tzinfo if created_at.tzinfo else None)
-        if created_at.tzinfo is None:
-            from datetime import timezone
-            epoch = datetime(1970, 1, 1, tzinfo=timezone.utc)
-            created_at = created_at.replace(tzinfo=timezone.utc)
-        
-        delta = created_at - epoch
-        return round(delta.total_seconds() / 86400, 6)  # Days with precision
-    
-    def _calculate_churn(self, commits: List) -> tuple:
-        """Calculate churn (total additions and deletions across all commits)"""
-        total_additions = 0
-        total_deletions = 0
-        
+        # Trouver le premier commit
+        commit_dates = []
         for commit in commits:
-            changes = commit.get('changes', [])
-            for change in changes:
-                total_additions += change.get('additions', 0) or 0
-                total_deletions += change.get('deletions', 0) or 0
-            
-            # Also try stats format
-            stats = commit.get('details', {}).get('stats', {})
-            if stats:
-                total_additions += stats.get('additions', 0) or 0
-                total_deletions += stats.get('deletions', 0) or 0
+            date_str = self.adapter.get_commit_date(commit)
+            if date_str:
+                try:
+                    commit_dates.append(
+                        datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+                    )
+                except:
+                    pass
         
-        # If no commit-level data, estimate from MR total
-        if total_additions == 0 and total_deletions == 0:
-            return 0.0, 0.0
+        if not commit_dates:
+            return 0.0
         
-        return float(total_additions), float(total_deletions)
+        first_commit = min(commit_dates)
+        delta = created_at - first_commit
+        
+        # Retourne en secondes (peut être négatif si le commit est après la création)
+        return round(delta.total_seconds(), 2)
+    
+    def _calculate_churn(self, item: dict) -> tuple:
+        """
+        Calculate churn (CORRIGÉ):
+        Utilise directement les totaux du MR/PR au lieu des commits individuels.
+        Churn = total des lignes ajoutées et supprimées dans le MR/PR.
+        """
+        details = item.get('details', {})
+        
+        # Utiliser les totaux du MR/PR directement via l'adapter
+        additions = self.adapter.get_additions(details)
+        deletions = self.adapter.get_deletions(details)
+        
+        # Si pas de données au niveau MR, essayer de les calculer des commits
+        if additions == 0 and deletions == 0:
+            for commit in item.get('commits', []):
+                # Essayer d'obtenir les stats du commit
+                commit_details = commit.get('details', {})
+                stats = commit_details.get('stats', {})
+                if stats:
+                    additions += stats.get('additions', 0) or 0
+                    deletions += stats.get('deletions', 0) or 0
+                
+                # Essayer le format 'changes'
+                changes = commit.get('changes', [])
+                for change in changes:
+                    additions += change.get('additions', 0) or 0
+                    deletions += change.get('deletions', 0) or 0
+        
+        return float(additions), float(deletions)
     
     def _count_filetypes(self, files: List) -> int:
         """Count unique file types/extensions"""
         extensions = set()
         for file in files:
-            filename = file.get('filename') or file.get('new_path') or file.get('old_path', '')
+            filename = self.extractor.get_file_name(file)
             if '.' in filename:
                 ext = filename.rsplit('.', 1)[-1].lower()
                 extensions.add(ext)
@@ -645,9 +1492,8 @@ class StatisticsCSVGenerator:
         """
         Calculate historical entropy based on file modifications.
         Uses Shannon entropy formula on file change distribution.
+        H = -Σ(p * log2(p)) où p = changements_fichier / total_changements
         """
-        import math
-        
         if not files:
             return 0.0
         
@@ -665,36 +1511,83 @@ class StatisticsCSVGenerator:
         if total == 0:
             return 0.0
         
+        # Shannon entropy formula
         entropy = 0.0
         for c in changes:
             if c > 0:
                 p = c / total
-                entropy -= p * math.log2(p) if p > 0 else 0
+                entropy -= p * math.log2(p)
         
         return round(entropy, 6)
     
     def _calculate_rework_size(self, item: dict) -> float:
         """
-        Calculate rework size - changes made after initial submission.
-        This is approximated by looking at review comments and subsequent commits.
+        Calculate rework size (CORRIGÉ):
+        Rework = changements faits APRÈS la première revue/discussion.
+        Compare les commits avant et après la première revue.
         """
-        # Count additions/deletions mentioned in review comments or subsequent pushes
-        rework = 0.0
+        details = item.get('details', {})
+        created_at = self._parse_date(details.get('created_at'))
         
-        # Check review comments for suggested changes
+        # Trouver la date de première revue/discussion
+        first_review_date = None
+        
+        # GitHub: chercher dans les reviews
+        for review in item.get('reviews', []):
+            review_date = self._parse_date(review.get('submitted_at'))
+            if review_date:
+                if first_review_date is None or review_date < first_review_date:
+                    first_review_date = review_date
+        
+        # GitHub: chercher dans les review comments
         for rc in item.get('review_comments', []):
-            # If there are review comments with code suggestions, estimate rework
-            body = rc.get('body', '')
-            if 'suggestion' in body.lower() or '```' in body:
-                rework += 10.0  # Estimate per review comment with code
+            comment_date = self._parse_date(rc.get('created_at'))
+            if comment_date:
+                if first_review_date is None or comment_date < first_review_date:
+                    first_review_date = comment_date
         
-        # For GitLab, check discussions
+        # GitLab: chercher dans les discussions
         for discussion in item.get('discussions', []):
             for note in discussion.get('notes', []):
-                if note.get('type') == 'DiffNote':
-                    rework += 10.0
+                note_date = self._parse_date(note.get('created_at'))
+                if note_date:
+                    if first_review_date is None or note_date < first_review_date:
+                        first_review_date = note_date
         
-        return rework
+        # GitLab: chercher dans les notes
+        for note in item.get('notes', []):
+            note_date = self._parse_date(note.get('created_at'))
+            if note_date:
+                if first_review_date is None or note_date < first_review_date:
+                    first_review_date = note_date
+        
+        # Si pas de revue trouvée, rework = 0
+        if not first_review_date or not created_at:
+            return 0.0
+        
+        # Compter les changements dans les commits après la première revue
+        rework_additions = 0
+        rework_deletions = 0
+        
+        for commit in item.get('commits', []):
+            commit_date = self._parse_date(self.adapter.get_commit_date(commit))
+            
+            if commit_date and commit_date > first_review_date:
+                # Obtenir les stats du commit
+                commit_details = commit.get('details', {})
+                stats = commit_details.get('stats', {})
+                
+                if stats:
+                    rework_additions += stats.get('additions', 0) or 0
+                    rework_deletions += stats.get('deletions', 0) or 0
+                
+                # Essayer aussi le format 'changes'
+                changes = commit.get('changes', [])
+                for change in changes:
+                    rework_additions += change.get('additions', 0) or 0
+                    rework_deletions += change.get('deletions', 0) or 0
+        
+        return float(rework_additions + rework_deletions)
     
     def _count_unique_people(self, item: dict, committers: set, discussioners: set) -> int:
         """Count total unique people involved in the MR/PR"""
@@ -711,5 +1604,9 @@ class StatisticsCSVGenerator:
         author = self.adapter.get_author(details)
         if author:
             people.add(author)
+        
+        # Add reviewers
+        reviewers = self.adapter.get_reviewers(item)
+        people.update(reviewers)
         
         return len(people)
