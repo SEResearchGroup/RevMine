@@ -199,34 +199,40 @@ class RepositoryService:
         Returns:
             Tuple (imported repositories, errors)
         """
+        print(f"Importing repositories for workspace {workspace.id}...")
         result = RepositoryService.fetch_repositories(
             workspace.platform,
             workspace.get_token(),
             workspace.url
         )
-        
+                
         if not result['success']:
+            print(f"Failed to fetch repositories: {result['message']}")
             raise Exception(result['message'])
         
         # Filter the selected repositories
+
         all_repos = result['repositories']
         selected = [
             repo for repo in all_repos
             if str(repo.get('id')) in [str(rid) for rid in repository_ids]
         ]
-        
+
+        print(f"Selected {len(selected)} repositories for import.")
+        print(f"Repository IDs to import: {repository_ids}")
         if not selected:
             raise ValueError('No repositories found with provided IDs')
         
         # Import each repository
         imported = []
         errors = []
-        
         for repo_data in selected:
             try:
                 repo = RepositoryService._import_single(workspace, repo_data)
+                print(f"Imported repository: {repo.full_name}")
                 imported.append(repo)
             except Exception as e:
+                print(f"Error importing repository {repo_data.get('name')}: {str(e)}")
                 errors.append({
                     'repository': repo_data.get('name'),
                     'error': str(e)
@@ -247,7 +253,7 @@ class RepositoryService:
         )
         
         normalized = normalizer.normalize_for_db(repo_data)
-        
+        print(f"Importing repository: {normalized['full_name']}")
         repository, created = Repository.objects.update_or_create(
             workspace=workspace,
             external_id=normalized['external_id'],
@@ -257,7 +263,7 @@ class RepositoryService:
         return repository
 
 
-# NORMALIZERS - API Data Transformation
+# NORMALIZERS - API      Transformation
 
 class BaseNormalizer:
     """Base class for normalizing repository data."""
@@ -281,6 +287,99 @@ class BaseNormalizer:
         raise NotImplementedError
 
 
+# class GitHubNormalizer(BaseNormalizer):
+#     """Normalize GitHub data."""
+    
+#     def normalize(self, repo: Dict) -> Dict:
+#         """Lightweight format for repository list."""
+#         return {
+#             'id': repo.get('id'),
+#             'name': repo.get('name'),
+#             'full_name': repo.get('full_name'),
+#             'description': repo.get('description'),
+#             'url': repo.get('html_url'),
+#             'clone_url': repo.get('clone_url'),
+#             'ssh_url': repo.get('ssh_url'),
+#             'default_branch': repo.get('default_branch', 'main'),
+#             'private': repo.get('private', False),
+#             'language': repo.get('language'),
+#             'updated_at': repo.get('updated_at'),
+#             'visibility': 'private' if repo.get('private') else 'public'
+#         }
+    
+#     def normalize_for_db(self, repo: Dict) -> Dict:
+#         """Full format for database storage."""
+#         print(f"Normalizing GitHub repository for DB: {repo}")
+#         return {
+#             'external_id': str(repo['id']),
+#             'name': repo['name'],
+#             'full_name': repo['full_name'],
+#             'description': repo.get('description'),
+#             'url': repo['url'],
+#             'web_url': repo['html_url'],
+#             'owner': repo['owner']['login'],
+#             'owner_type': repo['owner']['type'],
+#             'default_branch': repo.get('default_branch', 'main'),
+#             'language': repo.get('language'),
+#             'stars_count': repo.get('stargazers_count', 0),
+#             'forks_count': repo.get('forks_count', 0),
+#             'open_issues_count': repo.get('open_issues_count', 0),
+#             'is_private': repo.get('private', False),
+#             'is_fork': repo.get('fork', False),
+#             'is_archived': repo.get('archived', False),
+#             'created_at_platform': self.parse_datetime(repo.get('updated_at')),
+#             'last_activity_at': self.parse_datetime(repo.get('updated_at')),
+#             'raw_data': repo,
+#         }
+
+
+# class GitLabNormalizer(BaseNormalizer):
+#     """Normalize GitLab data."""
+    
+#     def normalize(self, repo: Dict) -> Dict:
+#         """Lightweight format for repository list."""
+#         print(f"Normalizing GitLab repository for API: {repo}")
+#         return {
+#             'id': repo.get('id'),
+#             'name': repo.get('name'),
+#             'full_name': repo.get('path_with_namespace'),
+#             'description': repo.get('description'),
+#             'web_url': repo.get('web_url'),
+#             'url': repo.get('url'),
+#             'clone_url': repo.get('http_url_to_repo'),
+#             'ssh_url': repo.get('ssh_url_to_repo'),
+#             'default_branch': repo.get('default_branch', 'main'),
+#             'private': repo.get('visibility') in ['private', 'internal'],
+#             'language': None,
+#             'updated_at': repo.get('last_activity_at'),
+#             'visibility': repo.get('visibility', 'private'), 
+#             'created_at': repo.get('created_at'),
+#         }
+    
+#     def normalize_for_db(self, repo: Dict) -> Dict:
+#         """Full format for database storage."""
+#         return {
+#             'external_id': str(repo['id']),
+#             'name': repo['name'],
+#             'full_name': repo['full_name'],
+#             'description': repo.get('description'),
+#             'url': repo['url'],
+#             'web_url': repo['web_url'],
+#             'owner': repo['namespace']['full_path'],
+#             'owner_type': repo['namespace']['kind'],
+#             'default_branch': repo.get('default_branch', 'main'),
+#             'language': None,
+#             'stars_count': repo.get('star_count', 0),
+#             'forks_count': repo.get('forks_count', 0),
+#             'open_issues_count': repo.get('open_issues_count', 0),
+#             'is_private': repo.get('visibility') == 'private',
+#             'is_fork': 'forked_from_project' in repo,
+#             'is_archived': repo.get('archived', False),
+#             'created_at_platform': self.parse_datetime(repo.get('created_at')),
+#             'last_activity_at': self.parse_datetime(repo.get('last_activity_at')),
+#             'raw_data': repo,
+#         }
+
 class GitHubNormalizer(BaseNormalizer):
     """Normalize GitHub data."""
     
@@ -302,16 +401,17 @@ class GitHubNormalizer(BaseNormalizer):
         }
     
     def normalize_for_db(self, repo: Dict) -> Dict:
-        """ull format for database storage."""
+        """Full format for database storage."""
+        print(f"Normalizing GitHub repository for DB: {repo.get('name', repo.get('full_name'))}")
         return {
             'external_id': str(repo['id']),
             'name': repo['name'],
             'full_name': repo['full_name'],
             'description': repo.get('description'),
-            'url': repo['url'],
-            'web_url': repo['html_url'],
-            'owner': repo['owner']['login'],
-            'owner_type': repo['owner']['type'],
+            'url': repo.get('url') or repo.get('clone_url'), 
+            'web_url': repo.get('html_url') or repo.get('url'), 
+            'owner': repo.get('owner', {}).get('login') if isinstance(repo.get('owner'), dict) else repo.get('full_name', '').split('/')[0],
+            'owner_type': repo.get('owner', {}).get('type') if isinstance(repo.get('owner'), dict) else 'User',
             'default_branch': repo.get('default_branch', 'main'),
             'language': repo.get('language'),
             'stars_count': repo.get('stargazers_count', 0),
@@ -320,7 +420,7 @@ class GitHubNormalizer(BaseNormalizer):
             'is_private': repo.get('private', False),
             'is_fork': repo.get('fork', False),
             'is_archived': repo.get('archived', False),
-            'created_at_platform': self.parse_datetime(repo.get('created_at')),
+            'created_at_platform': self.parse_datetime(repo.get('created_at') or repo.get('updated_at')),
             'last_activity_at': self.parse_datetime(repo.get('updated_at')),
             'raw_data': repo,
         }
@@ -331,45 +431,48 @@ class GitLabNormalizer(BaseNormalizer):
     
     def normalize(self, repo: Dict) -> Dict:
         """Lightweight format for repository list."""
+        print(f"Normalizing GitLab repository for API: {repo.get('name', repo.get('path_with_namespace'))}")
         return {
             'id': repo.get('id'),
             'name': repo.get('name'),
             'full_name': repo.get('path_with_namespace'),
             'description': repo.get('description'),
-            'url': repo.get('web_url'),
+            'web_url': repo.get('web_url'),
+            'url': repo.get('http_url_to_repo'),
             'clone_url': repo.get('http_url_to_repo'),
             'ssh_url': repo.get('ssh_url_to_repo'),
             'default_branch': repo.get('default_branch', 'main'),
             'private': repo.get('visibility') in ['private', 'internal'],
             'language': None,
             'updated_at': repo.get('last_activity_at'),
-            'visibility': repo.get('visibility', 'private')
+            'visibility': repo.get('visibility', 'private'), 
+            'created_at': repo.get('created_at'),
         }
     
     def normalize_for_db(self, repo: Dict) -> Dict:
         """Full format for database storage."""
+        print(f"Normalizing GitLab repository for DB: {repo.get('name', repo.get('path_with_namespace'))}")
         return {
             'external_id': str(repo['id']),
             'name': repo['name'],
-            'full_name': repo['path_with_namespace'],
+            'full_name': repo.get('path_with_namespace') or repo.get('full_name'),
             'description': repo.get('description'),
-            'url': repo['_links']['self'],
-            'web_url': repo['web_url'],
-            'owner': repo['namespace']['full_path'],
-            'owner_type': repo['namespace']['kind'],
+            'url': repo.get('http_url_to_repo') or repo.get('url') or repo.get('clone_url'),
+            'web_url': repo.get('web_url'),
+            'owner': repo.get('namespace', {}).get('full_path') if isinstance(repo.get('namespace'), dict) else repo.get('full_name', '').split('/')[0],
+            'owner_type': repo.get('namespace', {}).get('kind') if isinstance(repo.get('namespace'), dict) else 'user',
             'default_branch': repo.get('default_branch', 'main'),
             'language': None,
             'stars_count': repo.get('star_count', 0),
             'forks_count': repo.get('forks_count', 0),
             'open_issues_count': repo.get('open_issues_count', 0),
-            'is_private': repo.get('visibility') == 'private',
+            'is_private': repo.get('visibility') == 'private' or repo.get('private', False),
             'is_fork': 'forked_from_project' in repo,
             'is_archived': repo.get('archived', False),
             'created_at_platform': self.parse_datetime(repo.get('created_at')),
-            'last_activity_at': self.parse_datetime(repo.get('last_activity_at')),
+            'last_activity_at': self.parse_datetime(repo.get('last_activity_at') or repo.get('updated_at')),
             'raw_data': repo,
         }
-
 
 # WORKSPACE SERVICE - Workspace Management
 
