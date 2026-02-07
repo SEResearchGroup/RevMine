@@ -11,7 +11,8 @@ from .branch_fetcher import BranchFetcher
 from .metrics_config import get_metrics_for_platform
 from .minio_client import MinIOClient
 from .csv_generator import CSVGenerator, StatisticsCSVGenerator
-from .tasks import run_collection_in_background
+from .tasks import run_collection_in_background, cancellation_registry
+from .serializers import CollectionSerializer, CleanedDataSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -328,8 +329,22 @@ class CollectionService:
     
     @staticmethod
     def delete_collection(collection: Collection) -> None:
-        """Delete a collection and all its related files."""
+        """Delete a collection and all its related files.
+        
+        If the collection is in progress, it will be cancelled first
+        to stop the background collection task immediately.
+        """
         try:
+            collection_id = collection.id
+            raw_data_filename = collection.raw_data_filename
+            is_in_progress = collection.status == 'in_progress'
+            
+            # If collection is in progress, register it for cancellation
+            # This will signal the background thread to stop immediately
+            if is_in_progress:
+                cancellation_registry.cancel(collection_id)
+                logger.info(f"Collection {collection_id} is in progress, registered for cancellation")
+            
             minio_client = MinIOClient()
             
             # Delete all cleaning files
@@ -340,8 +355,8 @@ class CollectionService:
                     minio_client.delete_file(cleaned_data.statistics_csv_filename)
             
             # Delete raw data file
-            if collection.raw_data_filename:
-                minio_client.delete_file(collection.raw_data_filename)
+            if raw_data_filename:
+                minio_client.delete_file(raw_data_filename)
             
             # Delete legacy CSV files if they exist
             if collection.structured_csv_filename:
@@ -350,7 +365,6 @@ class CollectionService:
                 minio_client.delete_file(collection.statistics_csv_filename)
             
             # Delete collection (cascade will delete cleaned data)
-            collection_id = collection.id
             collection.delete()
             
             logger.info(f"Collection {collection_id} deleted successfully")
@@ -726,3 +740,72 @@ class CleanedDataService:
             logger.error(f"Error getting CSV for download: {e}")
             return None
 
+
+# =============================================================================
+# User Datasets Service
+# =============================================================================
+
+class UserDatasetsService:
+    """Service for user datasets operations."""
+    
+    @staticmethod
+    def get_user_datasets(user_id: int) -> Dict[str, Any]:
+        """Get all datasets (collections and cleaned data) for a user."""
+        logger.info(f"Fetching datasets for user {user_id}")
+        
+        # Query collections with related data
+        collections_query = Collection.objects.filter(user=user_id)
+        collections = collections_query.select_related().prefetch_related('cleaned_data')
+        
+        # Serialize collections
+        collections_data = CollectionSerializer(collections, many=True).data
+        
+        # Build cleaned datasets list with collection context
+        cleaned_data_list = UserDatasetsService._build_cleaned_datasets_list(collections)
+        
+        # Calculate statistics
+        statistics = UserDatasetsService._calculate_user_statistics(collections)
+        
+        response_data = {
+            'user_id': user_id,
+            'total_collections': collections.count(),
+            'collections': collections_data,
+            'total_cleaned_datasets': len(cleaned_data_list),
+            'cleaned_datasets': cleaned_data_list,
+            'statistics': statistics
+        }
+        
+        logger.info(f"Returning {collections.count()} collections for user {user_id}")
+        
+        return response_data
+    
+    @staticmethod
+    def _build_cleaned_datasets_list(collections) -> List[Dict[str, Any]]:
+        """Build cleaned datasets list with collection context."""
+        cleaned_data_list = []
+        
+        for collection in collections:
+            cleaned_items = collection.cleaned_data.all()
+            for cleaned in cleaned_items:
+                cleaned_data_list.append({
+                    **CleanedDataSerializer(cleaned).data,
+                    'collection_id': collection.id,
+                    'repository_name': collection.repository_name,
+                    'repository_full_name': collection.repository_full_name,
+                    'platform': collection.platform,
+                    'repository_url': collection.repository_url,
+                    'repository_id': collection.repository_id,
+                    'workspace_id': collection.workspace_id,
+                })
+        
+        return cleaned_data_list
+    
+    @staticmethod
+    def _calculate_user_statistics(collections) -> Dict[str, int]:
+        """Calculate global statistics for user's collections."""
+        return {
+            'total_items_collected': sum(c.collected_items for c in collections),
+            'active_collections': collections.filter(status__in=Collection.ACTIVE_STATUSES).count(),
+            'completed_collections': collections.filter(status='completed').count(),
+            'failed_collections': collections.filter(status='failed').count(),
+        }
