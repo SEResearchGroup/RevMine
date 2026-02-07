@@ -26,9 +26,21 @@ class WorkspaceSerializer(serializers.ModelSerializer):
         if value not in valid_platforms:
             raise serializers.ValidationError(f"Platform must be one of: {valid_platforms}")
         return value
+    
     def validate(self, data):
-        platform = data['platform']
+        # For partial updates, get platform from instance if not provided
+        platform = data.get('platform')
+        if platform is None and self.instance:
+            platform = self.instance.platform
+        
+        # Skip validation if platform is still unknown (shouldn't happen normally)
+        if platform is None:
+            return data
+            
         url = data.get('url')
+        # For partial updates, get url from instance if not in data
+        if url is None and self.instance:
+            url = self.instance.url
 
         if platform == 'gitlab_self' and not url:
             raise serializers.ValidationError({"url": "URL is required for GitLab self-hosted."})

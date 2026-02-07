@@ -1,0 +1,18 @@
+{
+  "testUser": {
+    "email": "e2e-test@revmine.com",
+    "password": "TestPassword123!",
+    "firstName": "E2E",
+    "lastName": "Tester",
+    "position": "QA Engineer"
+  },
+  "workspace": {
+    "name": "E2E Test Workspace",
+    "description": "Workspace created for E2E testing",
+    "platform": "github"
+  },
+  "repository": {
+    "name": "test-repo",
+    "fullName": "owner/test-repo"
+  }
+}
