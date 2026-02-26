@@ -2,6 +2,7 @@ from django.db import models
 from django.contrib.postgres.fields import ArrayField
 import uuid
 
+
 class Dataset(models.Model):
     """
     Model to store uploaded CSV datasets
@@ -16,6 +17,12 @@ class Dataset(models.Model):
     rows_count = models.IntegerField(default=0)
     columns_count = models.IntegerField(default=0)
     
+    # Stockage des colonnes disponibles et leurs types
+    columns_metadata = models.JSONField(
+        default=dict,
+        help_text="Metadata about columns: {column_name: {type: str, unique_values: int, ...}}"
+    )
+    
     uploaded_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
@@ -29,6 +36,76 @@ class Dataset(models.Model):
     
     def __str__(self):
         return f"{self.filename} - {self.id}"
+
+
+class MetricDefinition(models.Model):
+    """
+    Définition des métriques disponibles pour l'analyse
+    """
+    CHART_TYPE_CHOICES = [
+        ('line', 'Line Chart'),
+        ('bar', 'Bar Chart'),
+        ('scatter', 'Scatter Plot'),
+        ('histogram', 'Histogram'),
+        ('pie', 'Pie Chart'),
+        ('heatmap', 'Heatmap'),
+        ('box', 'Box Plot'),
+        ('area', 'Area Chart'),
+    ]
+    
+    AGGREGATION_CHOICES = [
+        ('sum', 'Sum'),
+        ('mean', 'Mean'),
+        ('median', 'Median'),
+        ('count', 'Count'),
+        ('min', 'Min'),
+        ('max', 'Max'),
+        ('std', 'Standard Deviation'),
+    ]
+    
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    code = models.CharField(max_length=100, unique=True, help_text="Unique code identifier")
+    name = models.CharField(max_length=200)
+    description = models.TextField()
+    
+    # Configuration de la métrique
+    category = models.CharField(max_length=50, help_text="Category: timeseries, distribution, correlation, etc.")
+    default_chart_type = models.CharField(max_length=50, choices=CHART_TYPE_CHOICES)
+    supported_chart_types = ArrayField(
+        models.CharField(max_length=50),
+        help_text="List of supported chart types for this metric"
+    )
+    
+    # Colonnes requises
+    required_columns = models.JSONField(
+        help_text="List of required column patterns: ['Creation_Date', '#Commits']"
+    )
+    
+    # Options de configuration
+    supports_time_aggregation = models.BooleanField(default=False)
+    supports_custom_axes = models.BooleanField(default=False)
+    default_aggregation = models.CharField(
+        max_length=20, 
+        choices=AGGREGATION_CHOICES,
+        null=True,
+        blank=True
+    )
+    
+    # Fonction d'analyse correspondante
+    analysis_function = models.CharField(
+        max_length=100,
+        help_text="Name of the function in analysis_functions.py"
+    )
+    
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        db_table = 'metric_definitions'
+        ordering = ['category', 'name']
+    
+    def __str__(self):
+        return f"{self.name} ({self.code})"
 
 
 class Analysis(models.Model):
@@ -49,13 +126,24 @@ class Analysis(models.Model):
         related_name='analyses'
     )
     
-    # Analysis configuration
-    requested_charts = ArrayField(
-        models.CharField(max_length=100),
-        help_text="List of requested chart types"
+    # Configuration de l'analyse
+    metric_code = models.CharField(max_length=100, help_text="Code of the metric to analyze")
+    chart_type = models.CharField(max_length=50, help_text="Type of chart to generate")
+    
+    # Configuration flexible pour les axes
+    config = models.JSONField(
+        default=dict,
+        help_text="""Configuration: {
+            'x_axis': 'column_name',
+            'y_axis': 'column_name',
+            'time_aggregation': 'D/W/M/Y',
+            'aggregation': 'sum/mean/median',
+            'filters': {...},
+            'custom_params': {...}
+        }"""
     )
     
-    # Analysis status and results
+    # Status et résultats
     status = models.CharField(
         max_length=20, 
         choices=STATUS_CHOICES, 
@@ -72,40 +160,115 @@ class Analysis(models.Model):
         ordering = ['-created_at']
         indexes = [
             models.Index(fields=['status']),
+            models.Index(fields=['metric_code']),
             models.Index(fields=['-created_at']),
         ]
     
     def __str__(self):
-        return f"Analysis {self.id} - {self.status}"
+        return f"Analysis {self.id} - {self.metric_code} - {self.status}"
 
 
 class AnalysisResult(models.Model):
     """
-    Model to store individual chart results for each analysis
+    Model to store analysis results
     """
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    analysis = models.ForeignKey(
+    analysis = models.OneToOneField(
         Analysis, 
         on_delete=models.CASCADE, 
-        related_name='results'
+        related_name='result'
     )
     
-    chart_type = models.CharField(max_length=100)
-    chart_image = models.TextField(help_text="Base64 encoded image")
+    # Données pour graphes interactifs
     chart_data = models.JSONField(
-        null=True, 
+        help_text="Data structure for interactive charts (plotly/recharts format)"
+    )
+    
+    # Image matplotlib (optionnel)
+    chart_image = models.TextField(
+        null=True,
         blank=True,
-        help_text="Additional data or statistics for the chart"
+        help_text="Base64 encoded matplotlib image"
+    )
+    
+    # Statistiques supplémentaires
+    statistics = models.JSONField(
+        null=True,
+        blank=True,
+        help_text="Additional statistical information"
     )
     
     created_at = models.DateTimeField(auto_now_add=True)
     
     class Meta:
         db_table = 'analysis_results'
-        ordering = ['created_at']
-        indexes = [
-            models.Index(fields=['analysis', 'chart_type']),
-        ]
+        ordering = ['-created_at']
     
     def __str__(self):
-        return f"{self.chart_type} - Analysis {self.analysis_id}"
+        return f"Result for Analysis {self.analysis_id}"
+
+
+class AnalysisBatch(models.Model):
+    """
+    Model to group multiple analyses together
+    """
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('processing', 'Processing'),
+        ('completed', 'Completed'),
+        ('partial', 'Partially Completed'),
+        ('failed', 'Failed'),
+    ]
+    
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    dataset = models.ForeignKey(
+        Dataset,
+        on_delete=models.CASCADE,
+        related_name='analysis_batches'
+    )
+    
+    name = models.CharField(max_length=200, null=True, blank=True)
+    description = models.TextField(null=True, blank=True)
+    
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='pending'
+    )
+    
+    total_analyses = models.IntegerField(default=0)
+    completed_analyses = models.IntegerField(default=0)
+    failed_analyses = models.IntegerField(default=0)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    
+    class Meta:
+        db_table = 'analysis_batches'
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"Batch {self.id} - {self.status}"
+
+
+class BatchAnalysis(models.Model):
+    """
+    Relation entre un batch et ses analyses
+    """
+    batch = models.ForeignKey(
+        AnalysisBatch,
+        on_delete=models.CASCADE,
+        related_name='batch_analyses'
+    )
+    analysis = models.ForeignKey(
+        Analysis,
+        on_delete=models.CASCADE,
+        related_name='batch_memberships'
+    )
+    order = models.IntegerField(default=0)
+    
+    class Meta:
+        db_table = 'batch_analyses'
+        ordering = ['order']
+        unique_together = ['batch', 'analysis']

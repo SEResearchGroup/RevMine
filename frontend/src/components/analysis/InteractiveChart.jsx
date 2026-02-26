@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef } from 'react';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -12,6 +12,7 @@ import {
   Legend,
   Filler
 } from 'chart.js';
+import zoomPlugin from 'chartjs-plugin-zoom';
 import { Line, Bar, Pie, Scatter } from 'react-chartjs-2';
 
 // Register ChartJS components
@@ -25,20 +26,70 @@ ChartJS.register(
   Title,
   Tooltip,
   Legend,
-  Filler
+  Filler,
+  zoomPlugin
 );
 
 const InteractiveChart = ({ chartData, chartType }) => {
+  
+  console.log("Chart data received:", chartData);
+  console.log("Chart type:", chartType);
   const chartRef = useRef(null);
 
-  if (!chartData || !chartData.data) {
+  if (!chartData) {
     return <div className="text-slate-500 text-center py-8">No data available</div>;
   }
 
-  const data = chartData.data;
+  // Handle different data formats from the backend
+  // Backend may send: { type, data: { labels, datasets }, options }
+  // Or old format: { data: { type, labels, values, ... } }
+  const rawData = chartData.data || chartData;
+  
+  // Normalize data format
+  const data = {
+    type: rawData.type || chartType || 'bar',
+    labels: rawData.labels || rawData.data?.labels || [],
+    // Get values from datasets if present, otherwise use values
+    values: rawData.datasets?.[0]?.data || rawData.values || rawData.data?.datasets?.[0]?.data || [],
+    // Preserve other properties
+    xLabel: rawData.options?.xLabel || rawData.xLabel || chartData.options?.xLabel || '',
+    yLabel: rawData.options?.yLabel || rawData.yLabel || chartData.options?.yLabel || '',
+    title: rawData.options?.title || rawData.title || chartData.options?.title || '',
+    // For scatter charts
+    x: rawData.x || [],
+    y: rawData.y || [],
+    // For multi-dataset charts
+    datasets: rawData.datasets || rawData.data?.datasets || [],
+    // Other complex data
+    projects: rawData.projects || [],
+    mean: rawData.mean || [],
+    median: rawData.median || [],
+    sum: rawData.sum || [],
+    people: rawData.people,
+    reviewers: rawData.reviewers,
+    commiters: rawData.commiters,
+    discussionners: rawData.discussionners,
+    additions: rawData.additions || [],
+    deletions: rawData.deletions || [],
+  };
+  
+  console.log("Normalized data:", data);
 
   // Prepare data based on chart type
   const prepareChartData = () => {
+    // If we already have datasets from the backend, use them directly
+    if (data.datasets && data.datasets.length > 0 && data.datasets[0].data && data.datasets[0].data.length > 0) {
+      return {
+        labels: data.labels,
+        datasets: data.datasets.map((ds, index) => ({
+          ...ds,
+          borderColor: ds.borderColor || `hsl(${index * 60 + 210}, 70%, 50%)`,
+          backgroundColor: ds.backgroundColor || `hsla(${index * 60 + 210}, 70%, 50%, 0.7)`,
+          borderWidth: ds.borderWidth || 2,
+        }))
+      };
+    }
+    
     switch (data.type) {
       case 'line':
         return {
@@ -315,6 +366,21 @@ const InteractiveChart = ({ chartData, chartType }) => {
             return label;
           }
         }
+      },
+      zoom: {
+        zoom: {
+          wheel: {
+            enabled: true,
+          },
+          pinch: {
+            enabled: true
+          },
+          mode: 'xy',
+        },
+        pan: {
+          enabled: true,
+          mode: 'xy',
+        },
       }
     },
     scales: data.type !== 'pie' && data.type !== 'scatter' ? {
@@ -405,7 +471,7 @@ const InteractiveChart = ({ chartData, chartType }) => {
     animation: {
       duration: 750,
       easing: 'easeInOutQuart'
-    }
+    },
   };
 
   const renderChart = () => {
@@ -431,9 +497,22 @@ const InteractiveChart = ({ chartData, chartType }) => {
     }
   };
 
+  const resetZoom = () => {
+    if (chartRef.current) {
+      chartRef.current.resetZoom();
+    }
+  };
+
   return (
-    <div className="w-full h-full min-h-[300px]">
+    <div className="w-full h-full min-h-[300px] relative group">
       {renderChart()}
+      <button
+        onClick={resetZoom}
+        className="absolute top-2 right-2 px-2 py-1 bg-white/90 hover:bg-white border border-slate-200 rounded-md text-xs text-slate-600 hover:text-slate-800 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+        title="Réinitialiser le zoom"
+      >
+        Reset Zoom
+      </button>
     </div>
   );
 };

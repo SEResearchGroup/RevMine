@@ -77,7 +77,7 @@ const Sidebar = () => {
       id: "analysis",
       icon: BarChart3,
       label: "Analysis",
-      subItems: ["Insights selection", "Intelligent insight", "visualizations"],
+      subItems: ["New Analysis", "Dashboard"],
     },
     {
       id: "settings",
@@ -97,6 +97,14 @@ const Sidebar = () => {
     e.preventDefault();
     if (subItem === "Data Cleaning") {
       navigate("/data-cleaning");
+    } else if (subItem === "Workspaces") {
+      navigate("/workspaces");
+    } else if (subItem === "New Analysis") {
+      navigate("/analysis");
+    } else if (subItem === "Dashboard") {
+      navigate("/analysis");
+    } else if (subItem === "Profile") {
+      navigate("/profile");
     }
   };
 
