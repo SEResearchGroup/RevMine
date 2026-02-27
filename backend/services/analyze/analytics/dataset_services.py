@@ -1,6 +1,9 @@
 import pandas as pd
 import numpy as np
 import os
+import csv as csv_module
+import re as _re
+from io import StringIO, BytesIO
 from django.conf import settings
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
@@ -12,6 +15,160 @@ class DatasetService:
     
     def __init__(self):
         self.storage_path = getattr(settings, 'DATASET_STORAGE_PATH', 'datasets/')
+    
+    # ------------------------------------------------------------------
+    # Robust CSV reader
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _read_csv_safe(file_obj):
+        """
+        Read a CSV file-like object robustly.
+
+        Handles the common case where data rows have MORE fields than the
+        header (e.g. an unnamed extra column was inserted into the data
+        but not the header).  Without this fix, pandas silently treats the
+        first data column as the row index, shifting every column by one.
+
+        Detection strategy (for exactly 1 extra data field):
+        1. Check every possible insertion position.
+        2. Score each position using multiple heuristics (state column
+           value, date column format, column-sum relationship).
+        3. Pick the position with the highest score.  Fall back to
+           appending the extra column at the end if scoring is ambiguous.
+        """
+        content = file_obj.read()
+        if isinstance(content, bytes):
+            content = content.decode('utf-8')
+
+        lines = content.strip().split('\n')
+        if len(lines) < 2:
+            return pd.read_csv(StringIO(content))
+
+        # Count columns in header vs first few data rows
+        header_fields = list(next(csv_module.reader(StringIO(lines[0]))))
+        sample_rows = []
+        for line in lines[1:min(6, len(lines))]:
+            sample_rows.append(list(next(csv_module.reader(StringIO(line)))))
+
+        n_header = len(header_fields)
+        n_data = len(sample_rows[0]) if sample_rows else n_header
+
+        if n_data <= n_header:
+            return pd.read_csv(StringIO(content))
+
+        extra_count = n_data - n_header
+
+        if extra_count == 1:
+            best_pos = DatasetService._detect_extra_col_position(
+                header_fields, sample_rows
+            )
+            all_names = list(header_fields)
+            all_names.insert(best_pos, '_extra_col_0')
+            return pd.read_csv(StringIO(content), names=all_names, skiprows=1)
+
+        # Multiple extra columns – append at end (best generic default)
+        extra_names = [f'_extra_col_{i}' for i in range(extra_count)]
+        all_names = list(header_fields) + extra_names
+        return pd.read_csv(StringIO(content), names=all_names, skiprows=1)
+
+    @staticmethod
+    def _detect_extra_col_position(header_fields, sample_rows):
+        """
+        Given *header_fields* (list[str]) and *sample_rows* (list of
+        list[str] for the first few data rows), return the best insertion
+        index for a single extra data column.
+
+        Uses a weighted scoring system that checks:
+          • 'state' column should contain MR/PR state strings
+          • 'Creation_Date' should look like a datetime
+          • Numeric-name columns (#Commits, etc.) should be integers
+          • Extra-col value = churn_deletions + initial_mr_size pattern
+        """
+        n_header = len(header_fields)
+        n_data = n_header + 1
+        valid_states = frozenset({'opened', 'merged', 'closed', 'open', 'locked'})
+
+        # Helper: map a header index to its data index given an insertion position
+        def data_idx(hdr_i, insert_at):
+            return hdr_i if hdr_i < insert_at else hdr_i + 1
+
+        # Build index maps for key columns
+        hdr_map = {name: i for i, name in enumerate(header_fields)}
+
+        # Integer-expected columns
+        int_cols = [hdr_map[c] for c in (
+            '#Discussions', '#Commits', '#UniqueCommiters',
+            'nb_minor_author', 'nb_major_author', 'modified_files',
+            '#people', '#reviewers', '#commiters', '#discussionners',
+            'comments', 'filetypes',
+        ) if c in hdr_map]
+
+        state_hi = hdr_map.get('state')
+        date_hi = hdr_map.get('Creation_Date')
+        # Columns for sum-relationship check
+        churn_del_hi = hdr_map.get('churn_deletions')
+        init_size_hi = hdr_map.get('initial_mr_size', hdr_map.get('initial_pr_size'))
+
+        best_pos = n_header  # default: append at end
+        best_score = -999
+
+        for insert_at in range(n_header + 1):
+            score = 0
+
+            for row in sample_rows:
+                if len(row) < n_data:
+                    continue
+
+                # --- state sentinel (high weight) ---
+                if state_hi is not None:
+                    di = data_idx(state_hi, insert_at)
+                    if di < len(row) and row[di].strip() in valid_states:
+                        score += 10
+                    else:
+                        score -= 10
+
+                # --- Creation_Date sentinel ---
+                if date_hi is not None:
+                    di = data_idx(date_hi, insert_at)
+                    if di < len(row) and _re.match(r'\d{4}-\d{2}-\d{2}', row[di].strip()):
+                        score += 5
+                    else:
+                        score -= 5
+
+                # --- Integer columns ---
+                for hi in int_cols:
+                    di = data_idx(hi, insert_at)
+                    if di < len(row):
+                        try:
+                            v = float(row[di])
+                            if v == int(v):
+                                score += 1
+                            else:
+                                score -= 2
+                        except ValueError:
+                            score -= 2
+
+                # --- Sum-relationship: extra_col == churn_del + initial_size ---
+                if churn_del_hi is not None and init_size_hi is not None:
+                    cd_i = data_idx(churn_del_hi, insert_at)
+                    is_i = data_idx(init_size_hi, insert_at)
+                    extra_val_i = insert_at
+                    if (extra_val_i < len(row) and cd_i < len(row)
+                            and is_i < len(row)):
+                        try:
+                            ev = float(row[extra_val_i])
+                            cv = float(row[cd_i])
+                            iv = float(row[is_i])
+                            if abs(ev - (cv + iv)) < 0.01:
+                                score += 8  # strong signal
+                        except ValueError:
+                            pass
+
+            if score > best_score:
+                best_score = score
+                best_pos = insert_at
+
+        return best_pos
     
     def create_dataset(self, file, workspace_id=None, repository_id=None, platform='gitlab'):
         """
@@ -27,8 +184,8 @@ class DatasetService:
         # Save file
         saved_path = default_storage.save(file_path, ContentFile(file.read()))
         
-        # Read CSV to get metadata
-        df = pd.read_csv(default_storage.open(saved_path))
+        # Read CSV to get metadata (using robust reader)
+        df = self._read_csv_safe(default_storage.open(saved_path))
         
         # Get columns metadata
         columns_metadata = self._extract_columns_metadata(df)
@@ -115,7 +272,7 @@ class DatasetService:
         Load dataset as pandas DataFrame
         """
         file_path = dataset.file_path
-        df = pd.read_csv(default_storage.open(file_path))
+        df = self._read_csv_safe(default_storage.open(file_path))
         
         # Auto-parse datetime columns based on metadata
         for col, meta in dataset.columns_metadata.items():

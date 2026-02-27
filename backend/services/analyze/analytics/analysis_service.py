@@ -84,6 +84,9 @@ class AnalysisService:
             # Execute analysis
             result_data = analysis_function(df, analysis)
             
+            # Sanitize all data for JSON serialization (NaN, numpy types, etc.)
+            result_data = self._sanitize_value(result_data)
+            
             # Create result
             AnalysisResult.objects.create(
                 analysis=analysis,
@@ -147,7 +150,43 @@ class AnalysisService:
         image_base64 = base64.b64encode(buffer.read()).decode('utf-8')
         plt.close(fig)
         return f"data:image/png;base64,{image_base64}"
-    
+
+    def _sanitize_value(self, value):
+        """
+        Recursively sanitize values for JSON serialization.
+        Handles NaN, Infinity, numpy types that would break json.dumps.
+        """
+        import math
+        if value is None:
+            return None
+        if isinstance(value, dict):
+            return {k: self._sanitize_value(v) for k, v in value.items()}
+        if isinstance(value, list):
+            return [self._sanitize_value(v) for v in value]
+        if isinstance(value, tuple):
+            return [self._sanitize_value(v) for v in value]
+        if isinstance(value, np.ndarray):
+            return [self._sanitize_value(v) for v in value.tolist()]
+        if isinstance(value, (np.integer,)):
+            return int(value)
+        if isinstance(value, (np.floating,)):
+            if np.isnan(value) or np.isinf(value):
+                return None
+            return float(value)
+        if isinstance(value, (np.bool_,)):
+            return bool(value)
+        if isinstance(value, float):
+            if math.isnan(value) or math.isinf(value):
+                return None
+            return value
+        if hasattr(value, 'item'):  # Generic numpy scalar
+            return self._sanitize_value(value.item())
+        if isinstance(value, pd.Timestamp):
+            return value.isoformat()
+        if isinstance(value, pd.Period):
+            return str(value)
+        return value
+
     # ==================== Analysis Functions ====================
     
     def _format_date_labels(self, periods):
@@ -730,12 +769,17 @@ class AnalysisService:
         df = self._apply_config(df, config)
         df_copy = df.copy()
         
-        # Ensure we have the required columns
-        add_col = 'additions' if 'additions' in df_copy.columns else 'churn_addition'
-        del_col = 'deletions' if 'deletions' in df_copy.columns else 'churn_deletions'
-        
-        if add_col not in df_copy.columns or del_col not in df_copy.columns:
-            raise ValueError(f"Required columns for churn analysis not found. Need additions and deletions columns.")
+        # Determine which addition/deletion columns to use.
+        # Prefer per-MR columns (additions/deletions) for meaningful time-series.
+        # Fall back to churn_addition/churn_deletions if per-MR columns are absent.
+        if 'additions' in df_copy.columns and 'deletions' in df_copy.columns:
+            add_col = 'additions'
+            del_col = 'deletions'
+        elif 'churn_addition' in df_copy.columns and 'churn_deletions' in df_copy.columns:
+            add_col = 'churn_addition'
+            del_col = 'churn_deletions'
+        else:
+            raise ValueError("Required columns for churn analysis not found. Need (additions, deletions) or (churn_addition, churn_deletions).")
         
         if not pd.api.types.is_datetime64_any_dtype(df_copy[date_col]):
             df_copy[date_col] = pd.to_datetime(df_copy[date_col], errors='coerce', format='mixed')
@@ -816,8 +860,15 @@ class AnalysisService:
         df = self._apply_config(df, config)
         df_copy = df.copy()
         
-        add_col = 'additions' if 'additions' in df_copy.columns else 'churn_addition'
-        del_col = 'deletions' if 'deletions' in df_copy.columns else 'churn_deletions'
+        # Prefer per-MR columns; fall back to churn columns
+        if 'additions' in df_copy.columns and 'deletions' in df_copy.columns:
+            add_col = 'additions'
+            del_col = 'deletions'
+        elif 'churn_addition' in df_copy.columns and 'churn_deletions' in df_copy.columns:
+            add_col = 'churn_addition'
+            del_col = 'churn_deletions'
+        else:
+            raise ValueError("Required columns not found. Need (additions, deletions) or (churn_addition, churn_deletions).")
         
         df_copy[add_col] = pd.to_numeric(df_copy[add_col], errors='coerce').fillna(0)
         df_copy[del_col] = pd.to_numeric(df_copy[del_col], errors='coerce').fillna(0)
@@ -878,12 +929,20 @@ class AnalysisService:
         df = self._apply_config(df, config)
         df_copy = df.copy()
         
-        add_col = 'additions' if 'additions' in df_copy.columns else 'churn_addition'
-        del_col = 'deletions' if 'deletions' in df_copy.columns else 'churn_deletions'
-        
-        df_copy[add_col] = pd.to_numeric(df_copy[add_col], errors='coerce').fillna(0)
-        df_copy[del_col] = pd.to_numeric(df_copy[del_col], errors='coerce').fillna(0)
-        df_copy['mr_size'] = df_copy[add_col] + df_copy[del_col]
+        # Use initial_mr_size directly if available (preferred)
+        if 'initial_mr_size' in df_copy.columns:
+            df_copy['mr_size'] = pd.to_numeric(df_copy['initial_mr_size'], errors='coerce').fillna(0)
+        else:
+            # Fall back to computing from additions + deletions
+            if 'additions' in df_copy.columns and 'deletions' in df_copy.columns:
+                add_col, del_col = 'additions', 'deletions'
+            elif 'churn_addition' in df_copy.columns and 'churn_deletions' in df_copy.columns:
+                add_col, del_col = 'churn_addition', 'churn_deletions'
+            else:
+                raise ValueError("Required columns for MR size analysis not found.")
+            df_copy[add_col] = pd.to_numeric(df_copy[add_col], errors='coerce').fillna(0)
+            df_copy[del_col] = pd.to_numeric(df_copy[del_col], errors='coerce').fillna(0)
+            df_copy['mr_size'] = df_copy[add_col] + df_copy[del_col]
         
         # Filter out extreme outliers
         q99 = df_copy['mr_size'].quantile(0.99)
@@ -1451,40 +1510,64 @@ class AnalysisService:
     
     def analyze_correlation_matrix(self, df, analysis):
         """
-        Analyze correlation between numeric columns
+        Analyze correlation between numeric columns.
+        Auto-detects numeric columns from the dataset instead of hardcoding.
         """
         config = analysis.config
         
         df = self._apply_config(df, config)
         
-        # Select numeric columns only
-        numeric_cols = ['#Commits', '#Discussions', 'Lead_Time', 'additions', 'deletions', 
-                       'comments', 'modified_files', 'rework_size', '#people', '#reviewers',
-                       '#UniqueCommiters', 'hist_entropy']
+        # Handle Lead_Time 'open' values BEFORE numeric conversion
+        df_work = df.copy()
+        if 'Lead_Time' in df_work.columns:
+            df_work = df_work[df_work['Lead_Time'].astype(str) != 'open']
         
-        available_cols = [c for c in numeric_cols if c in df.columns]
+        # Skip columns that are IDs or non-numeric metadata
+        skip_cols = {'Project_ID', 'MR_ID', 'Commiters', 'state', 'filetypes',
+                     'Creation_Date', 'created_at', 'updated_at', 'merged_at', 'closed_at'}
+        
+        # Auto-detect numeric columns
+        available_cols = []
+        for col in df_work.columns:
+            if col in skip_cols:
+                continue
+            numeric_vals = pd.to_numeric(df_work[col], errors='coerce')
+            # Only include columns where at least 50% of values are numeric
+            if numeric_vals.notna().sum() / max(len(df_work), 1) > 0.5:
+                available_cols.append(col)
         
         if len(available_cols) < 2:
             raise ValueError("Not enough numeric columns for correlation analysis")
         
-        df_copy = df[available_cols].copy()
+        df_copy = df_work[available_cols].copy()
         for col in available_cols:
             df_copy[col] = pd.to_numeric(df_copy[col], errors='coerce')
         
-        # Handle Lead_Time 'open' values
-        if 'Lead_Time' in df_copy.columns:
-            df_copy = df_copy[df_copy['Lead_Time'] != 'open']
-        
+        # Drop rows where any value is NaN
         df_copy = df_copy.dropna()
         
+        if len(df_copy) < 2:
+            raise ValueError("Not enough data rows for correlation analysis after filtering")
+        
+        # Remove zero-variance columns (they produce NaN correlations)
+        non_const_cols = [c for c in df_copy.columns if df_copy[c].nunique() > 1]
+        if len(non_const_cols) < 2:
+            raise ValueError("Not enough varying numeric columns for correlation analysis")
+        df_copy = df_copy[non_const_cols]
+        
         corr_matrix = df_copy.corr()
+        
+        # Ensure diagonal is exactly 1.0 and replace any remaining NaN with 0
+        for col in corr_matrix.columns:
+            corr_matrix.loc[col, col] = 1.0
+        corr_matrix = corr_matrix.fillna(0)
         
         # Convert to list format for frontend
         chart_data = {
             'type': 'heatmap',
             'data': {
                 'labels': corr_matrix.columns.tolist(),
-                'values': corr_matrix.values.tolist(),
+                'values': [[float(v) for v in row] for row in corr_matrix.values],
             },
             'options': {
                 'title': 'Correlation Matrix',
@@ -1503,9 +1586,11 @@ class AnalysisService:
         corr_pairs = []
         for i in range(len(corr_matrix.columns)):
             for j in range(i+1, len(corr_matrix.columns)):
+                val = corr_matrix.iloc[i, j]
+                corr_val = float(val) if pd.notna(val) else 0.0
                 corr_pairs.append({
                     'pair': f"{corr_matrix.columns[i]} - {corr_matrix.columns[j]}",
-                    'correlation': float(corr_matrix.iloc[i, j])
+                    'correlation': corr_val
                 })
         
         corr_pairs.sort(key=lambda x: abs(x['correlation']), reverse=True)
@@ -1513,6 +1598,7 @@ class AnalysisService:
         statistics = {
             'strongest_correlations': corr_pairs[:5],
             'columns_analyzed': len(available_cols),
+            'rows_analyzed': len(df_copy),
         }
         
         return {
@@ -1541,10 +1627,18 @@ class AnalysisService:
             df_copy['files_norm'] = pd.to_numeric(df_copy['modified_files'], errors='coerce').fillna(0)
             complexity_factors.append('files_norm')
         
-        add_col = 'additions' if 'additions' in df_copy.columns else 'churn_addition'
-        del_col = 'deletions' if 'deletions' in df_copy.columns else 'churn_deletions'
-        
-        if add_col in df_copy.columns:
+        # For churn: use initial_mr_size if available, else additions+deletions, else churn columns
+        if 'initial_mr_size' in df_copy.columns:
+            df_copy['churn_norm'] = pd.to_numeric(df_copy['initial_mr_size'], errors='coerce').fillna(0)
+            complexity_factors.append('churn_norm')
+        elif 'additions' in df_copy.columns and 'deletions' in df_copy.columns:
+            add_col, del_col = 'additions', 'deletions'
+            df_copy[add_col] = pd.to_numeric(df_copy[add_col], errors='coerce').fillna(0)
+            df_copy[del_col] = pd.to_numeric(df_copy[del_col], errors='coerce').fillna(0)
+            df_copy['churn_norm'] = df_copy[add_col] + df_copy[del_col]
+            complexity_factors.append('churn_norm')
+        elif 'churn_addition' in df_copy.columns and 'churn_deletions' in df_copy.columns:
+            add_col, del_col = 'churn_addition', 'churn_deletions'
             df_copy[add_col] = pd.to_numeric(df_copy[add_col], errors='coerce').fillna(0)
             df_copy[del_col] = pd.to_numeric(df_copy[del_col], errors='coerce').fillna(0)
             df_copy['churn_norm'] = df_copy[add_col] + df_copy[del_col]
