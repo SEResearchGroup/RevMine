@@ -205,10 +205,10 @@ class AnalysisService:
         Analyze commits over time with configurable aggregation
         """
         config = analysis.config
-        date_col = config.get('x_axis', 'Creation_Date')
-        value_col = config.get('y_axis', '#Commits')
-        freq = config.get('time_aggregation', 'M')
-        aggregation = config.get('aggregation', 'sum')
+        date_col = config.get('x_axis') or 'Creation_Date'
+        value_col = config.get('y_axis') or '#Commits'
+        freq = config.get('time_aggregation') or 'M'
+        aggregation = config.get('aggregation') or 'sum'
         
         df = self._apply_config(df, config)
         
@@ -311,8 +311,8 @@ class AnalysisService:
         Analyze MR creation timeline - counts MRs created per period
         """
         config = analysis.config
-        date_col = config.get('x_axis', 'Creation_Date')
-        freq = config.get('time_aggregation', 'W')
+        date_col = config.get('x_axis') or 'Creation_Date'
+        freq = config.get('time_aggregation') or 'W'
         
         df = self._apply_config(df, config)
         
@@ -387,7 +387,7 @@ class AnalysisService:
         Analyze lead time distribution - only for merged MRs
         """
         config = analysis.config
-        lead_time_col = config.get('x_axis', 'Lead_Time')
+        lead_time_col = config.get('x_axis') or 'Lead_Time'
         
         df = self._apply_config(df, config)
         
@@ -463,7 +463,7 @@ class AnalysisService:
         Analyze distribution of commits per MR
         """
         config = analysis.config
-        commit_col = config.get('x_axis', '#Commits')
+        commit_col = config.get('x_axis') or '#Commits'
         
         df = self._apply_config(df, config)
         
@@ -531,7 +531,7 @@ class AnalysisService:
         Analyze number of unique contributors per MR
         """
         config = analysis.config
-        commiters_col = config.get('x_axis', '#UniqueCommiters')
+        commiters_col = config.get('x_axis') or '#UniqueCommiters'
         
         df = self._apply_config(df, config)
         
@@ -698,7 +698,7 @@ class AnalysisService:
         Analyze commit time distribution - when do commits happen
         """
         config = analysis.config
-        date_col = config.get('x_axis', 'Creation_Date')
+        date_col = config.get('x_axis') or 'Creation_Date'
         
         df = self._apply_config(df, config)
         df_copy = df.copy()
@@ -763,8 +763,8 @@ class AnalysisService:
         Analyze code churn (additions + deletions) over time
         """
         config = analysis.config
-        date_col = config.get('x_axis', 'Creation_Date')
-        freq = config.get('time_aggregation', 'M')
+        date_col = config.get('x_axis') or 'Creation_Date'
+        freq = config.get('time_aggregation') or 'M'
         
         df = self._apply_config(df, config)
         df_copy = df.copy()
@@ -999,7 +999,7 @@ class AnalysisService:
         Analyze discussions count per MR
         """
         config = analysis.config
-        discussions_col = config.get('x_axis', '#Discussions')
+        discussions_col = config.get('x_axis') or '#Discussions'
         
         df = self._apply_config(df, config)
         
@@ -1126,7 +1126,7 @@ class AnalysisService:
         Analyze comments distribution per MR
         """
         config = analysis.config
-        comments_col = config.get('x_axis', 'comments')
+        comments_col = config.get('x_axis') or 'comments'
         
         df = self._apply_config(df, config)
         
@@ -1190,7 +1190,7 @@ class AnalysisService:
         Analyze number of files modified per MR
         """
         config = analysis.config
-        files_col = config.get('x_axis', 'modified_files')
+        files_col = config.get('x_axis') or 'modified_files'
         
         df = self._apply_config(df, config)
         
@@ -1253,7 +1253,7 @@ class AnalysisService:
         Analyze distribution of file types in MRs
         """
         config = analysis.config
-        filetypes_col = config.get('x_axis', 'filetypes')
+        filetypes_col = config.get('x_axis') or 'filetypes'
         
         df = self._apply_config(df, config)
         
@@ -1315,7 +1315,7 @@ class AnalysisService:
         Analyze historical entropy distribution
         """
         config = analysis.config
-        entropy_col = config.get('x_axis', 'hist_entropy')
+        entropy_col = config.get('x_axis') or 'hist_entropy'
         
         df = self._apply_config(df, config)
         
@@ -1377,7 +1377,7 @@ class AnalysisService:
         Analyze distribution of MR states (opened, merged, closed)
         """
         config = analysis.config
-        state_col = config.get('x_axis', 'state')
+        state_col = config.get('x_axis') or 'state'
         
         df = self._apply_config(df, config)
         
@@ -1424,7 +1424,7 @@ class AnalysisService:
         Analyze rework size distribution
         """
         config = analysis.config
-        rework_col = config.get('x_axis', 'rework_size')
+        rework_col = config.get('x_axis') or 'rework_size'
         
         df = self._apply_config(df, config)
         
@@ -1701,8 +1701,8 @@ class AnalysisService:
         Compare metrics across different projects
         """
         config = analysis.config
-        project_col = config.get('x_axis', 'Project_ID')
-        metric_col = config.get('y_axis', '#Commits')
+        project_col = config.get('x_axis') or 'Project_ID'
+        metric_col = config.get('y_axis') or '#Commits'
         
         df = self._apply_config(df, config)
         

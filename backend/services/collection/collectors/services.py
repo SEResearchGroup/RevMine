@@ -559,7 +559,8 @@ class CleanedDataService:
         collection: Collection,
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,
-        filters: Optional[Dict] = None
+        filters: Optional[Dict] = None,
+        selected_features: Optional[list] = None
     ) -> CleanedData:
         """Create a new cleaned data instance with filtered CSV files."""
         if collection.status != 'completed':
@@ -571,6 +572,7 @@ class CleanedDataService:
             start_date=start_date,
             end_date=end_date,
             filters=filters or {},
+            selected_features=selected_features or [],
             status='in_progress'
         )
         
@@ -600,7 +602,7 @@ class CleanedDataService:
             structured_csv = csv_generator.generate_csv(filtered_data)
             
             stats_generator = StatisticsCSVGenerator(collection.platform)
-            statistics_csv = stats_generator.generate_statistics_csv(filtered_data, collection)
+            statistics_csv = stats_generator.generate_statistics_csv(filtered_data, collection, selected_features=selected_features)
             
             # Generate filenames for CSV files
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -726,3 +728,71 @@ class CleanedDataService:
             logger.error(f"Error getting CSV for download: {e}")
             return None
 
+# =============================================================================
+# User Datasets Service
+# =============================================================================
+
+class UserDatasetsService:
+    """Service for user datasets operations."""
+    
+    @staticmethod
+    def get_user_datasets(user_id: int) -> Dict[str, Any]:
+        """Get all datasets (collections and cleaned data) for a user."""
+        logger.info(f"Fetching datasets for user {user_id}")
+        
+        # Query collections with related data
+        collections_query = Collection.objects.filter(user=user_id)
+        collections = collections_query.select_related().prefetch_related('cleaned_data')
+        
+        # Serialize collections
+        collections_data = CollectionSerializer(collections, many=True).data
+        
+        # Build cleaned datasets list with collection context
+        cleaned_data_list = UserDatasetsService._build_cleaned_datasets_list(collections)
+        
+        # Calculate statistics
+        statistics = UserDatasetsService._calculate_user_statistics(collections)
+        
+        response_data = {
+            'user_id': user_id,
+            'total_collections': collections.count(),
+            'collections': collections_data,
+            'total_cleaned_datasets': len(cleaned_data_list),
+            'cleaned_datasets': cleaned_data_list,
+            'statistics': statistics
+        }
+        
+        logger.info(f"Returning {collections.count()} collections for user {user_id}")
+        
+        return response_data
+    
+    @staticmethod
+    def _build_cleaned_datasets_list(collections) -> List[Dict[str, Any]]:
+        """Build cleaned datasets list with collection context."""
+        cleaned_data_list = []
+        
+        for collection in collections:
+            cleaned_items = collection.cleaned_data.all()
+            for cleaned in cleaned_items:
+                cleaned_data_list.append({
+                    **CleanedDataSerializer(cleaned).data,
+                    'collection_id': collection.id,
+                    'repository_name': collection.repository_name,
+                    'repository_full_name': collection.repository_full_name,
+                    'platform': collection.platform,
+                    'repository_url': collection.repository_url,
+                    'repository_id': collection.repository_id,
+                    'workspace_id': collection.workspace_id,
+                })
+        
+        return cleaned_data_list
+    
+    @staticmethod
+    def _calculate_user_statistics(collections) -> Dict[str, int]:
+        """Calculate global statistics for user's collections."""
+        return {
+            'total_items_collected': sum(c.collected_items for c in collections),
+            'active_collections': collections.filter(status__in=Collection.ACTIVE_STATUSES).count(),
+            'completed_collections': collections.filter(status='completed').count(),
+            'failed_collections': collections.filter(status='failed').count(),
+        }

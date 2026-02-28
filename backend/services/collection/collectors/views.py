@@ -27,6 +27,7 @@ from .services import (
     CollectionStateError,
     CollectionValidationError,
     StorageError,
+    UserDatasetsService,
 )
 from .schema import (
     available_metrics_schema,
@@ -684,7 +685,8 @@ class CreateCleanedDataView(UserIdRequiredMixin, APIView):
                 collection=collection,
                 start_date=validated_data.get('start_date'),
                 end_date=validated_data.get('end_date'),
-                filters=validated_data.get('filters')
+                filters=validated_data.get('filters'),
+                selected_features=validated_data.get('selected_features')
             )
             
             return Response({
@@ -813,6 +815,31 @@ class DownloadCleanedDataCSVView(View):
         )
         return response
 
+
+class UserDatasetsView(UserIdRequiredMixin, APIView):
+    """Get all datasets (collections and cleaned data) for a user."""
+    
+    def get(self, request):
+        user_id = self.get_user_id(request)
+        
+        if not user_id:
+            return self.user_id_error_response()
+        
+        try:
+            response_data = UserDatasetsService.get_user_datasets(user_id)
+            return Response(response_data, status=status.HTTP_200_OK)
+            
+        except ValueError as e:
+            return Response(
+                {'error': 'Invalid user_id format'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            logger.error(f"Error fetching user datasets: {e}")
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 # =============================================================================
 # Backward Compatibility Aliases

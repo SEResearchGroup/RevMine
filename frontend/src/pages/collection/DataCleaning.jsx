@@ -24,15 +24,15 @@ import { collectionService, workspaceService } from "../../services/api";
 // Feature definitions with descriptions
 const FEATURES_CONFIG = [
   { id: 'Creation_Date', label: 'Creation Date', description: 'When the PR/MR was created', category: 'Basic Info' },
-  { id: 'Lead_Time', label: 'Lead Time', description: 'Time from creation to close/merge (in minutes)', category: 'Time Metrics' },
+  { id: 'Lead_Time', label: 'Lead Time', description: 'Time from creation to close/merge (in hours)', category: 'Time Metrics' },
   { id: '#Discussions', label: 'Discussions Count', description: 'Number of discussion threads or comments', category: 'Collaboration' },
   { id: '#Commits', label: 'Commits Count', description: 'Total number of commits in the PR/MR', category: 'Basic Info' },
-  { id: 'Mean_Time_between_commits', label: 'Mean Time Between Commits', description: 'Average time interval between consecutive commits (seconds)', category: 'Time Metrics' },
+  { id: 'Mean_Time_between_commits', label: 'Mean Time Between Commits', description: 'Average time between consecutive commits (in seconds)', category: 'Time Metrics' },
   { id: 'Commiters', label: 'Committers List', description: 'Set of unique committer names', category: 'Collaboration' },
   { id: '#UniqueCommiters', label: 'Unique Committers', description: 'Number of unique people who made commits', category: 'Collaboration' },
   { id: 'nb_minor_author', label: 'Minor Authors', description: 'Authors who contributed <50% of commits', category: 'Collaboration' },
   { id: 'nb_major_author', label: 'Major Authors', description: 'Authors who contributed ≥50% of commits', category: 'Collaboration' },
-  { id: 'delta_time', label: 'Delta Time', description: 'Days since Unix epoch (for time-series analysis)', category: 'Time Metrics' },
+  { id: 'delta_time', label: 'Delta Time', description: 'Time from first commit to PR/MR creation (in seconds)', category: 'Time Metrics' },
   { id: 'churn_addition', label: 'Churn Additions', description: 'Total lines added across all commits', category: 'Code Metrics' },
   { id: 'churn_deletions', label: 'Churn Deletions', description: 'Total lines deleted across all commits', category: 'Code Metrics' },
   { id: 'initial_size', label: 'Initial Size', description: 'Total size of PR/MR (additions + deletions)', category: 'Code Metrics' },

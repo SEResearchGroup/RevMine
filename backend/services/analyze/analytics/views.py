@@ -438,14 +438,18 @@ class GenerateChartView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Create Analysis record
+        # Create Analysis record – only include x_axis / y_axis when they
+        # are explicitly provided so that analysis functions fall back to
+        # their own defaults via config.get('x_axis', '<default>').
         config = {
-            "x_axis": x_axis,
-            "y_axis": y_axis,
             "time_aggregation": time_aggregation,
             "aggregation": aggregation,
             "filters": filters,
         }
+        if x_axis is not None:
+            config["x_axis"] = x_axis
+        if y_axis is not None:
+            config["y_axis"] = y_axis
         
         analysis = Analysis.objects.create(
             dataset=dataset,
