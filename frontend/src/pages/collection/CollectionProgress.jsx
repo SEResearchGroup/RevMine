@@ -18,7 +18,7 @@ function CollectionProgress() {
   const [connectionError, setConnectionError] = useState(false);
   const consecutiveErrorsRef = useRef(0);
   const MAX_CONSECUTIVE_ERRORS = 3;
-  
+
   // Check if this is a resume operation
   const isResume = location.state?.resume || false;
 
@@ -39,7 +39,7 @@ function CollectionProgress() {
       setWorkspace(wsRes.data);
       const repo = reposRes.data.find((r) => r.id === parseInt(repositoryId));
       setRepository(repo);
-      
+
       await pollStatus();
     } catch (err) {
       console.error("Error fetching data:", err);
@@ -63,7 +63,7 @@ function CollectionProgress() {
           );
         }, 1000);
       }
-      
+
       // If failed or paused, show error modal with progress info
       if (res.data.status === "failed" || res.data.status === "paused") {
         setErrorMessage(res.data.error_message || "The collection was interrupted.");
@@ -72,7 +72,7 @@ function CollectionProgress() {
     } catch (err) {
       console.error("Error polling status:", err);
       consecutiveErrorsRef.current += 1;
-      
+
       // After multiple consecutive errors, show connection lost modal
       if (consecutiveErrorsRef.current >= MAX_CONSECUTIVE_ERRORS) {
         setConnectionError(true);
@@ -222,7 +222,7 @@ function CollectionProgress() {
 
               {/* Info Note */}
               <div className="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-4 flex gap-3">
-                
+
                 <div className="text-sm text-blue-800">
                   <p className="font-medium mb-1">Note:</p>
                   <p>
@@ -256,7 +256,7 @@ function CollectionProgress() {
                 {connectionError ? 'Connection Lost' : status?.can_resume ? 'Collection Interrupted' : 'Collection Failed'}
               </h3>
             </div>
-            
+
             {/* Progress Info */}
             {status && (status.collected_items > 0 || status.total_items > 0) && (
               <div className="mb-4 bg-gray-50 border border-gray-200 rounded-lg p-4">
@@ -282,12 +282,12 @@ function CollectionProgress() {
                 </div>
               </div>
             )}
-            
+
             <div className="mb-6">
               <p className="text-gray-600 mb-3">
-                {connectionError 
+                {connectionError
                   ? 'Unable to reach the server. The collection may still be running in the background, or the service may have stopped.'
-                  : status?.can_resume 
+                  : status?.can_resume
                     ? 'The collection was interrupted but can be resumed from where it stopped.'
                     : 'An error occurred during the data collection:'}
               </p>
@@ -318,7 +318,7 @@ function CollectionProgress() {
                   Retry Connection
                 </button>
               )}
-              
+
               {!connectionError && status?.can_resume && (
                 <button
                   onClick={handleContinueCollection}
@@ -338,7 +338,7 @@ function CollectionProgress() {
                   )}
                 </button>
               )}
-              
+
               <div className="flex gap-3">
                 <button
                   onClick={handleGoToProject}

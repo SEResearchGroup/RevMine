@@ -1,10 +1,15 @@
-from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
+from django.contrib.auth.models import (
+    AbstractBaseUser,
+    BaseUserManager,
+    PermissionsMixin,
+)
 from django.db import models
+
 
 class UserManager(BaseUserManager):
     def create_user(self, email, password=None, **extra_fields):
         if not email:
-            raise ValueError('Email is required')
+            raise ValueError("Email is required")
 
         email = self.normalize_email(email)
         user = self.model(email=email, **extra_fields)
@@ -13,9 +18,9 @@ class UserManager(BaseUserManager):
         return user
 
     def create_superuser(self, email, password=None, **extra_fields):
-        extra_fields.setdefault('is_staff', True)
-        extra_fields.setdefault('is_superuser', True)
-        extra_fields.setdefault('is_active', True)
+        extra_fields.setdefault("is_staff", True)
+        extra_fields.setdefault("is_superuser", True)
+        extra_fields.setdefault("is_active", True)
 
         return self.create_user(email, password, **extra_fields)
 
@@ -32,10 +37,10 @@ class User(AbstractBaseUser, PermissionsMixin):
         blank=True,
         null=True,
         choices=[
-            ('github', 'GitHub'),
-            ('gitlab', 'GitLab'),
-            ('google', 'Google'),
-        ]
+            ("github", "GitHub"),
+            ("gitlab", "GitLab"),
+            ("google", "Google"),
+        ],
     )
     oauth_id = models.CharField(max_length=255, blank=True, null=True)
 
@@ -45,9 +50,9 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     objects = UserManager()
 
-    USERNAME_FIELD = 'email'
-    REQUIRED_FIELDS = []  
+    USERNAME_FIELD = "email"
+    REQUIRED_FIELDS = []
 
     class Meta:
-        db_table = 'auth_users'
-        unique_together = [['email', 'oauth_provider']]
+        db_table = "auth_users"
+        unique_together = [["email", "oauth_provider"]]

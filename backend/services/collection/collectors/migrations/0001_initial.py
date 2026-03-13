@@ -4,47 +4,141 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
-    dependencies = [
-    ]
+    dependencies = []
 
     operations = [
         migrations.CreateModel(
-            name='Collection',
+            name="Collection",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('user', models.IntegerField(help_text='User ID from API Gateway')),
-                ('workspace_id', models.IntegerField(help_text='Workspace ID from Configuration Service')),
-                ('repository_id', models.IntegerField(help_text='Repository ID from Configuration Service')),
-                ('repository_name', models.CharField(max_length=255)),
-                ('repository_full_name', models.CharField(max_length=500)),
-                ('platform', models.CharField(max_length=20)),
-                ('repository_url', models.URLField(blank=True, null=True)),
-                ('default_branch', models.CharField(blank=True, max_length=100, null=True)),
-                ('branch_name', models.CharField(blank=True, help_text='Branch to collect data from', max_length=255, null=True)),
-                ('token_encrypted', models.TextField(help_text='Encrypted access token')),
-                ('status', models.CharField(choices=[('pending', 'Pending'), ('in_progress', 'In Progress'), ('completed', 'Completed'), ('failed', 'Failed'), ('paused', 'Paused')], default='pending', max_length=20)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('started_at', models.DateTimeField(blank=True, null=True)),
-                ('completed_at', models.DateTimeField(blank=True, null=True)),
-                ('paused_at', models.DateTimeField(blank=True, null=True)),
-                ('selected_metrics', models.JSONField(default=list, help_text='List of metrics to collect')),
-                ('filters', models.JSONField(default=dict, help_text='Collection filters')),
-                ('total_items', models.IntegerField(default=0)),
-                ('collected_items', models.IntegerField(default=0)),
-                ('last_collected_item_id', models.CharField(blank=True, help_text='Last PR/MR number collected (for resume)', max_length=100, null=True)),
-                ('raw_data_filename', models.CharField(blank=True, help_text='Filename in MinIO for raw JSON data', max_length=500, null=True)),
-                ('structured_csv_filename', models.CharField(blank=True, help_text='Filename in MinIO for structured CSV', max_length=500, null=True)),
-                ('statistics_csv_filename', models.CharField(blank=True, help_text='Filename in MinIO for statistics CSV', max_length=500, null=True)),
-                ('stats', models.JSONField(default=dict, help_text='Collection statistics')),
-                ('error_message', models.TextField(blank=True, null=True)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("user", models.IntegerField(help_text="User ID from API Gateway")),
+                (
+                    "workspace_id",
+                    models.IntegerField(
+                        help_text="Workspace ID from Configuration Service"
+                    ),
+                ),
+                (
+                    "repository_id",
+                    models.IntegerField(
+                        help_text="Repository ID from Configuration Service"
+                    ),
+                ),
+                ("repository_name", models.CharField(max_length=255)),
+                ("repository_full_name", models.CharField(max_length=500)),
+                ("platform", models.CharField(max_length=20)),
+                ("repository_url", models.URLField(blank=True, null=True)),
+                (
+                    "default_branch",
+                    models.CharField(blank=True, max_length=100, null=True),
+                ),
+                (
+                    "branch_name",
+                    models.CharField(
+                        blank=True,
+                        help_text="Branch to collect data from",
+                        max_length=255,
+                        null=True,
+                    ),
+                ),
+                (
+                    "token_encrypted",
+                    models.TextField(help_text="Encrypted access token"),
+                ),
+                (
+                    "status",
+                    models.CharField(
+                        choices=[
+                            ("pending", "Pending"),
+                            ("in_progress", "In Progress"),
+                            ("completed", "Completed"),
+                            ("failed", "Failed"),
+                            ("paused", "Paused"),
+                        ],
+                        default="pending",
+                        max_length=20,
+                    ),
+                ),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("started_at", models.DateTimeField(blank=True, null=True)),
+                ("completed_at", models.DateTimeField(blank=True, null=True)),
+                ("paused_at", models.DateTimeField(blank=True, null=True)),
+                (
+                    "selected_metrics",
+                    models.JSONField(
+                        default=list, help_text="List of metrics to collect"
+                    ),
+                ),
+                (
+                    "filters",
+                    models.JSONField(default=dict, help_text="Collection filters"),
+                ),
+                ("total_items", models.IntegerField(default=0)),
+                ("collected_items", models.IntegerField(default=0)),
+                (
+                    "last_collected_item_id",
+                    models.CharField(
+                        blank=True,
+                        help_text="Last PR/MR number collected (for resume)",
+                        max_length=100,
+                        null=True,
+                    ),
+                ),
+                (
+                    "raw_data_filename",
+                    models.CharField(
+                        blank=True,
+                        help_text="Filename in MinIO for raw JSON data",
+                        max_length=500,
+                        null=True,
+                    ),
+                ),
+                (
+                    "structured_csv_filename",
+                    models.CharField(
+                        blank=True,
+                        help_text="Filename in MinIO for structured CSV",
+                        max_length=500,
+                        null=True,
+                    ),
+                ),
+                (
+                    "statistics_csv_filename",
+                    models.CharField(
+                        blank=True,
+                        help_text="Filename in MinIO for statistics CSV",
+                        max_length=500,
+                        null=True,
+                    ),
+                ),
+                (
+                    "stats",
+                    models.JSONField(default=dict, help_text="Collection statistics"),
+                ),
+                ("error_message", models.TextField(blank=True, null=True)),
             ],
             options={
-                'db_table': 'collections',
-                'ordering': ['-created_at'],
-                'indexes': [models.Index(fields=['user', 'repository_id'], name='collections_user_42cf34_idx'), models.Index(fields=['status'], name='collections_status_7f6a4e_idx')],
+                "db_table": "collections",
+                "ordering": ["-created_at"],
+                "indexes": [
+                    models.Index(
+                        fields=["user", "repository_id"],
+                        name="collections_user_42cf34_idx",
+                    ),
+                    models.Index(
+                        fields=["status"], name="collections_status_7f6a4e_idx"
+                    ),
+                ],
             },
         ),
     ]

@@ -3,6 +3,7 @@
 OpenAPI schema definitions for the Collection Service API.
 Uses drf-spectacular for documentation generation.
 """
+
 from drf_spectacular.utils import (
     extend_schema,
     OpenApiParameter,
@@ -108,10 +109,16 @@ branches_for_repository_schema = extend_schema(
     request=inline_serializer(
         name="BranchesRequest",
         fields={
-            "platform": serializers.CharField(help_text="Platform type (github/gitlab)"),
+            "platform": serializers.CharField(
+                help_text="Platform type (github/gitlab)"
+            ),
             "token": serializers.CharField(help_text="Access token for the platform"),
-            "repository_full_name": serializers.CharField(help_text="Full repository name (owner/repo)"),
-            "default_branch": serializers.CharField(required=False, help_text="Default branch name"),
+            "repository_full_name": serializers.CharField(
+                help_text="Full repository name (owner/repo)"
+            ),
+            "default_branch": serializers.CharField(
+                required=False, help_text="Default branch name"
+            ),
         },
     ),
     responses={

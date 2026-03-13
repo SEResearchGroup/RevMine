@@ -44,17 +44,17 @@ function CleaningDetail() {
   const handleDownloadCSV = async (fileType) => {
     try {
       // Get the actual filename from cleanedData
-      const actualFilename = fileType === 'structured' 
-        ? cleanedData.structured_csv_filename 
+      const actualFilename = fileType === 'structured'
+        ? cleanedData.structured_csv_filename
         : cleanedData.statistics_csv_filename;
-      
+
       if (!actualFilename) {
         alert('File not available');
         return;
       }
 
       const response = await collectionService.downloadCleanedDataCSV(cleanedDataId, fileType);
-      
+
       // Try to use File System Access API for "Save As" dialog
       if (window.showSaveFilePicker) {
         try {
@@ -74,7 +74,7 @@ function CleaningDetail() {
           if (err.name === 'AbortError') return;
         }
       }
-      
+
       // Fallback for browsers that don't support File System Access API
       const url = window.URL.createObjectURL(response.data);
       const a = document.createElement('a');
@@ -295,7 +295,7 @@ function CleaningDetail() {
               <Settings className="w-5 h-5 text-gray-700" />
               <h2 className="text-xl font-semibold text-gray-900">Configuration</h2>
             </div>
-            
+
             <div className="bg-gray-50 rounded-lg p-4">
               <pre className="text-sm text-gray-700 overflow-x-auto">
                 {JSON.stringify(cleanedData.config, null, 2)}

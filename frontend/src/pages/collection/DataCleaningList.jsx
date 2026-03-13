@@ -43,16 +43,16 @@ function DataCleaningList() {
   const fetchAllCollections = async () => {
     try {
       setLoading(true);
-      
+
       // Get all collection plans
       const plansResponse = await collectionService.getAllPlans();
       // API returns array directly, not wrapped in { plans: [...] }
-      const allPlans = Array.isArray(plansResponse.data) 
-        ? plansResponse.data 
+      const allPlans = Array.isArray(plansResponse.data)
+        ? plansResponse.data
         : (plansResponse.data.plans || []);
-      
+
       console.log("All plans fetched:", allPlans);
-      
+
       // Filter collections that have data (completed, paused, or interrupted)
       const validStatuses = ["completed", "paused", "in_progress", "failed"];
       const collectionsWithData = allPlans.filter(
@@ -64,7 +64,7 @@ function DataCleaningList() {
       // Get all workspaces
       const workspacesResponse = await workspaceService.getAll();
       const workspacesList = workspacesResponse.data || [];
-      
+
       // Create workspace map
       const workspaceMap = {};
       workspacesList.forEach((ws) => {
@@ -148,12 +148,12 @@ function DataCleaningList() {
   const filteredCollections = collections.filter((collection) => {
     const repo = repositories[collection.repository_id];
     const workspace = repo ? workspaces[repo.workspace_id] : null;
-    
+
     const searchLower = searchTerm.toLowerCase();
     const repoName = repo?.name?.toLowerCase() || "";
     const workspaceName = workspace?.name?.toLowerCase() || "";
     const platform = workspace?.platform?.toLowerCase() || "";
-    
+
     return (
       repoName.includes(searchLower) ||
       workspaceName.includes(searchLower) ||
@@ -178,7 +178,7 @@ function DataCleaningList() {
     const now = new Date();
     const past = new Date(date);
     const diffInMinutes = Math.floor((now - past) / (1000 * 60));
-    
+
     if (diffInMinutes < 60) return `${diffInMinutes} min ago`;
     const diffInHours = Math.floor(diffInMinutes / 60);
     if (diffInHours < 24) return `${diffInHours}h ago`;
@@ -349,8 +349,8 @@ function DataCleaningList() {
                       </div>
                     </div>
 
-                    
-                    
+
+
                   </div>
 
                   {/* Collection info */}
@@ -361,7 +361,7 @@ function DataCleaningList() {
                     </div>
 
 
-                
+
 
                     <div className="flex items-center gap-2">
                       <Layers className="w-4 h-4 text-gray-400" />
@@ -408,7 +408,7 @@ function DataCleaningList() {
                     )}
                   </div>
                 </div>
-                
+
               );
             })}
           </div>

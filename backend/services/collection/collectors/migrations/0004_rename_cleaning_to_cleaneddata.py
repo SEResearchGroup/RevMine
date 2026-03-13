@@ -4,18 +4,17 @@ from django.db import migrations
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('collectors', '0003_create_cleaning'),
+        ("collectors", "0003_create_cleaning"),
     ]
 
     operations = [
         migrations.RenameModel(
-            old_name='Cleaning',
-            new_name='CleanedData',
+            old_name="Cleaning",
+            new_name="CleanedData",
         ),
         migrations.AlterModelTable(
-            name='cleaneddata',
-            table='cleaned_data',
+            name="cleaneddata",
+            table="cleaned_data",
         ),
     ]

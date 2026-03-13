@@ -1,10 +1,10 @@
 import axios from 'axios';
-import { 
-  getToken, 
-  setToken, 
-  getRefreshToken, 
+import {
+  getToken,
+  setToken,
+  getRefreshToken,
   clearTokens,
-  isTokenExpired 
+  isTokenExpired
 } from '../utils/jwt';
 
 let isRefreshing = false;
@@ -95,12 +95,12 @@ const createApiInstance = (baseURL) => {
 
           const { access } = response.data;
           setToken(access);
-          
+
           instance.defaults.headers.common['Authorization'] = `Bearer ${access}`;
           originalRequest.headers.Authorization = `Bearer ${access}`;
-          
+
           processQueue(null, access);
-          
+
           return instance(originalRequest);
         } catch (refreshError) {
           processQueue(refreshError, null);

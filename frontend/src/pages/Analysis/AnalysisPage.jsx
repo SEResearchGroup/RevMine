@@ -23,7 +23,7 @@ const AnalysisPage = () => {
     };
 
     loadInitialResults();
-  }, []); 
+  }, []);
 
   const handleDatasetSelect = (dataset) => {
     console.log("Dataset selected:", dataset);

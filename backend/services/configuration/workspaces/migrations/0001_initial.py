@@ -5,68 +5,148 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
-    dependencies = [
-    ]
+    dependencies = []
 
     operations = [
         migrations.CreateModel(
-            name='Workspace',
+            name="Workspace",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('user', models.IntegerField()),
-                ('name', models.CharField(max_length=200)),
-                ('description', models.TextField(blank=True, null=True)),
-                ('platform', models.CharField(choices=[('github', 'GitHub'), ('gitlab', 'GitLab.com'), ('gitlab_self', 'GitLab Self-Hosted')], max_length=20)),
-                ('url', models.URLField(blank=True, help_text='Required only for GitLab self-hosted', null=True)),
-                ('token_encrypted', models.TextField()),
-                ('is_active', models.BooleanField(default=True)),
-                ('last_sync', models.DateTimeField(blank=True, null=True)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("user", models.IntegerField()),
+                ("name", models.CharField(max_length=200)),
+                ("description", models.TextField(blank=True, null=True)),
+                (
+                    "platform",
+                    models.CharField(
+                        choices=[
+                            ("github", "GitHub"),
+                            ("gitlab", "GitLab.com"),
+                            ("gitlab_self", "GitLab Self-Hosted"),
+                        ],
+                        max_length=20,
+                    ),
+                ),
+                (
+                    "url",
+                    models.URLField(
+                        blank=True,
+                        help_text="Required only for GitLab self-hosted",
+                        null=True,
+                    ),
+                ),
+                ("token_encrypted", models.TextField()),
+                ("is_active", models.BooleanField(default=True)),
+                ("last_sync", models.DateTimeField(blank=True, null=True)),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
             ],
             options={
-                'db_table': 'config_workspaces',
-                'ordering': ['-created_at'],
-                'unique_together': {('user', 'name')},
+                "db_table": "config_workspaces",
+                "ordering": ["-created_at"],
+                "unique_together": {("user", "name")},
             },
         ),
         migrations.CreateModel(
-            name='Repository',
+            name="Repository",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('external_id', models.CharField(help_text='ID du repo sur GitHub/GitLab', max_length=100)),
-                ('name', models.CharField(max_length=255)),
-                ('full_name', models.CharField(help_text='Ex: owner/repo-name', max_length=500)),
-                ('description', models.TextField(blank=True, null=True)),
-                ('url', models.URLField(help_text='URL du repository')),
-                ('web_url', models.URLField(help_text='URL web pour accéder au repo')),
-                ('owner', models.CharField(max_length=255)),
-                ('owner_type', models.CharField(blank=True, help_text='User, Organization, Group', max_length=50, null=True)),
-                ('default_branch', models.CharField(default='main', max_length=100)),
-                ('language', models.CharField(blank=True, max_length=50, null=True)),
-                ('stars_count', models.IntegerField(default=0)),
-                ('forks_count', models.IntegerField(default=0)),
-                ('open_issues_count', models.IntegerField(default=0)),
-                ('is_private', models.BooleanField(default=False)),
-                ('is_fork', models.BooleanField(default=False)),
-                ('is_archived', models.BooleanField(default=False)),
-                ('created_at_platform', models.DateTimeField(help_text='Date de création sur la plateforme')),
-                ('last_activity_at', models.DateTimeField(blank=True, null=True)),
-                ('is_active', models.BooleanField(default=True, help_text="Si le repo est actif pour l'analyse")),
-                ('last_analyzed_at', models.DateTimeField(blank=True, null=True)),
-                ('imported_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
-                ('raw_data', models.JSONField(blank=True, help_text="Données brutes de l'API", null=True)),
-                ('workspace', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='repositories', to='workspaces.workspace')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "external_id",
+                    models.CharField(
+                        help_text="ID du repo sur GitHub/GitLab", max_length=100
+                    ),
+                ),
+                ("name", models.CharField(max_length=255)),
+                (
+                    "full_name",
+                    models.CharField(help_text="Ex: owner/repo-name", max_length=500),
+                ),
+                ("description", models.TextField(blank=True, null=True)),
+                ("url", models.URLField(help_text="URL du repository")),
+                ("web_url", models.URLField(help_text="URL web pour accéder au repo")),
+                ("owner", models.CharField(max_length=255)),
+                (
+                    "owner_type",
+                    models.CharField(
+                        blank=True,
+                        help_text="User, Organization, Group",
+                        max_length=50,
+                        null=True,
+                    ),
+                ),
+                ("default_branch", models.CharField(default="main", max_length=100)),
+                ("language", models.CharField(blank=True, max_length=50, null=True)),
+                ("stars_count", models.IntegerField(default=0)),
+                ("forks_count", models.IntegerField(default=0)),
+                ("open_issues_count", models.IntegerField(default=0)),
+                ("is_private", models.BooleanField(default=False)),
+                ("is_fork", models.BooleanField(default=False)),
+                ("is_archived", models.BooleanField(default=False)),
+                (
+                    "created_at_platform",
+                    models.DateTimeField(
+                        help_text="Date de création sur la plateforme"
+                    ),
+                ),
+                ("last_activity_at", models.DateTimeField(blank=True, null=True)),
+                (
+                    "is_active",
+                    models.BooleanField(
+                        default=True, help_text="Si le repo est actif pour l'analyse"
+                    ),
+                ),
+                ("last_analyzed_at", models.DateTimeField(blank=True, null=True)),
+                ("imported_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
+                (
+                    "raw_data",
+                    models.JSONField(
+                        blank=True, help_text="Données brutes de l'API", null=True
+                    ),
+                ),
+                (
+                    "workspace",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="repositories",
+                        to="workspaces.workspace",
+                    ),
+                ),
             ],
             options={
-                'db_table': 'repositories',
-                'ordering': ['-last_activity_at', '-created_at_platform'],
-                'indexes': [models.Index(fields=['workspace', 'is_active'], name='repositorie_workspa_e15bcb_idx'), models.Index(fields=['external_id'], name='repositorie_externa_7aae0b_idx'), models.Index(fields=['full_name'], name='repositorie_full_na_874b2c_idx')],
-                'unique_together': {('workspace', 'external_id')},
+                "db_table": "repositories",
+                "ordering": ["-last_activity_at", "-created_at_platform"],
+                "indexes": [
+                    models.Index(
+                        fields=["workspace", "is_active"],
+                        name="repositorie_workspa_e15bcb_idx",
+                    ),
+                    models.Index(
+                        fields=["external_id"], name="repositorie_externa_7aae0b_idx"
+                    ),
+                    models.Index(
+                        fields=["full_name"], name="repositorie_full_na_874b2c_idx"
+                    ),
+                ],
+                "unique_together": {("workspace", "external_id")},
             },
         ),
     ]

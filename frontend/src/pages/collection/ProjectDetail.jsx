@@ -1,6 +1,6 @@
 /**
  * frontend/src/pages/collection/ProjectDetail.jsx
- * 
+ *
  * FIXED: Collections are NO LONGER created automatically on page load.
  * A collection is only created when the user explicitly clicks "Go to collect plan".
  */
@@ -44,7 +44,7 @@ function ProjectDetail() {
   // Collection plan - only set when user explicitly creates one
   const [planId, setPlanId] = useState(null);
   const [platform, setPlatform] = useState("");
-  
+
   // Active collection info (if one already exists)
   const [activeCollection, setActiveCollection] = useState(null);
 
@@ -77,7 +77,7 @@ function ProjectDetail() {
   // Collection History
   const [collectionHistory, setCollectionHistory] = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
-  
+
   // Delete confirmation modal
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [collectionToDelete, setCollectionToDelete] = useState(null);
@@ -125,7 +125,7 @@ function ProjectDetail() {
     if (location.state?.interruptedCollection) {
       const interruptedFromNav = location.state.interruptedCollection;
       const dismissed = getDismissedNotifications();
-      
+
       // Add to notifications if not dismissed
       if (!dismissed.includes(interruptedFromNav.id)) {
         setInterruptedNotifications(prev => {
@@ -134,7 +134,7 @@ function ProjectDetail() {
           return [...prev, interruptedFromNav];
         });
       }
-      
+
       // Clear the state to prevent showing again on refresh
       window.history.replaceState({}, document.title);
     }
@@ -146,7 +146,7 @@ function ProjectDetail() {
       fetchData();
       fetchCollectionHistory();
     }
-    
+
     return () => {
       dataFetchedRef.current = false;
     };
@@ -186,7 +186,7 @@ function ProjectDetail() {
       const repo = reposRes.data.find((r) => r.id === parseInt(repositoryId));
       setRepository(repo);
       setPlatform(repo.platform);
-      
+
       // After getting repository, load metrics and branches WITHOUT creating a collection
       await loadMetricsAndBranches(repo.platform);
     } catch (err) {
@@ -207,26 +207,26 @@ function ProjectDetail() {
         repositoryId,
         repoPlatform
       );
-      
+
       setAvailableMetrics(metricsRes.data.available_metrics);
-      
+
       // If there's already an active collection, restore its settings
       if (metricsRes.data.has_active_collection && metricsRes.data.active_collection) {
         const existingCollection = metricsRes.data.active_collection;
         setActiveCollection(existingCollection);
         setPlanId(existingCollection.id);
-        
+
         // Restore selected metrics if any
         if (existingCollection.selected_metrics?.length > 0) {
           setSelectedMetrics(existingCollection.selected_metrics);
         }
-        
+
         // Restore filters
         const existingFilters = existingCollection.filters || {};
         if (existingFilters.start_date) setStartDate(existingFilters.start_date);
         if (existingFilters.end_date) setEndDate(existingFilters.end_date);
         if (existingFilters.status?.length > 0) setSelectedStatus(existingFilters.status);
-        
+
         // Restore branch
         if (existingCollection.branch_name) {
           setSelectedBranch(existingCollection.branch_name);
@@ -254,19 +254,19 @@ function ProjectDetail() {
       const res = await collectionService.getHistory(repositoryId);
       const collections = res.data.collections || [];
       setCollectionHistory(collections);
-      
+
       // Track running collections (in_progress) - no notifications for these
       const runningIds = new Set(
         collections.filter(c => c.status === 'in_progress').map(c => c.id)
       );
       setRunningCollections(runningIds);
-      
+
       // Load interrupted collections as notifications (paused, failed ONLY - not in_progress)
       const dismissed = getDismissedNotifications();
       const interruptedCollections = collections.filter(
         c => ['paused', 'failed'].includes(c.status) && !dismissed.includes(c.id)
       );
-      
+
       // Add to notifications without duplicates
       setInterruptedNotifications(prev => {
         const existingIds = new Set(prev.map(n => n.id));
@@ -303,7 +303,7 @@ function ProjectDetail() {
         repositoryId
       );
       setBranches(res.data.branches || []);
-      
+
       // Only set default branch if not already set (from active collection)
       if (!selectedBranch) {
         setSelectedBranch(res.data.default_branch || "");
@@ -574,7 +574,7 @@ function ProjectDetail() {
   const formatCollectionDate = (collection) => {
     const startDate = collection.filters?.start_date;
     const endDate = collection.filters?.end_date;
-    
+
     if (startDate && endDate) {
       return `${new Date(startDate).toLocaleDateString()} → ${new Date(endDate).toLocaleDateString()}`;
     } else if (startDate) {
@@ -604,7 +604,7 @@ function ProjectDetail() {
   // Animated progress indicator component for in-progress collections
   const InProgressIndicator = () => (
     <div className="relative w-full h-1 bg-blue-100 rounded-full overflow-hidden">
-      <div 
+      <div
         className="absolute h-full w-1/3 bg-gradient-to-r from-blue-400 via-blue-600 to-blue-400 rounded-full animate-slide-progress"
       />
     </div>
@@ -1084,14 +1084,14 @@ function ProjectDetail() {
                 Delete Collection?
               </h3>
             </div>
-            
+
             <div className="mb-6">
               <p className="text-gray-600 mb-3">
                 Are you sure you want to delete this collection?
               </p>
               <div className="bg-red-50 border border-red-200 rounded-lg p-3">
                 <p className="text-sm text-red-800">
-                  <strong>Warning:</strong> This action cannot be undone. All collected data, 
+                  <strong>Warning:</strong> This action cannot be undone. All collected data,
                   cleaning operations, and created files will be permanently deleted.
                 </p>
               </div>
@@ -1132,13 +1132,13 @@ function ProjectDetail() {
                 Incomplete Collections Found
               </h3>
             </div>
-            
+
             <div className="mb-6">
               <p className="text-gray-600 mb-4">
-                You have <strong>{incompleteCollections.length}</strong> incomplete collection{incompleteCollections.length > 1 ? 's' : ''} for this project. 
+                You have <strong>{incompleteCollections.length}</strong> incomplete collection{incompleteCollections.length > 1 ? 's' : ''} for this project.
                 Do you want to continue one of them or create a new collection?
               </p>
-              
+
               {/* List of incomplete collections */}
               <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 max-h-48 overflow-y-auto">
                 {incompleteCollections.map((collection) => (

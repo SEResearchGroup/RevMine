@@ -1,9 +1,9 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import AuthContext from "./AuthContext";
-import { 
-  getToken, 
-  isTokenExpired, 
+import {
+  getToken,
+  isTokenExpired,
   setToken,
   setRefreshToken,
   getRefreshToken,
@@ -40,7 +40,7 @@ export const AuthProvider = ({ children }) => {
           });
           const { access } = response.data;
           setToken(access);
-          
+
           const payload = JSON.parse(atob(access.split(".")[1]));
           setUser(payload.user || payload);
           setIsAuthenticated(true);
@@ -77,7 +77,7 @@ export const AuthProvider = ({ children }) => {
           });
           const { access } = response.data;
           setToken(access);
-          
+
           const payload = JSON.parse(atob(access.split(".")[1]));
           setUser(payload.user || payload);
         } catch (error) {
@@ -93,14 +93,14 @@ export const AuthProvider = ({ children }) => {
   const login = (accessToken, refreshToken) => {
     setToken(accessToken);
     setRefreshToken(refreshToken);
-    
+
     const payload = JSON.parse(atob(accessToken.split(".")[1]));
     setUser(payload.user || payload);
     setIsAuthenticated(true);
     navigate("/workspaces");
   };
 
-  
+
 
   return (
     <AuthContext.Provider value={{ isAuthenticated, user, login, logout, loading }}>

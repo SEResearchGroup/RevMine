@@ -149,7 +149,7 @@ const ResultsDisplay = ({ results = [], onExportAll, onExportSingle, exportLoadi
                         <ChevronDown className="w-5 h-5 text-slate-600" />
                       )}
                     </button>
-                    
+
                     {isStatsExpanded && (
                       <div className="px-6 pb-6 pt-2">
                         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
@@ -217,8 +217,8 @@ const ResultsDisplay = ({ results = [], onExportAll, onExportSingle, exportLoadi
                 {AVAILABLE_METRICS.find((m) => m.id === fullscreenChart.chart_type)?.description}
               </p>
             </div>
-            
-            <div className="flex-1 bg-white rounded-lg p-6 overflow-auto">  
+
+            <div className="flex-1 bg-white rounded-lg p-6 overflow-auto">
               <InteractiveChart
                 chartData={{ data: fullscreenChart.chart_data }}
                 chartType={fullscreenChart.chart_type}
