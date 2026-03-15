@@ -10,7 +10,7 @@ from utils.json_utils import extract_json_object
 
 class OllamaParserService:
     def __init__(self) -> None:
-        self.client = Client()
+        self.client = Client(host=settings.OLLAMA_HOST)
 
     def parse_user_request(
         self, user_message: str, model: str | None = None
@@ -25,6 +25,7 @@ class OllamaParserService:
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_message},
                 ],
+                format="json",
                 options={"temperature": 0},
             )
         except ResponseError:
