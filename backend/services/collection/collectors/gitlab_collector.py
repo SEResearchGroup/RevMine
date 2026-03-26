@@ -17,7 +17,9 @@ class GitLabCollector:
         self.branch_name = branch_name
         self.base_url = base_url
         self.headers = {'PRIVATE-TOKEN': token}
-        self.project_id = project_id  # Can be passed directly from external_id
+        # self.headers = {'Authorization': f'Bearer {token}'}
+
+        self.project_id = project_id 
     
     def collect_all_data(self, filters=None, progress_callback=None, resume_from=None, existing_data=None):
         """

@@ -45,13 +45,12 @@ const WorkspaceModal = ({ workspace, onClose }) => {
         token: formData.token,
       };
 
-      if (formData.platform === "gitlab") {
+      if (formData.platform === "gitlab" || formData.platform === "gitlab_self") {
         testData.hosting_type = formData.hostingType;
         if (formData.hostingType === "self-hosted") {
           testData.url = formData.url;
         }
       }
-
       const response = await workspaceService.testConnection(testData);
 
       if (response.data.success) {
@@ -88,7 +87,7 @@ const WorkspaceModal = ({ workspace, onClose }) => {
         }
       }
 
-      if (formData.platform === "gitlab") {
+      if (formData.platform === "gitlab" || formData.platform === "gitlab_self") {
         workspaceData.hosting_type = formData.hostingType;
         if (formData.hostingType === "self-hosted") {
           workspaceData.url = formData.url;
@@ -176,7 +175,7 @@ const WorkspaceModal = ({ workspace, onClose }) => {
         return;
       }
       if (
-        formData.platform === "gitlab" &&
+        formData.platform === "gitlab_self" &&
         formData.hostingType === "self-hosted" &&
         !formData.url
       ) {
@@ -302,7 +301,7 @@ const WorkspaceModal = ({ workspace, onClose }) => {
                     }
                     disabled={isEditMode}
                     className={`p-4 sm:p-6 border-2 rounded-lg flex flex-col items-center gap-2 sm:gap-3 transition-all ${
-                      formData.platform === "gitlab"
+                      formData.platform === "gitlab" || formData.platform === "gitlab_self"
                         ? "border-blue-600 bg-blue-50"
                         : "border-gray-300 hover:border-gray-400"
                     } ${isEditMode ? "opacity-60 cursor-not-allowed" : ""}`}
@@ -349,7 +348,7 @@ const WorkspaceModal = ({ workspace, onClose }) => {
 
           {step === 2 && (
             <div className="space-y-4 sm:space-y-6">
-              {formData.platform === "gitlab" && (
+              {(formData.platform === "gitlab" || formData.platform === "gitlab_self") && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-3">
                     GitLab Hosting Type
@@ -375,6 +374,7 @@ const WorkspaceModal = ({ workspace, onClose }) => {
                         setFormData({
                           ...formData,
                           hostingType: "self-hosted",
+                          platform: "gitlab_self"
                         })
                       }
                       className={`py-2.5 sm:py-3 border-2 rounded-lg transition-all text-sm sm:text-base ${
@@ -389,7 +389,7 @@ const WorkspaceModal = ({ workspace, onClose }) => {
                 </div>
               )}
 
-              {formData.platform === "gitlab" &&
+              {(formData.platform === "gitlab" || formData.platform === "gitlab_self") &&
                 formData.hostingType === "self-hosted" && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">

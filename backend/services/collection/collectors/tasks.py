@@ -114,7 +114,7 @@ def execute_collection_task(plan_id, resume=False):
                 token=collection.token_encrypted,
                 repo_full_name=collection.repository_full_name,
                 branch_name=collection.branch_name,
-                project_id=collection.external_id  # Pass GitLab project ID directly
+                project_id=collection.external_id
             )
         
         # Progress callback with incremental saving and cancellation check

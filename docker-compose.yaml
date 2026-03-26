@@ -1,6 +1,36 @@
-version: '3.8'
-
 services:
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka
+    hostname: kafka
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093,PLAINTEXT_HOST://0.0.0.0:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-topics --bootstrap-server localhost:9092 --list >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    networks:
+      - app-network
 
   # Service de stockage d'objets MinIO
   minio:
@@ -119,8 +149,11 @@ services:
       DATABASE_PASSWORD: postgres
       DATABASE_PORT: 5432
       CONFIGURATION_SERVICE_URL: http://configuration-service:8001/api/workspaces
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
     depends_on:
       gateway-db:
+        condition: service_healthy
+      kafka:
         condition: service_healthy
     volumes:
       - ./backend/api-gateway:/app
@@ -145,11 +178,14 @@ services:
       DATABASE_USER: postgres
       DATABASE_PASSWORD: postgres
       DATABASE_PORT: 5432
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
     depends_on:
       configuration-db:
         condition: service_healthy
       api-gateway:
         condition: service_started
+      kafka:
+        condition: service_healthy
     volumes:
       - ./backend/services/configuration:/app
     networks:
@@ -157,8 +193,65 @@ services:
     command: sh -c "sleep 10 && python manage.py migrate --run-syncdb && python manage.py runserver 0.0.0.0:8001"
     restart: unless-stopped
 
+  # Collection Service
+  collection-service:
+    build:
+      context: ./backend/services/collection
+    container_name: collection-service
+    hostname: collection-service  
+    ports:
+      - "8002:8002"
+    env_file:
+      - ./backend/services/collection/.env
+    environment:
+      DATABASE_HOST: collection-db
+      DATABASE_NAME: collection_db
+      DATABASE_USER: postgres
+      DATABASE_PASSWORD: postgres
+      DATABASE_PORT: 5432
+    depends_on:
+      collection-db:
+        condition: service_healthy
+      api-gateway:
+        condition: service_started
+    volumes:
+      - ./backend/services/collection:/app
+    networks:
+      - app-network  
+    command: sh -c "sleep 10 && python manage.py migrate --run-syncdb && python manage.py runserver 0.0.0.0:8002"
+    restart: unless-stopped
+
+
+  analyze-service:
+    build:
+      context: ./backend/services/analyze
+    container_name: analyze-service
+    hostname: analyze-service  
+    ports:
+      - "8003:8003"
+    env_file:
+      - ./backend/services/analyze/.env
+    environment:
+      DATABASE_HOST: analyze-db
+      DATABASE_NAME: analyze_db
+      DATABASE_USER: postgres
+      DATABASE_PASSWORD: postgres
+      DATABASE_PORT: 5432
+    depends_on:
+      analyze-db:
+        condition: service_healthy
+      api-gateway:
+        condition: service_started
+    volumes:
+      - ./backend/services/analyze:/app
+    networks:
+      - app-network  
+    command: sh -c "sleep 10 && python manage.py migrate --run-syncdb && python manage.py runserver 0.0.0.0:8003"
+
+
   
 volumes:
+  kafka_data:
   gateway_postgres_data:
   configuration_postgres_data:
   collection_postgres_data:

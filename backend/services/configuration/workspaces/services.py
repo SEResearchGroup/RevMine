@@ -48,8 +48,13 @@ class GitAPIClient:
                 'Authorization': f'token {self.token}',
                 'Accept': 'application/vnd.github.v3+json'
             }
-        else:  # gitlab ou gitlab_self
+        elif self.platform == 'gitlab':
             self._headers = {'PRIVATE-TOKEN': self.token}
+        else : 
+            print(f"Using token for GitLab self-hosted: {self.token[:4]}...{self.token[-4:]}")
+            self._headers = {'Authorization': f'Bearer {self.token}'}
+           
+
         
         return self._headers
     
