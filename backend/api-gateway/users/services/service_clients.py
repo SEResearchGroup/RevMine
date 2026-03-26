@@ -200,14 +200,12 @@ class CollectionServiceClient:
             )
 
 
-def build_collection_payload(repository_details: dict, workspace_token: str, 
-                             repository_id: str, workspace_id: str) -> dict:
+def build_collection_payload(repository_details: dict, repository_id: str, workspace_id: str) -> dict:
     """
     Build the payload for starting a collection.
     
     Args:
         repository_details: Repository details from configuration service
-        workspace_token: The workspace token
         repository_id: The repository ID
         workspace_id: The workspace ID
         
@@ -223,24 +221,23 @@ def build_collection_payload(repository_details: dict, workspace_token: str,
         'repository_url': repository_details.get('web_url'),
         'default_branch': repository_details.get('default_branch'),
         'external_id': repository_details.get('external_id'),
-        'token': workspace_token,
     }
 
 
-def build_branches_payload(repository_details: dict, workspace_token: str) -> dict:
+def build_branches_payload(repository_details: dict, workspace_id: str) -> dict:
     """
     Build the payload for fetching branches.
     
     Args:
         repository_details: Repository details from configuration service
-        workspace_token: The workspace token
+        workspace_id: The workspace ID
         
     Returns:
         Branches payload dictionary
     """
     return {
         'platform': repository_details.get('platform'),
-        'token': workspace_token,
+        'workspace_id': workspace_id,
         'repository_full_name': repository_details.get('full_name'),
         'default_branch': repository_details.get('default_branch'),
     }

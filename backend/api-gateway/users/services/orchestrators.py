@@ -45,11 +45,10 @@ class CollectionOrchestrator:
             repository_details = self.config_client.get_repository(
                 workspace_id, repository_id, user_id
             )
-            workspace_token = self.config_client.get_workspace_token(workspace_id, user_id)
             
             # Build payload and start collection
             collection_payload = build_collection_payload(
-                repository_details, workspace_token, repository_id, workspace_id
+                repository_details, repository_id, workspace_id
             )
             response_data, status_code = self.collection_client.start_collection(
                 collection_payload, user_id
@@ -89,10 +88,9 @@ class CollectionOrchestrator:
             repository_details = self.config_client.get_repository(
                 workspace_id, repository_id, user_id
             )
-            workspace_token = self.config_client.get_workspace_token(workspace_id, user_id)
             
             # Build payload and fetch branches
-            branches_payload = build_branches_payload(repository_details, workspace_token)
+            branches_payload = build_branches_payload(repository_details, workspace_id)
             response_data, status_code = self.collection_client.get_branches(
                 branches_payload, user_id
             )

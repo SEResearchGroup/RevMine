@@ -5,6 +5,8 @@ from .models import Collection
 from .github_collector import GitHubCollector
 from .gitlab_collector import GitLabCollector
 from .minio_client import MinIOClient
+from kafka_utils.client import KafkaClient
+from kafka_utils.topics import Topics
 import logging
 
 logger = logging.getLogger(__name__)
@@ -70,6 +72,7 @@ def execute_collection_task(plan_id, resume=False):
     """Execute the actual collection task with incremental saving"""
     minio_client = MinIOClient()
     raw_data_filename = None  # Track the filename for cleanup on cancellation
+    collection = None
     
     try:
         # Check if already cancelled before starting
@@ -87,6 +90,17 @@ def execute_collection_task(plan_id, resume=False):
             collection.started_at = timezone.now()
             collection.last_collected_item_id = None
         collection.save()
+
+        KafkaClient.publish(
+            Topics.COLLECTION_STARTED,
+            {
+                'collection_id': collection.id,
+                'user_id': collection.user,
+                'workspace_id': collection.workspace_id,
+                'repository_id': collection.repository_id,
+                'status': 'in_progress',
+            },
+        )
         
         logger.info(f"Starting collection for {plan_id} (resume={resume})")
         
@@ -217,6 +231,18 @@ def execute_collection_task(plan_id, resume=False):
         minio_client.save_json(all_data, collection.raw_data_filename)
         
         collection.save()
+
+        KafkaClient.publish(
+            Topics.COLLECTION_COMPLETED,
+            {
+                'collection_id': collection.id,
+                'user_id': collection.user,
+                'workspace_id': collection.workspace_id,
+                'repository_id': collection.repository_id,
+                'status': 'completed',
+                'result_summary': stats,
+            },
+        )
         
         logger.info(f"Collection completed for {plan_id}! Total items: {stats.get('total_items', 0)}")
         
@@ -245,6 +271,22 @@ def execute_collection_task(plan_id, resume=False):
             collection.save()
         except:
             pass
+        finally:
+            if collection:
+                try:
+                    KafkaClient.publish(
+                        Topics.COLLECTION_FAILED,
+                        {
+                            'collection_id': collection.id,
+                            'user_id': collection.user,
+                            'workspace_id': collection.workspace_id,
+                            'repository_id': collection.repository_id,
+                            'status': 'failed',
+                            'error': str(e),
+                        },
+                    )
+                except Exception as publish_error:
+                    logger.warning(f"Could not publish COLLECTION_FAILED event: {publish_error}")
 
 
 def calculate_statistics(all_data, platform):

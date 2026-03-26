@@ -209,11 +209,14 @@ services:
       DATABASE_USER: postgres
       DATABASE_PASSWORD: postgres
       DATABASE_PORT: 5432
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
     depends_on:
       collection-db:
         condition: service_healthy
       api-gateway:
         condition: service_started
+      kafka:
+        condition: service_healthy
     volumes:
       - ./backend/services/collection:/app
     networks:
@@ -237,11 +240,14 @@ services:
       DATABASE_USER: postgres
       DATABASE_PASSWORD: postgres
       DATABASE_PORT: 5432
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
     depends_on:
       analyze-db:
         condition: service_healthy
       api-gateway:
         condition: service_started
+      kafka:
+        condition: service_healthy
     volumes:
       - ./backend/services/analyze:/app
     networks:

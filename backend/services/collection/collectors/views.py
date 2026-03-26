@@ -19,6 +19,7 @@ from .models import Collection, CleanedData
 from .services import (
     MetricsService,
     BranchService,
+    resolve_workspace_token,
     CollectionService,
     CollectedDataService,
     DataCleaningService,
@@ -136,13 +137,26 @@ class GetBranchesForRepositoryView(UserIdRequiredMixin, APIView):
 
         platform = request.data.get('platform')
         token = request.data.get('token')
+        workspace_id = request.data.get('workspace_id')
         repo_full_name = request.data.get('repository_full_name')
         default_branch = request.data.get('default_branch')
 
-        if not all([platform, token, repo_full_name]):
+        if not all([platform, repo_full_name]):
             return Response(
-                {'error': 'platform, token, and repository_full_name are required'},
+                {'error': 'platform and repository_full_name are required'},
                 status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if not token:
+            if not workspace_id:
+                return Response(
+                    {'error': 'workspace_id is required when token is not provided'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            token = resolve_workspace_token(
+                user_id=user_id,
+                workspace_id=int(workspace_id),
+                platform=platform,
             )
 
         try:

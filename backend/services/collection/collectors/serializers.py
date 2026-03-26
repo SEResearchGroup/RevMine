@@ -14,7 +14,7 @@ class StartCollectionSerializer(serializers.Serializer):
     default_branch = serializers.CharField(required=False)
     external_id = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     
-    token = serializers.CharField(required=True, write_only=True)
+    token = serializers.CharField(required=False, allow_blank=True, allow_null=True, write_only=True)
 
 
 class MetricsFilterSerializer(serializers.Serializer):

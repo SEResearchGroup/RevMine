@@ -5,6 +5,8 @@ from typing import Optional, Dict, List, Any, Tuple
 
 from django.utils import timezone
 from django.db import transaction
+from kafka_utils.request_reply import RequestReplyClient
+from kafka_utils.topics import Topics
 
 from .models import Collection, CleanedData
 from .branch_fetcher import BranchFetcher
@@ -15,6 +17,47 @@ from .tasks import run_collection_in_background, cancellation_registry
 from .serializers import CollectionSerializer, CleanedDataSerializer
 
 logger = logging.getLogger(__name__)
+
+_rr_client: RequestReplyClient | None = None
+
+
+def _get_rr_client() -> RequestReplyClient:
+    global _rr_client
+    if _rr_client is None:
+        _rr_client = RequestReplyClient()
+    return _rr_client
+
+
+def resolve_workspace_token(user_id: int, workspace_id: int, platform: str) -> str:
+    """Retrieve workspace token from configuration service through Kafka request-reply."""
+    response = _get_rr_client().call(
+        request_topic=Topics.TOKENS_REQUEST,
+        response_topic=Topics.TOKENS_RESPONSE,
+        payload={
+            'user_id': user_id,
+            'workspace_id': workspace_id,
+        },
+        timeout=10,
+    )
+
+    if not response or response.get('status') != 'ok':
+        raise CollectionValidationError(
+            f"Could not retrieve workspace token from configuration service: {response}"
+        )
+
+    token = response.get('token')
+    if not token:
+        raise CollectionValidationError('Token missing in configuration service response')
+
+    response_platform = response.get('platform')
+    if response_platform and response_platform != platform:
+        logger.warning(
+            "Workspace platform mismatch between collection request (%s) and configuration (%s)",
+            platform,
+            response_platform,
+        )
+
+    return token
 
 
 # =============================================================================
@@ -206,6 +249,14 @@ class CollectionService:
             if existing_check:
                 return existing_check, True
         
+        token = validated_data.get('token')
+        if not token:
+            token = resolve_workspace_token(
+                user_id=user_id,
+                workspace_id=validated_data['workspace_id'],
+                platform=platform,
+            )
+
         # Create new collection
         collection = Collection.objects.create(
             user=user_id,
@@ -217,7 +268,7 @@ class CollectionService:
             repository_url=validated_data.get('repository_url'),
             default_branch=validated_data.get('default_branch'),
             external_id=validated_data.get('external_id'),
-            token_encrypted=validated_data['token'],
+            token_encrypted=token,
             status='pending'
         )
         
