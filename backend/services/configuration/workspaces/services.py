@@ -489,10 +489,18 @@ class WorkspaceService:
         
         Returns:
             Tuple (created workspace, connection test result)
+            
+        Raises:
+            ValueError: If connection test fails or workspace name already exists
         """
         platform = validated_data['platform']
         token = validated_data.pop('token')
         url = validated_data.get('url')
+        name = validated_data.get('name')
+        
+        # Check for duplicate workspace name
+        if Workspace.objects.filter(user=user_id, name=name).exists():
+            raise ValueError(f"A workspace named '{name}' already exists")
         
         # Connection test
         connection_result = ConnectionService.test_connection(platform, token, url)

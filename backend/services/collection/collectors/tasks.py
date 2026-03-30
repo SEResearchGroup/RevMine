@@ -11,6 +11,54 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+# =============================================================================
+# Collection Cancellation Registry
+# =============================================================================
+
+class CollectionCancelledException(Exception):
+    """Raised when a collection is cancelled/deleted during execution"""
+    pass
+
+
+class CancellationRegistry:
+    """
+    Thread-safe registry to track cancelled collections.
+    When a collection is deleted, it gets registered here so the background
+    thread knows to stop immediately.
+    """
+    _instance = None
+    _lock = threading.Lock()
+    
+    def __new__(cls):
+        if cls._instance is None:
+            with cls._lock:
+                if cls._instance is None:
+                    cls._instance = super().__new__(cls)
+                    cls._instance._cancelled_collections = set()
+                    cls._instance._registry_lock = threading.Lock()
+        return cls._instance
+    
+    def cancel(self, collection_id: int):
+        """Register a collection as cancelled"""
+        with self._registry_lock:
+            self._cancelled_collections.add(collection_id)
+            logger.info(f"Collection {collection_id} marked for cancellation")
+    
+    def is_cancelled(self, collection_id: int) -> bool:
+        """Check if a collection is cancelled"""
+        with self._registry_lock:
+            return collection_id in self._cancelled_collections
+    
+    def remove(self, collection_id: int):
+        """Remove a collection from the cancelled set (cleanup)"""
+        with self._registry_lock:
+            self._cancelled_collections.discard(collection_id)
+
+
+# Global cancellation registry instance
+cancellation_registry = CancellationRegistry()
+
+
 def run_collection_in_background(plan_id, resume=False):
     """Start collection in a separate thread"""
     thread = threading.Thread(target=execute_collection_task, args=(plan_id, resume))
@@ -22,9 +70,17 @@ def run_collection_in_background(plan_id, resume=False):
 def execute_collection_task(plan_id, resume=False):
     """Execute the actual collection task with incremental saving"""
     minio_client = MinIOClient()
+    raw_data_filename = None  # Track the filename for cleanup on cancellation
     
     try:
+        # Check if already cancelled before starting
+        if cancellation_registry.is_cancelled(plan_id):
+            logger.info(f"Collection {plan_id} was cancelled before starting")
+            cancellation_registry.remove(plan_id)
+            return
+        
         collection = Collection.objects.get(id=plan_id)
+        raw_data_filename = collection.raw_data_filename  # Store for potential cleanup
         
         # Update status
         collection.status = 'in_progress'
@@ -74,6 +130,7 @@ def execute_collection_task(plan_id, resume=False):
         # Progress callback with incremental saving
         def save_progress(current, total, message="", item_data=None, all_data=None):
             try:
+                collection.refresh_from_db()
                 collection.collected_items = current
                 collection.total_items = total
                 
@@ -90,11 +147,20 @@ def execute_collection_task(plan_id, resume=False):
                             collection.id,
                             'json'
                         )
+                        raw_data_filename = collection.raw_data_filename
                     
                     minio_client.save_json(all_data, collection.raw_data_filename)
                 
                 collection.save(update_fields=['collected_items', 'total_items', 'last_collected_item_id', 'raw_data_filename'])
                 logger.info(f"Progress: {current}/{total} - {message}")
+            except Collection.DoesNotExist:
+                logger.info(f"Collection {plan_id} was deleted during progress save")
+                if raw_data_filename:
+                    try:
+                        minio_client.delete_file(raw_data_filename)
+                    except:
+                        pass
+                raise CollectionCancelledException(f"Collection {plan_id} was deleted")
             except Exception as e:
                 logger.error(f"Error saving progress: {e}")
         
@@ -133,8 +199,20 @@ def execute_collection_task(plan_id, resume=False):
         
     except Collection.DoesNotExist:
         logger.error(f"Collection {plan_id} not found")
+        cancellation_registry.remove(plan_id)
+    except CollectionCancelledException as e:
+        logger.info(f"Collection {plan_id} was cancelled: {e}")
+        cancellation_registry.remove(plan_id)
+        # Clean up any remaining MinIO file
+        if raw_data_filename:
+            try:
+                minio_client.delete_file(raw_data_filename)
+                logger.info(f"Final cleanup of MinIO file {raw_data_filename}")
+            except Exception as cleanup_error:
+                logger.warning(f"Could not clean up MinIO file during cancellation: {cleanup_error}")
     except Exception as e:
         logger.error(f"Collection failed for {plan_id}: {e}")
+        cancellation_registry.remove(plan_id)
         
         try:
             collection = Collection.objects.get(id=plan_id)

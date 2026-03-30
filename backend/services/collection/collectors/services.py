@@ -11,7 +11,8 @@ from .branch_fetcher import BranchFetcher
 from .metrics_config import get_metrics_for_platform
 from .minio_client import MinIOClient
 from .csv_generator import CSVGenerator, StatisticsCSVGenerator
-from .tasks import run_collection_in_background
+from .tasks import run_collection_in_background, cancellation_registry
+from .serializers import CollectionSerializer, CleanedDataSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -328,8 +329,22 @@ class CollectionService:
     
     @staticmethod
     def delete_collection(collection: Collection) -> None:
-        """Delete a collection and all its related files."""
+        """Delete a collection and all its related files.
+        
+        If the collection is in progress, it will be cancelled first
+        to stop the background collection task immediately.
+        """
         try:
+            collection_id = collection.id
+            raw_data_filename = collection.raw_data_filename
+            is_in_progress = collection.status == 'in_progress'
+            
+            # If collection is in progress, register it for cancellation
+            # This will signal the background thread to stop immediately
+            if is_in_progress:
+                cancellation_registry.cancel(collection_id)
+                logger.info(f"Collection {collection_id} is in progress, registered for cancellation")
+            
             minio_client = MinIOClient()
             
             # Delete all cleaning files
@@ -340,8 +355,8 @@ class CollectionService:
                     minio_client.delete_file(cleaned_data.statistics_csv_filename)
             
             # Delete raw data file
-            if collection.raw_data_filename:
-                minio_client.delete_file(collection.raw_data_filename)
+            if raw_data_filename:
+                minio_client.delete_file(raw_data_filename)
             
             # Delete legacy CSV files if they exist
             if collection.structured_csv_filename:
@@ -350,7 +365,6 @@ class CollectionService:
                 minio_client.delete_file(collection.statistics_csv_filename)
             
             # Delete collection (cascade will delete cleaned data)
-            collection_id = collection.id
             collection.delete()
             
             logger.info(f"Collection {collection_id} deleted successfully")
