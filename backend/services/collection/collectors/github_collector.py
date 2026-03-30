@@ -1,14 +1,33 @@
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 from datetime import datetime
 import logging
 
 logger = logging.getLogger(__name__)
 
 
+def _create_session(headers, max_retries=5, backoff_factor=1):
+    """Create a requests.Session with retry + exponential backoff."""
+    session = requests.Session()
+    session.headers.update(headers)
+    retry = Retry(
+        total=max_retries,
+        backoff_factor=backoff_factor,
+        status_forcelist=[429, 500, 502, 503, 504],
+        allowed_methods=['GET'],
+        raise_on_status=False,
+    )
+    adapter = HTTPAdapter(max_retries=retry)
+    session.mount('https://', adapter)
+    session.mount('http://', adapter)
+    return session
+
+
 class GitHubCollector:
     """Collects data from GitHub API with resume capability"""
     
-    def __init__(self, token, repo_full_name, branch_name=None):
+    def __init__(self, token, repo_full_name, branch_name=None, selected_metrics=None):
         self.token = token
         self.repo_full_name = repo_full_name
         self.branch_name = branch_name
@@ -17,6 +36,10 @@ class GitHubCollector:
             'Authorization': f'token {token}',
             'Accept': 'application/vnd.github.v3+json'
         }
+        self.session = _create_session(self.headers)
+        self.selected_metrics = selected_metrics
+        self.required_endpoints = None  # Computed lazily
+        self.project_created_at = None  # Fetched from API
     
     def collect_all_data(self, filters=None, progress_callback=None, resume_from=None, existing_data=None):
         """
@@ -37,6 +60,20 @@ class GitHubCollector:
             all_data = {'pull_requests': []}
         
         try:
+            # Fetch project creation date
+            try:
+                repo_response = self.session.get(
+                    f"{self.base_url}/repos/{self.repo_full_name}",
+                    timeout=30
+                )
+                if repo_response.status_code == 200:
+                    self.project_created_at = repo_response.json().get('created_at')
+            except Exception as e:
+                logger.warning(f"Could not fetch repo creation date: {e}")
+            
+            # Store project_created_at in the data for later use by CSV generator
+            all_data['project_created_at'] = self.project_created_at
+
             # Get collected PR numbers to skip
             collected_prs = set()
             if existing_data:
@@ -61,8 +98,7 @@ class GitHubCollector:
                     break
             
             # Filter out already collected PRs
-            if resume_from:
-                resume_pr_num = int(resume_from)
+            if collected_prs:
                 all_prs = [pr for pr in all_prs if pr['number'] not in collected_prs]
             
             total_prs = len(all_prs) + len(collected_prs)
@@ -73,9 +109,15 @@ class GitHubCollector:
             
             # Process each PR
             collected_count = len(collected_prs)
+            failed_prs = []
             
             for pr in all_prs:
-                pr_data = self._process_pull_request(pr['number'])
+                try:
+                    pr_data = self._process_pull_request(pr['number'])
+                except Exception as e:
+                    logger.warning(f"Skipping PR #{pr['number']} due to error: {e}")
+                    failed_prs.append(pr['number'])
+                    continue
                 if pr_data:
                     all_data['pull_requests'].append(pr_data)
                     collected_count += 1
@@ -86,10 +128,20 @@ class GitHubCollector:
                             collected_count, 
                             total_prs,
                             f"Collected PR #{pr['number']}",
-                            pr_data
+                            pr_data,
+                            all_data
                         )
             
-            logger.info(f"Collection completed: {collected_count} PRs")
+            if failed_prs:
+                logger.warning(f"Failed to collect {len(failed_prs)} PRs: {failed_prs}")
+            
+            # Deduplicate PRs by pull_request_number as a safety net
+            seen = {}
+            for pr in all_data['pull_requests']:
+                seen[pr['pull_request_number']] = pr
+            all_data['pull_requests'] = list(seen.values())
+            
+            logger.info(f"Collection completed: {len(all_data['pull_requests'])} unique PRs")
             
             return all_data
             
@@ -106,9 +158,8 @@ class GitHubCollector:
                 'page': page
             }
             
-            response = requests.get(
+            response = self.session.get(
                 f"{self.base_url}/repos/{self.repo_full_name}/pulls",
-                headers=self.headers,
                 params=params,
                 timeout=30
             )
@@ -134,12 +185,17 @@ class GitHubCollector:
             logger.error(f"Network error fetching PR page: {e}")
             raise Exception(f"Network error connecting to GitHub: {str(e)}")
     
+    def _needs_endpoint(self, endpoint_key):
+        """Check if a given endpoint category is needed based on selected metrics."""
+        if self.required_endpoints is None:
+            return True
+        return endpoint_key in self.required_endpoints
+
     def _process_pull_request(self, pr_number):
         """Process a single pull request - raises exception on network errors"""
         try:
-            pr_response = requests.get(
+            pr_response = self.session.get(
                 f"{self.base_url}/repos/{self.repo_full_name}/pulls/{pr_number}",
-                headers=self.headers,
                 timeout=30
             )
             
@@ -162,83 +218,83 @@ class GitHubCollector:
                 'files': []
             }
             
-            # Get commits
-            try:
-                commits_response = requests.get(
-                    f"{self.base_url}/repos/{self.repo_full_name}/pulls/{pr_number}/commits",
-                    headers=self.headers,
-                    params={'per_page': 100},
-                    timeout=30
-                )
-                
-                if commits_response.status_code == 200:
-                    commits = commits_response.json()
-                    for commit in commits:
-                        commit_detail = self._get_commit_details(commit['sha'])
-                        organized_pr['commits'].append({
-                            'commit_sha': commit['sha'],
-                            'details': commit,
-                            'changes': commit_detail.get('files', []) if commit_detail else []
-                        })
-            except requests.exceptions.RequestException as e:
-                logger.error(f"Network error fetching commits for PR #{pr_number}: {e}")
-                raise Exception(f"Network error fetching commits for PR #{pr_number}: {str(e)}")
+            # Get commits (only if selected)
+            if self._needs_endpoint('commits'):
+                try:
+                    commits_response = self.session.get(
+                        f"{self.base_url}/repos/{self.repo_full_name}/pulls/{pr_number}/commits",
+                        params={'per_page': 100},
+                        timeout=30
+                    )
+                    
+                    if commits_response.status_code == 200:
+                        commits = commits_response.json()
+                        for commit in commits:
+                            commit_detail = self._get_commit_details(commit['sha'])
+                            organized_pr['commits'].append({
+                                'commit_sha': commit['sha'],
+                                'details': commit,
+                                'changes': commit_detail.get('files', []) if commit_detail else []
+                            })
+                except requests.exceptions.RequestException as e:
+                    logger.error(f"Network error fetching commits for PR #{pr_number}: {e}")
+                    raise Exception(f"Network error fetching commits for PR #{pr_number}: {str(e)}")
             
-            # Get comments
-            try:
-                comments_response = requests.get(
-                    f"{self.base_url}/repos/{self.repo_full_name}/issues/{pr_number}/comments",
-                    headers=self.headers,
-                    timeout=30
-                )
-                
-                if comments_response.status_code == 200:
-                    organized_pr['comments'] = comments_response.json()
-            except requests.exceptions.RequestException as e:
-                logger.error(f"Network error fetching comments for PR #{pr_number}: {e}")
-                raise Exception(f"Network error fetching comments for PR #{pr_number}: {str(e)}")
+            # Get comments (only if selected)
+            if self._needs_endpoint('comments'):
+                try:
+                    comments_response = self.session.get(
+                        f"{self.base_url}/repos/{self.repo_full_name}/issues/{pr_number}/comments",
+                        timeout=30
+                    )
+                    
+                    if comments_response.status_code == 200:
+                        organized_pr['comments'] = comments_response.json()
+                except requests.exceptions.RequestException as e:
+                    logger.error(f"Network error fetching comments for PR #{pr_number}: {e}")
+                    raise Exception(f"Network error fetching comments for PR #{pr_number}: {str(e)}")
             
-            # Get reviews
-            try:
-                reviews_response = requests.get(
-                    f"{self.base_url}/repos/{self.repo_full_name}/pulls/{pr_number}/reviews",
-                    headers=self.headers,
-                    timeout=30
-                )
-                
-                if reviews_response.status_code == 200:
-                    organized_pr['reviews'] = reviews_response.json()
-            except requests.exceptions.RequestException as e:
-                logger.error(f"Network error fetching reviews for PR #{pr_number}: {e}")
-                raise Exception(f"Network error fetching reviews for PR #{pr_number}: {str(e)}")
+            # Get reviews (only if selected)
+            if self._needs_endpoint('reviews'):
+                try:
+                    reviews_response = self.session.get(
+                        f"{self.base_url}/repos/{self.repo_full_name}/pulls/{pr_number}/reviews",
+                        timeout=30
+                    )
+                    
+                    if reviews_response.status_code == 200:
+                        organized_pr['reviews'] = reviews_response.json()
+                except requests.exceptions.RequestException as e:
+                    logger.error(f"Network error fetching reviews for PR #{pr_number}: {e}")
+                    raise Exception(f"Network error fetching reviews for PR #{pr_number}: {str(e)}")
             
-            # Get review comments
-            try:
-                review_comments_response = requests.get(
-                    f"{self.base_url}/repos/{self.repo_full_name}/pulls/{pr_number}/comments",
-                    headers=self.headers,
-                    timeout=30
-                )
-                
-                if review_comments_response.status_code == 200:
-                    organized_pr['review_comments'] = review_comments_response.json()
-            except requests.exceptions.RequestException as e:
-                logger.error(f"Network error fetching review comments for PR #{pr_number}: {e}")
-                raise Exception(f"Network error fetching review comments for PR #{pr_number}: {str(e)}")
+            # Get review comments (only if selected)
+            if self._needs_endpoint('review_comments'):
+                try:
+                    review_comments_response = self.session.get(
+                        f"{self.base_url}/repos/{self.repo_full_name}/pulls/{pr_number}/comments",
+                        timeout=30
+                    )
+                    
+                    if review_comments_response.status_code == 200:
+                        organized_pr['review_comments'] = review_comments_response.json()
+                except requests.exceptions.RequestException as e:
+                    logger.error(f"Network error fetching review comments for PR #{pr_number}: {e}")
+                    raise Exception(f"Network error fetching review comments for PR #{pr_number}: {str(e)}")
             
-            # Get files changed
-            try:
-                files_response = requests.get(
-                    f"{self.base_url}/repos/{self.repo_full_name}/pulls/{pr_number}/files",
-                    headers=self.headers,
-                    timeout=30
-                )
-                
-                if files_response.status_code == 200:
-                    organized_pr['files'] = files_response.json()
-            except requests.exceptions.RequestException as e:
-                logger.error(f"Network error fetching files for PR #{pr_number}: {e}")
-                raise Exception(f"Network error fetching files for PR #{pr_number}: {str(e)}")
+            # Get files changed (only if selected)
+            if self._needs_endpoint('files'):
+                try:
+                    files_response = self.session.get(
+                        f"{self.base_url}/repos/{self.repo_full_name}/pulls/{pr_number}/files",
+                        timeout=30
+                    )
+                    
+                    if files_response.status_code == 200:
+                        organized_pr['files'] = files_response.json()
+                except requests.exceptions.RequestException as e:
+                    logger.error(f"Network error fetching files for PR #{pr_number}: {e}")
+                    raise Exception(f"Network error fetching files for PR #{pr_number}: {str(e)}")
             
             return organized_pr
             
@@ -255,9 +311,8 @@ class GitHubCollector:
     def _get_commit_details(self, commit_sha):
         """Get commit details with file changes"""
         try:
-            response = requests.get(
+            response = self.session.get(
                 f"{self.base_url}/repos/{self.repo_full_name}/commits/{commit_sha}",
-                headers=self.headers,
                 timeout=30
             )
             

@@ -76,6 +76,21 @@ class MinIOClient:
                 response.close()
                 response.release_conn()
     
+    def get_json_bytes(self, filename: str) -> bytes:
+        """Retrieve JSON data from MinIO as raw bytes (for streaming downloads)"""
+        response = None
+        try:
+            response = self.client.get_object(self.bucket_name, filename)
+            data = response.read()
+            return data
+        except S3Error as e:
+            logger.error(f"Error retrieving JSON bytes from MinIO: {e}")
+            return None
+        finally:
+            if response:
+                response.close()
+                response.release_conn()
+    
     def save_csv(self, csv_content: str, filename: str) -> bool:
         """Save CSV data to MinIO"""
         try:

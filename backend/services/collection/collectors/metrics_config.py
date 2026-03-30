@@ -143,3 +143,59 @@ def get_category_metric_values(platform, category):
         return [m['value'] for m in metrics[category]]
     
     return []
+
+
+# Mapping from metric category names to collector endpoint keys
+_GITLAB_CATEGORY_TO_ENDPOINT = {
+    'Merge Request Metadata': 'details',
+    'Commits': 'commits',
+    'Discussions': 'discussions',
+    'Notes': 'notes',
+    'Changes': 'changes',
+}
+
+_GITHUB_CATEGORY_TO_ENDPOINT = {
+    'Pull Request Metadata': 'details',
+    'Commits': 'commits',
+    'Comments': 'comments',
+    'Reviews': 'reviews',
+    'Review Comments': 'review_comments',
+    'Files': 'files',
+}
+
+
+def get_required_endpoints(platform, selected_metrics):
+    """
+    Determine which API endpoint categories are needed based on selected metrics.
+    
+    Args:
+        platform (str): 'github', 'gitlab', or 'gitlab_self'
+        selected_metrics (list): List of selected metric value strings
+    
+    Returns:
+        set: Set of endpoint keys that need to be fetched
+              (e.g. {'details', 'commits', 'notes'})
+    """
+    if not selected_metrics:
+        return set()
+
+    if platform == 'github':
+        metrics_dict = GITHUB_METRICS
+        category_map = _GITHUB_CATEGORY_TO_ENDPOINT
+    elif platform in ['gitlab', 'gitlab_self']:
+        metrics_dict = GITLAB_METRICS
+        category_map = _GITLAB_CATEGORY_TO_ENDPOINT
+    else:
+        return set()
+
+    selected_set = set(selected_metrics)
+    required = {'details'}  # Always fetch the base MR/PR details
+
+    for category, metric_list in metrics_dict.items():
+        category_values = {m['value'] for m in metric_list}
+        if selected_set & category_values:  # Any overlap
+            endpoint = category_map.get(category)
+            if endpoint:
+                required.add(endpoint)
+
+    return required
