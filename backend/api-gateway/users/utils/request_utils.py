@@ -47,7 +47,7 @@ def prepare_multipart_data(request):
     # Préparation des fichiers
     files = {}
     for key, file in request.FILES.items():
-        files[key] = (file.name, file.read(), file.content_type)
+        files[key] = (file.name, file, file.content_type)
     
     return data, files
 

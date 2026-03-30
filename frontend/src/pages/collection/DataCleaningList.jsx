@@ -3,7 +3,7 @@
  * Page displaying all collections for data cleaning management
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Search,
@@ -19,6 +19,8 @@ import {
   Github,
   FileSpreadsheet,
   ArrowRight,
+  Upload,
+  X,
 } from "lucide-react";
 import { collectionService, workspaceService } from "../../services/api";
 
@@ -35,6 +37,16 @@ function DataCleaningList() {
     interrupted: 0,
     lastCollectionDate: null,
   });
+
+  // Upload modal state
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [uploadFile, setUploadFile] = useState(null);
+  const [uploadPlatform, setUploadPlatform] = useState("");
+  const [uploadName, setUploadName] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     fetchAllCollections();
@@ -150,9 +162,9 @@ function DataCleaningList() {
     const workspace = repo ? workspaces[repo.workspace_id] : null;
     
     const searchLower = searchTerm.toLowerCase();
-    const repoName = repo?.name?.toLowerCase() || "";
-    const workspaceName = workspace?.name?.toLowerCase() || "";
-    const platform = workspace?.platform?.toLowerCase() || "";
+    const repoName = (repo?.name || collection.repository_name || "").toLowerCase();
+    const workspaceName = (workspace?.name || "").toLowerCase();
+    const platform = (workspace?.platform || collection.platform || "").toLowerCase();
     
     return (
       repoName.includes(searchLower) ||
@@ -190,6 +202,10 @@ function DataCleaningList() {
   };
 
   const handleCollectionClick = (collection) => {
+    if (collection.is_external) {
+      navigate(`/external/collection/${collection.id}`);
+      return;
+    }
     const repo = repositories[collection.repository_id];
     if (repo) {
       navigate(
@@ -211,6 +227,46 @@ function DataCleaningList() {
     return <GitBranch className="w-4 h-4" />;
   };
 
+  const handleUploadSubmit = async () => {
+    if (!uploadFile || !uploadPlatform || !uploadName.trim()) {
+      setUploadError("Please fill all fields.");
+      return;
+    }
+    setUploading(true);
+    setUploadError("");
+    setUploadProgress(0);
+    try {
+      await collectionService.uploadExternalCollection(
+        uploadFile,
+        uploadPlatform,
+        uploadName.trim(),
+        (progressEvent) => {
+          if (progressEvent.total) {
+            setUploadProgress(Math.round((progressEvent.loaded * 100) / progressEvent.total));
+          }
+        }
+      );
+      setShowUploadModal(false);
+      setUploadFile(null);
+      setUploadPlatform("");
+      setUploadName("");
+      setUploadProgress(0);
+      fetchAllCollections();
+    } catch (err) {
+      setUploadError(err.response?.data?.error || "Upload failed. Please try again.");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const openUploadModal = () => {
+    setUploadFile(null);
+    setUploadPlatform("");
+    setUploadName("");
+    setUploadError("");
+    setShowUploadModal(true);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -226,13 +282,22 @@ function DataCleaningList() {
     <div className="min-h-screen bg-gray-50 p-4 sm:p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
-            Data Cleaning
-          </h1>
-          <p className="text-gray-600">
-            Manage and clean your collected data from all projects
-          </p>
+        <div className="mb-6 flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
+              Data Cleaning
+            </h1>
+            <p className="text-gray-600">
+              Manage and clean your collected data from all projects
+            </p>
+          </div>
+          <button
+            onClick={openUploadModal}
+            className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+          >
+            <Upload className="w-4 h-4" />
+            Upload External Data
+          </button>
         </div>
 
         {/* Statistics Section */}
@@ -338,12 +403,12 @@ function DataCleaningList() {
                       </div>
                       <div className="min-w-0">
                         <h3 className="font-semibold text-sm text-gray-900 truncate">
-                          {repo?.name || "Unknown Project"}
+                          {repo?.name || collection.repository_name || "Unknown Project"}
                         </h3>
                         <div className="flex items-center gap-1 text-xs text-gray-500">
-                          {workspace && getPlatformIcon(workspace.platform)}
+                          {getPlatformIcon(workspace?.platform || collection.platform)}
                           <span className="truncate">
-                            {workspace?.name || "Unknown Workspace"}
+                            {workspace?.name || (collection.is_external ? "External Upload" : "Unknown Workspace")}
                           </span>
                         </div>
                       </div>
@@ -367,7 +432,7 @@ function DataCleaningList() {
                       <Layers className="w-4 h-4 text-gray-400" />
                       <span>
                         {collection.total_items || 0}{" "}
-                        {workspace?.platform === "github" ? "PRs" : "MRs"}
+                        {(workspace?.platform || collection.platform) === "github" ? "PRs" : "MRs"}
                       </span>
                     </div>
 
@@ -387,23 +452,34 @@ function DataCleaningList() {
                     <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-blue-600 group-hover:translate-x-1 transition-all" />
                   </div>
 
-                  <div className="flex items-center justify-end">
+                  <div className="flex items-center justify-end gap-1.5 flex-wrap">
                     {collection.status === "completed" ? (
-                      collection.is_cleaned ? (
-                        <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full flex items-center gap-1">
-                          <CheckCircle2 className="w-3 h-3" />
-                          Cleaned
-                        </span>
-                      ) : (
+                      <>
                         <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded-full flex items-center gap-1">
                           <CheckCircle2 className="w-3 h-3" />
                           Completed
                         </span>
-                      )
+                        {collection.is_cleaned ? (
+                          <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full flex items-center gap-1">
+                            <CheckCircle2 className="w-3 h-3" />
+                            Cleaned
+                          </span>
+                        ) : (
+                          <span className="px-2 py-1 bg-orange-100 text-orange-700 text-xs font-medium rounded-full flex items-center gap-1">
+                            <AlertCircle className="w-3 h-3" />
+                            Not Cleaned
+                          </span>
+                        )}
+                      </>
                     ) : (
                       <span className="px-2 py-1 bg-red-100 text-red-700 text-xs font-medium rounded-full flex items-center gap-1">
                         <AlertCircle className="w-3 h-3" />
                         Interrupted
+                      </span>
+                    )}
+                    {collection.is_external && (
+                      <span className="px-2 py-1 bg-violet-100 text-violet-700 text-xs font-medium rounded-full flex items-center gap-1">
+                        Extern
                       </span>
                     )}
                   </div>
@@ -411,6 +487,141 @@ function DataCleaningList() {
                 
               );
             })}
+          </div>
+        )}
+
+        {/* Upload External Data Modal */}
+        {showUploadModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+            <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 relative">
+              <button
+                onClick={() => setShowUploadModal(false)}
+                className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">
+                Upload External Collected Data
+              </h2>
+
+              <div className="space-y-4">
+                {/* Name */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Collection Name
+                  </label>
+                  <input
+                    type="text"
+                    value={uploadName}
+                    onChange={(e) => setUploadName(e.target.value)}
+                    placeholder="e.g. my-project-data"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  />
+                </div>
+
+                {/* Platform */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Platform
+                  </label>
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setUploadPlatform("github")}
+                      className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg border text-sm font-medium transition-colors ${
+                        uploadPlatform === "github"
+                          ? "border-blue-500 bg-blue-50 text-blue-700"
+                          : "border-gray-300 text-gray-600 hover:border-gray-400"
+                      }`}
+                    >
+                      <Github className="w-4 h-4" />
+                      GitHub
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setUploadPlatform("gitlab")}
+                      className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg border text-sm font-medium transition-colors ${
+                        uploadPlatform === "gitlab"
+                          ? "border-blue-500 bg-blue-50 text-blue-700"
+                          : "border-gray-300 text-gray-600 hover:border-gray-400"
+                      }`}
+                    >
+                      <GitBranch className="w-4 h-4" />
+                      GitLab
+                    </button>
+                  </div>
+                </div>
+
+                {/* File */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    JSON File
+                  </label>
+                  <div
+                    onClick={() => fileInputRef.current?.click()}
+                    className="w-full px-3 py-4 border-2 border-dashed border-gray-300 rounded-lg text-center cursor-pointer hover:border-blue-400 transition-colors"
+                  >
+                    {uploadFile ? (
+                      <div>
+                        <span className="text-sm text-gray-700">{uploadFile.name}</span>
+                        <span className="text-xs text-gray-400 ml-2">
+                          ({(uploadFile.size / (1024 * 1024)).toFixed(1)} MB)
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-sm text-gray-500">
+                        Click to select a .json file
+                      </span>
+                    )}
+                  </div>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".json,application/json"
+                    className="hidden"
+                    onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
+                  />
+                </div>
+
+                {uploadError && (
+                  <p className="text-sm text-red-600">{uploadError}</p>
+                )}
+
+                {uploading && (
+                  <div>
+                    <div className="flex items-center justify-between text-xs text-gray-600 mb-1">
+                      <span>Uploading{uploadFile ? ` (${(uploadFile.size / (1024 * 1024)).toFixed(1)} MB)` : ''}...</span>
+                      <span>{uploadProgress}%</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div
+                        className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                        style={{ width: `${uploadProgress}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <button
+                  onClick={handleUploadSubmit}
+                  disabled={uploading || !uploadFile || !uploadPlatform || !uploadName.trim()}
+                  className="w-full py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium flex items-center justify-center gap-2"
+                >
+                  {uploading ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
+                      Uploading...
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="w-4 h-4" />
+                      Upload
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>

@@ -94,6 +94,17 @@ class Collection(models.Model):
     
     error_message = models.TextField(null=True, blank=True)
     
+    is_external = models.BooleanField(
+        default=False,
+        help_text="Whether this collection was uploaded externally by the user"
+    )
+    
+    cleaning_metadata = models.JSONField(
+        null=True,
+        blank=True,
+        help_text="Pre-computed metadata for cleaning config (authors, extensions, item count)"
+    )
+    
     class Meta:
         db_table = 'collections' 
         ordering = ['-created_at']

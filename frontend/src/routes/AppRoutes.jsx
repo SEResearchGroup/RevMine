@@ -14,6 +14,7 @@ import CollectionDetail from "../pages/collection/CollectionDetail";
 import CleaningDetail from "../pages/collection/CleaningDetail";
 import DataCleaning from "../pages/collection/DataCleaning";
 import DataCleaningList from "../pages/collection/DataCleaningList";
+import ExternalCollectionDetail from "../pages/collection/ExternalCollectionDetail";
 import {
   GitHubCallback,
   GitLabCallback,
@@ -49,6 +50,9 @@ const AppRoutes = () => {
         <Route path="/workspaces" element={<Workspaces />} />
         <Route path="/workspaces/:id" element={<Projects />} />
         <Route path="/data-cleaning" element={<DataCleaningList />} />
+        <Route path="/external/collection/:collectionId" element={<ExternalCollectionDetail />} />
+        <Route path="/external/collection/:collectionId/cleaned-data/new" element={<DataCleaning />} />
+        <Route path="/external/collection/:collectionId/cleaned-data/:cleanedDataId" element={<CleaningDetail />} />
 
         <Route
           path="/workspaces/:workspaceId/repositories/:repositoryId/collect"

@@ -58,6 +58,7 @@ function DataCleaning() {
   const [workspace, setWorkspace] = useState(null);
   const [collection, setCollection] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(null);
   const [processing, setProcessing] = useState(false);
 
   // Available options
@@ -103,17 +104,34 @@ function DataCleaning() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [wsRes, reposRes, collectionRes, cleaningRes] = await Promise.all([
-        workspaceService.getById(workspaceId),
-        workspaceService.getRepositories(workspaceId),
+      const isExternal = workspaceId === "0" || !workspaceId;
+
+      const promises = [
         collectionService.getStatus(collectionId),
         collectionService.getCleaningConfig(collectionId),
-      ]);
+      ];
+      if (!isExternal) {
+        promises.push(
+          workspaceService.getById(workspaceId),
+          workspaceService.getRepositories(workspaceId)
+        );
+      }
 
-      setWorkspace(wsRes.data);
-      const repo = reposRes.data.find((r) => r.id === parseInt(repositoryId));
-      setRepository(repo);
+      const results = await Promise.all(promises);
+      const collectionRes = results[0];
+      const cleaningRes = results[1];
+
       setCollection(collectionRes.data.collection_plan);
+
+      if (!isExternal) {
+        setWorkspace(results[2].data);
+        const repo = results[3].data.find((r) => r.id === parseInt(repositoryId));
+        setRepository(repo);
+      } else {
+        // For external collections, create a minimal repository-like object from collection data
+        const col = collectionRes.data.collection_plan;
+        setRepository({ name: col.repository_name, full_name: col.repository_full_name || col.repository_name, platform: col.platform });
+      }
 
       setAvailableAuthors(cleaningRes.data.available_filters.authors);
       setAvailableExtensions(cleaningRes.data.available_filters.file_extensions);
@@ -126,6 +144,7 @@ function DataCleaning() {
       }
     } catch (err) {
       console.error("Error fetching data:", err);
+      setFetchError(err.message);
     } finally {
       setLoading(false);
     }
@@ -235,10 +254,26 @@ function DataCleaning() {
   const platform = repository?.platform || "github";
   const itemTerm = platform === "github" ? "PR" : "MR";
 
-  if (loading || !repository) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-gray-500">Loading...</div>
+      </div>
+    );
+  }
+
+  if (fetchError || !repository) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-red-500 mb-4">{fetchError || "Failed to load collection data"}</p>
+          <button
+            onClick={() => { setFetchError(null); fetchData(); }}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            Retry
+          </button>
+        </div>
       </div>
     );
   }
@@ -290,14 +325,14 @@ function DataCleaning() {
 
             <div className="flex gap-4">
               <button
-                onClick={() => navigate(`/workspaces/${workspaceId}/repositories/${repositoryId}/collection/${collectionId}`)}
+                onClick={() => navigate(workspaceId === "0" || !workspaceId ? `/external/collection/${collectionId}` : `/workspaces/${workspaceId}/repositories/${repositoryId}/collection/${collectionId}`)}
                 className="flex-1 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
               >
                 Back to Collection
               </button>
               {createdCleanedData && (
                 <button
-                  onClick={() => navigate(`/workspaces/${workspaceId}/repositories/${repositoryId}/collection/${collectionId}/cleaned-data/${createdCleanedData.id}`)}
+                  onClick={() => navigate(workspaceId === "0" || !workspaceId ? `/external/collection/${collectionId}/cleaned-data/${createdCleanedData.id}` : `/workspaces/${workspaceId}/repositories/${repositoryId}/collection/${collectionId}/cleaned-data/${createdCleanedData.id}`)}
                   className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
                 >
                   View CleanedData Details
@@ -316,7 +351,9 @@ function DataCleaning() {
         <button
           onClick={() =>
             navigate(
-              `/workspaces/${workspaceId}/repositories/${repositoryId}/collection/${collectionId}`
+              workspaceId === "0" || !workspaceId
+                ? `/external/collection/${collectionId}`
+                : `/workspaces/${workspaceId}/repositories/${repositoryId}/collection/${collectionId}`
             )
           }
           className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-6"

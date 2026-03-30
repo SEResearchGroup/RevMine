@@ -62,13 +62,17 @@ class BaseProxyHandler:
         
         # Execute the request
         try:
+            # Use a longer timeout for file uploads and heavy processing
+            is_upload = bool(files)
+            req_timeout = 1800 if is_upload else 300  # 30 min for uploads, 5 min otherwise
+
             response = requests.request(
                 method=request.method,
                 url=target_url,
                 headers=headers,
                 data=data if data else body,
                 files=files,
-                timeout=30
+                timeout=req_timeout,
             )
             
             logger.info(f"Response from service: {response.status_code}")

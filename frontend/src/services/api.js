@@ -300,7 +300,7 @@ export const collectionService = {
   },
 
   createCleanedData: (data) => {
-    return collectionApi.post('/cleaned-data/', data);
+    return collectionApi.post('/cleaned-data/', data, { timeout: 300000 });
   },
 
   getCleanedDataDetail: (cleanedDataId) => {
@@ -320,6 +320,18 @@ export const collectionService = {
   getUserDatasets: async () => {
     const response = await collectionApi.get('/datasets/');
     return response.data;
+  },
+
+  uploadExternalCollection: (file, platform, name, onUploadProgress) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('platform', platform);
+    formData.append('name', name);
+    return collectionApi.post('/upload-external/', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 1800000, // 30 minutes – large files up to 5 GB
+      onUploadProgress,
+    });
   },
 };
 

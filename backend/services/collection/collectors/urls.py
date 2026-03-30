@@ -21,6 +21,7 @@ from .views import (
     DownloadCleanedDataCSVView,
     DownloadCollectionJSONView,
     DeleteCollectionView,
+    UploadExternalCollectionView,
 )
 
 urlpatterns = [
@@ -58,6 +59,9 @@ urlpatterns = [
     # Lists and history
     path('plans/', CollectionPlanListView.as_view(), name='collection-plans'),
     path('history/<int:repository_id>/', CollectionHistoryView.as_view(), name='collection-history'),
+
+    # External upload
+    path('upload-external/', UploadExternalCollectionView.as_view(), name='upload-external-collection'),
 
     # get all user datasets
     path('datasets/', UserDatasetsView.as_view(), name='user-datasets'),
