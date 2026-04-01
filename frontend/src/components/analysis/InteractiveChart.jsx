@@ -272,7 +272,7 @@ const InteractiveChart = ({ chartData, chartType }) => {
       case 'dual_histogram':
         const addValues = data.additions || [];
         const delValues = data.deletions || [];
-        
+
         return {
           labels: Array.from({length: Math.min(addValues.length, 30)}, (_, i) => i + 1),
           datasets: [
@@ -359,8 +359,8 @@ const InteractiveChart = ({ chartData, chartType }) => {
               label += ': ';
             }
             if (context.parsed.y !== null) {
-              label += typeof context.parsed.y === 'number' 
-                ? context.parsed.y.toFixed(2) 
+              label += typeof context.parsed.y === 'number'
+                ? context.parsed.y.toFixed(2)
                 : context.parsed.y;
             }
             return label;

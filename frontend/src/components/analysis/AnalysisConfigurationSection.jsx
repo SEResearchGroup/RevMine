@@ -64,16 +64,16 @@ const AnalysisConfigurationSection = ({
     if (uploadedFile) {
       formData.append("csv_file", uploadedFile);
       console.log("Using uploaded file");
-    } 
+    }
     else if (dataset) {
       console.log("Using existing dataset:", dataset);
       formData.append("cleaned_data_id", dataset.id);
       formData.append("collection_id", dataset.collection_id);
-      
+
       formData.append("workspace_id", dataset.workspace_id);
       formData.append("repository_id", dataset.repository_id);
-      
-      formData.append("file_type", "statistics"); 
+
+      formData.append("file_type", "statistics");
       if (dataset.platform) {
         formData.append("platform", dataset.platform);
       }
@@ -95,7 +95,7 @@ const AnalysisConfigurationSection = ({
 
     const response = await analyzeService.createAnalysis(formData);
     console.log("Analysis created:", response);
-    
+
     setAnalysisId(response.id);
     setAnalysisStatus(response.status);
     startPolling(response.id);
@@ -240,7 +240,7 @@ const AnalysisConfigurationSection = ({
 
       {/* Metric Selection Section */}
       <div className="mb-6">
-        <MetricSelection 
+        <MetricSelection
           onStartAnalysis={handleStartAnalysis}
           loading={loading}
         />

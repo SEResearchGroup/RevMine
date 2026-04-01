@@ -1,5 +1,12 @@
 from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiExample
-from .serializers import ChangePasswordSerializer, RegisterSerializer, LoginSerializer, UpdateUserSerializer, UserSerializer, LoginResponseSerializer
+from .serializers import (
+    ChangePasswordSerializer,
+    RegisterSerializer,
+    LoginSerializer,
+    UpdateUserSerializer,
+    UserSerializer,
+    LoginResponseSerializer,
+)
 
 
 register_view_schema = extend_schema(
@@ -8,21 +15,21 @@ register_view_schema = extend_schema(
     request=RegisterSerializer,
     responses={
         201: RegisterSerializer,
-        400: OpenApiResponse(description='Invalid data'),
+        400: OpenApiResponse(description="Invalid data"),
     },
     examples=[
         OpenApiExample(
-            'Registration example',
+            "Registration example",
             value={
-                'email': 'user@example.com',
-                'password': 'password123',
-                'first_name': 'John',
-                'last_name': 'Doe'
+                "email": "user@example.com",
+                "password": "password123",
+                "first_name": "John",
+                "last_name": "Doe",
             },
             request_only=True,
         ),
     ],
-    tags=['Authentication']
+    tags=["Authentication"],
 )
 
 
@@ -32,33 +39,30 @@ login_view_schema = extend_schema(
     request=LoginSerializer,
     responses={
         200: LoginResponseSerializer,
-        401: OpenApiResponse(description='Invalid credentials'),
+        401: OpenApiResponse(description="Invalid credentials"),
     },
     examples=[
         OpenApiExample(
-            'Login example',
-            value={
-                'email': 'user@example.com',
-                'password': 'password123'
-            },
+            "Login example",
+            value={"email": "user@example.com", "password": "password123"},
             request_only=True,
         ),
         OpenApiExample(
-            'Successful response',
+            "Successful response",
             value={
-                'access': 'eyJ0eXAiOiJKV1QiLCJhbGc...',
-                'refresh': 'eyJ0eXAiOiJKV1QiLCJhbGc...',
-                'user': {
-                    'id': 1,
-                    'email': 'user@example.com',
-                    'date_joined': '2024-01-01T00:00:00Z'
-                }
+                "access": "eyJ0eXAiOiJKV1QiLCJhbGc...",
+                "refresh": "eyJ0eXAiOiJKV1QiLCJhbGc...",
+                "user": {
+                    "id": 1,
+                    "email": "user@example.com",
+                    "date_joined": "2024-01-01T00:00:00Z",
+                },
             },
             response_only=True,
-            status_codes=['200']
+            status_codes=["200"],
         ),
     ],
-    tags=['Authentication']
+    tags=["Authentication"],
 )
 
 
@@ -67,22 +71,22 @@ me_view_schema = extend_schema(
     description="Returns the information of the currently authenticated user",
     responses={
         200: UserSerializer,
-        401: OpenApiResponse(description='Unauthenticated - Missing or invalid token'),
+        401: OpenApiResponse(description="Unauthenticated - Missing or invalid token"),
     },
     examples=[
         OpenApiExample(
-            'User profile response',
+            "User profile response",
             value={
-                'id': 1,
-                'email': 'user@example.com',
-                'first_name': 'John',
-                'last_name': 'Doe',
-                'date_joined': '2024-01-01T00:00:00Z'
+                "id": 1,
+                "email": "user@example.com",
+                "first_name": "John",
+                "last_name": "Doe",
+                "date_joined": "2024-01-01T00:00:00Z",
             },
             response_only=True,
         ),
     ],
-    tags=['User']
+    tags=["User"],
 )
 
 update_user_schema = extend_schema(
@@ -105,7 +109,7 @@ update_user_schema = extend_schema(
             value={
                 "first_name": "Oussama",
                 "last_name": "Cherguelaine",
-                "position": "Backend Developer"
+                "position": "Backend Developer",
             },
             request_only=True,
         )
@@ -141,14 +145,11 @@ change_password_schema = extend_schema(
 )
 
 
-
-
-
 github_login_schema = extend_schema(
     summary="GitHub OAuth Login",
     description="Redirects to GitHub for OAuth authentication",
-    responses={302: OpenApiResponse(description='Redirect to GitHub')},
-    tags=['OAuth']
+    responses={302: OpenApiResponse(description="Redirect to GitHub")},
+    tags=["OAuth"],
 )
 
 
@@ -157,17 +158,17 @@ github_callback_schema = extend_schema(
     description="Handles the callback from GitHub OAuth",
     responses={
         200: LoginResponseSerializer,
-        400: OpenApiResponse(description='OAuth error'),
+        400: OpenApiResponse(description="OAuth error"),
     },
-    tags=['OAuth']
+    tags=["OAuth"],
 )
 
 
 gitlab_login_schema = extend_schema(
     summary="GitLab OAuth Login",
     description="Redirects to GitLab for OAuth authentication",
-    responses={302: OpenApiResponse(description='Redirect to GitLab')},
-    tags=['OAuth']
+    responses={302: OpenApiResponse(description="Redirect to GitLab")},
+    tags=["OAuth"],
 )
 
 
@@ -176,17 +177,17 @@ gitlab_callback_schema = extend_schema(
     description="Handles the callback from GitLab OAuth",
     responses={
         200: LoginResponseSerializer,
-        400: OpenApiResponse(description='OAuth error'),
+        400: OpenApiResponse(description="OAuth error"),
     },
-    tags=['OAuth']
+    tags=["OAuth"],
 )
 
 
 google_login_schema = extend_schema(
     summary="Google OAuth Login",
     description="Redirects to Google for OAuth authentication",
-    responses={302: OpenApiResponse(description='Redirect to Google')},
-    tags=['OAuth']
+    responses={302: OpenApiResponse(description="Redirect to Google")},
+    tags=["OAuth"],
 )
 
 
@@ -195,7 +196,7 @@ google_callback_schema = extend_schema(
     description="Handles the callback from Google OAuth",
     responses={
         200: LoginResponseSerializer,
-        400: OpenApiResponse(description='OAuth error'),
+        400: OpenApiResponse(description="OAuth error"),
     },
-    tags=['OAuth']
+    tags=["OAuth"],
 )

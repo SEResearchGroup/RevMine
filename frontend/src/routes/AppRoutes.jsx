@@ -66,17 +66,17 @@ const AppRoutes = () => {
           path="/workspaces/:workspaceId/repositories/:repositoryId/collection/:planId/results"
           element={<CollectionResults />}
         />
-        <Route 
-          path="/workspaces/:workspaceId/repositories/:repositoryId/collection/:collectionId" 
-          element={<CollectionDetail />} 
+        <Route
+          path="/workspaces/:workspaceId/repositories/:repositoryId/collection/:collectionId"
+          element={<CollectionDetail />}
         />
-        <Route 
-          path="/workspaces/:workspaceId/repositories/:repositoryId/collection/:collectionId/cleaned-data/new" 
-          element={<DataCleaning />} 
+        <Route
+          path="/workspaces/:workspaceId/repositories/:repositoryId/collection/:collectionId/cleaned-data/new"
+          element={<DataCleaning />}
         />
-        <Route 
-          path="/workspaces/:workspaceId/repositories/:repositoryId/collection/:collectionId/cleaned-data/:cleanedDataId" 
-          element={<CleaningDetail />} 
+        <Route
+          path="/workspaces/:workspaceId/repositories/:repositoryId/collection/:collectionId/cleaned-data/:cleanedDataId"
+          element={<CleaningDetail />}
         />
         
         {/* Analysis Routes */}

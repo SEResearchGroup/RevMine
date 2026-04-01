@@ -5,7 +5,6 @@ x-default-logging: &default-logging
     max-file: "3"
 
 services:
-
   kafka:
     image: confluentinc/cp-kafka:7.5.0
     container_name: kafka
@@ -104,29 +103,28 @@ services:
     networks:
       - app-network
 
-  # Service de stockage d'objets MinIO
   minio:
-      image: minio/minio:latest
-      container_name: minio
-      ports:
-        - "9000:9000"
-        - "9001:9001"
-      hostname: minio
-      env_file:
-        - ./backend/services/collection/.env
-      volumes:
-        - minio_data:/data
-      command: server /data --console-address ":9001"
-      healthcheck:
-        test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-        interval: 10s
-        timeout: 5s
-        retries: 5
-      logging: *default-logging
-      networks:
-        - app-network
-  
-  # Base de données pour API Gateway
+    image: minio/minio:latest
+    container_name: minio
+    hostname: minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    env_file:
+      - ./backend/services/collection/.env
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    logging: *default-logging
+    networks:
+      - app-network
+
   gateway-db:
     image: postgres:15
     container_name: gateway-db
@@ -147,7 +145,6 @@ services:
     networks:
       - app-network
 
-  # Database for Configuration Service
   configuration-db:
     image: postgres:15
     container_name: configuration-db
@@ -168,7 +165,6 @@ services:
     networks:
       - app-network
 
-  # Database for Collection Service
   collection-db:
     image: postgres:15
     container_name: collection-db
@@ -180,41 +176,53 @@ services:
       - "5434:5432"
     volumes:
       - collection_postgres_data:/var/lib/postgresql/data
-    networks:
-      - app-network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
       timeout: 5s
       retries: 5
     logging: *default-logging
+    networks:
+      - app-network
 
   analyze-db:
-      image: postgres:15
-      container_name: analyze-db
-      environment:
-        POSTGRES_DB: analyze_db
-        POSTGRES_USER: postgres
-        POSTGRES_PASSWORD: postgres
-      ports:
-        - "5435:5432"
-      volumes:
-        - analyze_postgres_data:/var/lib/postgresql/data
-      networks:
-        - app-network
-      healthcheck:
-        test: ["CMD-SHELL", "pg_isready -U postgres"]
-        interval: 5s
-        timeout: 5s
-        retries: 5
-      logging: *default-logging
+    image: postgres:15
+    container_name: analyze-db
+    environment:
+      POSTGRES_DB: analyze_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5435:5432"
+    volumes:
+      - analyze_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    logging: *default-logging
+    networks:
+      - app-network
 
-  # API Gateway
+  ollama-service:
+    image: ollama/ollama:latest
+    container_name: ollama-service
+    hostname: ollama-service
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - app-network
+    restart: unless-stopped
+    logging: *default-logging
+
   api-gateway:
     build:
       context: ./backend/api-gateway
     container_name: api-gateway
-    hostname: api-gateway  
+    hostname: api-gateway
     ports:
       - "8000:8000"
     env_file:
@@ -227,25 +235,27 @@ services:
       DATABASE_PORT: 5432
       CONFIGURATION_SERVICE_URL: http://configuration-service:8001/api/workspaces
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      LLM_SERVICE_URL: http://llm-service:8004
     depends_on:
       gateway-db:
         condition: service_healthy
       kafka:
         condition: service_healthy
+      llm-service:
+        condition: service_started
     volumes:
       - ./backend/api-gateway:/app
     networks:
-      - app-network  
+      - app-network
     command: sh -c "sleep 5 && python manage.py migrate && python manage.py runserver 0.0.0.0:8000"
     restart: unless-stopped
     logging: *default-logging
 
-  # Configuration Service
   configuration-service:
     build:
       context: ./backend/services/configuration
     container_name: configuration-service
-    hostname: configuration-service 
+    hostname: configuration-service
     ports:
       - "8001:8001"
     env_file:
@@ -267,17 +277,16 @@ services:
     volumes:
       - ./backend/services/configuration:/app
     networks:
-      - app-network  
+      - app-network
     command: sh -c "sleep 10 && python manage.py migrate --run-syncdb && python manage.py runserver 0.0.0.0:8001"
     restart: unless-stopped
     logging: *default-logging
 
-  # Collection Service
   collection-service:
     build:
       context: ./backend/services/collection
     container_name: collection-service
-    hostname: collection-service  
+    hostname: collection-service
     ports:
       - "8002:8002"
     env_file:
@@ -289,6 +298,7 @@ services:
       DATABASE_PASSWORD: postgres
       DATABASE_PORT: 5432
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      LLM_SERVICE_URL: http://llm-service:8004
     depends_on:
       collection-db:
         condition: service_healthy
@@ -296,10 +306,12 @@ services:
         condition: service_started
       kafka:
         condition: service_healthy
+      llm-service:
+        condition: service_started
     volumes:
       - ./backend/services/collection:/app
     networks:
-      - app-network  
+      - app-network
     command: sh -c "sleep 10 && python manage.py migrate --run-syncdb && python manage.py runserver 0.0.0.0:8002"
     restart: unless-stopped
     logging: *default-logging
@@ -308,7 +320,7 @@ services:
     build:
       context: ./backend/services/analyze
     container_name: analyze-service
-    hostname: analyze-service  
+    hostname: analyze-service
     ports:
       - "8003:8003"
     env_file:
@@ -320,6 +332,7 @@ services:
       DATABASE_PASSWORD: postgres
       DATABASE_PORT: 5432
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      LLM_SERVICE_URL: http://llm-service:8004
     depends_on:
       analyze-db:
         condition: service_healthy
@@ -327,15 +340,16 @@ services:
         condition: service_started
       kafka:
         condition: service_healthy
+      llm-service:
+        condition: service_started
     volumes:
       - ./backend/services/analyze:/app
     networks:
-      - app-network  
+      - app-network
     command: sh -c "sleep 10 && python manage.py migrate --run-syncdb && python manage.py runserver 0.0.0.0:8003"
     restart: unless-stopped
     logging: *default-logging
-    
-  # Celery Worker for Analyze Service
+
   celery-worker:
     build:
       context: ./backend/services/analyze
@@ -362,12 +376,13 @@ services:
       - app-network
     command: celery -A analyze_service worker --loglevel=info
     restart: unless-stopped
-  
+    logging: *default-logging
+
   redis:
     image: redis:7-alpine
     container_name: redis
     ports:
-      - "6379:6379"  
+      - "6379:6379"
     volumes:
       - redis_data:/data
     command: redis-server --appendonly yes
@@ -378,20 +393,43 @@ services:
       retries: 5
     networks:
       - app-network
+    logging: *default-logging
 
+  llm-service:
+    build:
+      context: ./backend/services/llm
+    container_name: llm-service
+    hostname: llm-service
+    ports:
+      - "8004:8004"
+    env_file:
+      - ./backend/services/llm/.env
+    environment:
+      OLLAMA_DEFAULT_MODEL: deepseek-r1
+      OLLAMA_HOST: http://ollama-service:11434
+    depends_on:
+      - ollama-service
+    volumes:
+      - ./backend/services/llm:/app
+    networks:
+      - app-network
+    command: uvicorn main:app --host 0.0.0.0 --port 8004
+    restart: unless-stopped
+    logging: *default-logging
 
 volumes:
   kafka_data:
   gateway_postgres_data:
   configuration_postgres_data:
   collection_postgres_data:
-  minio_data:
   analyze_postgres_data:
   loki_data:
   grafana_data:
   redis_data:
+  minio_data:
+  ollama_data:
 
 networks:
   app-network:
     driver: bridge
-    name: revmine-network  
+    name: revmine-network

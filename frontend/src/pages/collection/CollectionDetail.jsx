@@ -24,7 +24,7 @@ function CollectionDetail() {
   const [cleanings, setCleanings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  
+
   // Delete cleaning modal state
   const [showDeleteCleaningModal, setShowDeleteCleaningModal] = useState(false);
   const [cleanedDataToDelete, setCleanedDataToDelete] = useState(null);
@@ -65,10 +65,10 @@ function CollectionDetail() {
   const handleDownloadJSON = async () => {
     try {
       const response = await collectionService.downloadCollectionJSON(collectionId);
-      
+
       // Use filename from collection data (loaded from API) or fallback to header/default
       let filename = collection?.raw_data_filename || `collection_${collectionId}_raw_data.json`;
-      
+
       // Try to get from Content-Disposition header as fallback
       if (!collection?.raw_data_filename) {
         const contentDisposition = response.headers['content-disposition'];
@@ -79,9 +79,9 @@ function CollectionDetail() {
           }
         }
       }
-      
+
       const blob = new Blob([response.data], { type: 'application/json' });
-      
+
       // Check if showSaveFilePicker is available (modern browsers)
       if (window.showSaveFilePicker) {
         try {
@@ -101,7 +101,7 @@ function CollectionDetail() {
           if (err.name === 'AbortError') return;
         }
       }
-      
+
       // Fallback for browsers that don't support showSaveFilePicker
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -128,17 +128,17 @@ function CollectionDetail() {
     try {
       // Find the cleaning object to get the actual filename
       const cleaningItem = cleanings.find(c => c.id === cleanedDataId);
-      const actualFilename = fileType === 'structured' 
-        ? cleaningItem?.structured_csv_filename 
+      const actualFilename = fileType === 'structured'
+        ? cleaningItem?.structured_csv_filename
         : cleaningItem?.statistics_csv_filename;
-      
+
       if (!actualFilename) {
         alert('File not available');
         return;
       }
 
       const response = await collectionService.downloadCleanedDataCSV(cleanedDataId, fileType);
-      
+
       // Try to use File System Access API for "Save As" dialog
       if (window.showSaveFilePicker) {
         try {
@@ -158,7 +158,7 @@ function CollectionDetail() {
           if (err.name === 'AbortError') return;
         }
       }
-      
+
       // Fallback for browsers that don't support File System Access API
       const url = window.URL.createObjectURL(response.data);
       const a = document.createElement('a');
@@ -189,7 +189,7 @@ function CollectionDetail() {
 
   const confirmDeleteCleanedData = async () => {
     if (!cleanedDataToDelete) return;
-    
+
     try {
       setDeletingCleanedData(true);
       await collectionService.deleteCleanedData(cleanedDataToDelete.id);
@@ -291,7 +291,7 @@ function CollectionDetail() {
                     // Handle ISO format or other standard formats
                     return new Date(dateStr);
                   };
-                  
+
                   const startDate = collection.filters?.start_date || collection.stats?.start_date;
                   const endDate = collection.filters?.end_date || collection.stats?.end_date;
                   if (startDate) {

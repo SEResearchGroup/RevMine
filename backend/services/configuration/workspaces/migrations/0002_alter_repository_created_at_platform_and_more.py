@@ -4,40 +4,45 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('workspaces', '0001_initial'),
+        ("workspaces", "0001_initial"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='repository',
-            name='created_at_platform',
-            field=models.DateTimeField(help_text='Creation date on the platform'),
+            model_name="repository",
+            name="created_at_platform",
+            field=models.DateTimeField(help_text="Creation date on the platform"),
         ),
         migrations.AlterField(
-            model_name='repository',
-            name='external_id',
-            field=models.CharField(help_text='ID of the repo on GitHub/GitLab', max_length=100),
+            model_name="repository",
+            name="external_id",
+            field=models.CharField(
+                help_text="ID of the repo on GitHub/GitLab", max_length=100
+            ),
         ),
         migrations.AlterField(
-            model_name='repository',
-            name='is_active',
-            field=models.BooleanField(default=True, help_text='If the repo is active for analysis'),
+            model_name="repository",
+            name="is_active",
+            field=models.BooleanField(
+                default=True, help_text="If the repo is active for analysis"
+            ),
         ),
         migrations.AlterField(
-            model_name='repository',
-            name='raw_data',
-            field=models.JSONField(blank=True, help_text='Raw data from the API', null=True),
+            model_name="repository",
+            name="raw_data",
+            field=models.JSONField(
+                blank=True, help_text="Raw data from the API", null=True
+            ),
         ),
         migrations.AlterField(
-            model_name='repository',
-            name='url',
-            field=models.URLField(help_text='URL of the repository'),
+            model_name="repository",
+            name="url",
+            field=models.URLField(help_text="URL of the repository"),
         ),
         migrations.AlterField(
-            model_name='repository',
-            name='web_url',
-            field=models.URLField(help_text='Web URL to access the repository'),
+            model_name="repository",
+            name="web_url",
+            field=models.URLField(help_text="Web URL to access the repository"),
         ),
     ]

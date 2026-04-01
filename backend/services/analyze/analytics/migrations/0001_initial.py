@@ -7,11 +7,9 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
-    dependencies = [
-    ]
+    dependencies = []
 
     operations = [
         migrations.CreateModel(
@@ -86,9 +84,17 @@ class Migration(migrations.Migration):
                 ('updated_at', models.DateTimeField(auto_now=True)),
             ],
             options={
-                'db_table': 'datasets',
-                'ordering': ['-uploaded_at'],
-                'indexes': [models.Index(fields=['workspace_id', 'repository_id'], name='datasets_workspa_a78d5a_idx'), models.Index(fields=['-uploaded_at'], name='datasets_uploade_c9b9eb_idx')],
+                "db_table": "datasets",
+                "ordering": ["-uploaded_at"],
+                "indexes": [
+                    models.Index(
+                        fields=["workspace_id", "repository_id"],
+                        name="datasets_workspa_a78d5a_idx",
+                    ),
+                    models.Index(
+                        fields=["-uploaded_at"], name="datasets_uploade_c9b9eb_idx"
+                    ),
+                ],
             },
         ),
         migrations.CreateModel(
@@ -131,8 +137,8 @@ class Migration(migrations.Migration):
             },
         ),
         migrations.AddIndex(
-            model_name='analysis',
-            index=models.Index(fields=['status'], name='analyses_status_a2cfc9_idx'),
+            model_name="analysis",
+            index=models.Index(fields=["status"], name="analyses_status_a2cfc9_idx"),
         ),
         migrations.AddIndex(
             model_name='analysis',

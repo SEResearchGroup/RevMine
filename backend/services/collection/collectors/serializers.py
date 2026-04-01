@@ -4,7 +4,7 @@ from .models import Collection, CleanedData
 
 class StartCollectionSerializer(serializers.Serializer):
     """Serializer for starting a collection."""
-    
+
     repository_id = serializers.IntegerField(required=True)
     workspace_id = serializers.IntegerField(required=True)
     repository_name = serializers.CharField(required=True)
@@ -19,41 +19,39 @@ class StartCollectionSerializer(serializers.Serializer):
 
 class MetricsFilterSerializer(serializers.Serializer):
     """Serializer for metrics and filters configuration."""
+
     selected_metrics = serializers.ListField(
-        child=serializers.CharField(),
-        required=True,
-        min_length=1
+        child=serializers.CharField(), required=True, min_length=1
     )
-    
+
     start_date = serializers.DateField(required=False, allow_null=True)
     end_date = serializers.DateField(required=False, allow_null=True)
     status = serializers.ListField(
-        child=serializers.CharField(),
-        required=False,
-        allow_empty=True
+        child=serializers.CharField(), required=False, allow_empty=True
     )
-    
-    branch_name = serializers.CharField(required=False, allow_null=True, allow_blank=True)
-    
+
+    branch_name = serializers.CharField(
+        required=False, allow_null=True, allow_blank=True
+    )
+
     def validate(self, data):
         """Validate that end_date is after start_date"""
-        start_date = data.get('start_date')
-        end_date = data.get('end_date')
-        
+        start_date = data.get("start_date")
+        end_date = data.get("end_date")
+
         if start_date and end_date and end_date < start_date:
-            raise serializers.ValidationError(
-                "end_date must be after start_date"
-            )
-        
+            raise serializers.ValidationError("end_date must be after start_date")
+
         return data
 
 
 class CollectionSerializer(serializers.ModelSerializer):
     """Serializer for Collection model."""
+
     progress_percentage = serializers.ReadOnlyField()
     is_active = serializers.ReadOnlyField()
     can_resume = serializers.ReadOnlyField()
-    
+
     class Meta:
         model = Collection
         fields = [
@@ -86,44 +84,45 @@ class CollectionSerializer(serializers.ModelSerializer):
             'is_external',
         ]
         read_only_fields = [
-            'id', 
-            'created_at', 
-            'started_at', 
-            'completed_at',
-            'progress_percentage',
-            'is_active',
-            'can_resume',
-            'raw_data_filename',
+            "id",
+            "created_at",
+            "started_at",
+            "completed_at",
+            "progress_percentage",
+            "is_active",
+            "can_resume",
+            "raw_data_filename",
         ]
 
 
 class CleanedDataSerializer(serializers.ModelSerializer):
     """Serializer for CleanedData model."""
-    collection_id = serializers.IntegerField(source='collection.id', read_only=True)
+
+    collection_id = serializers.IntegerField(source="collection.id", read_only=True)
     platform = serializers.SerializerMethodField()
 
     class Meta:
         model = CleanedData
         fields = [
-            'id',
-            'collection_id',
-            'platform',  # <-- ici
-            'created_at',
-            'completed_at',
-            'start_date',
-            'end_date',
-            'filters',
-            'selected_features',
-            'structured_csv_filename',
-            'statistics_csv_filename',
-            'stats',
-            'status',
-            'error_message',
+            "id",
+            "collection_id",
+            "platform",  # <-- ici
+            "created_at",
+            "completed_at",
+            "start_date",
+            "end_date",
+            "filters",
+            "selected_features",
+            "structured_csv_filename",
+            "statistics_csv_filename",
+            "stats",
+            "status",
+            "error_message",
         ]
         read_only_fields = [
-            'id',
-            'created_at',
-            'completed_at',
+            "id",
+            "created_at",
+            "completed_at",
         ]
 
     def get_platform(self, obj):
@@ -134,6 +133,7 @@ class CleanedDataSerializer(serializers.ModelSerializer):
 
 class CreateCleanedDataSerializer(serializers.Serializer):
     """Serializer for creating cleaned data."""
+
     collection_id = serializers.IntegerField(required=True)
     start_date = serializers.DateField(required=False, allow_null=True)
     end_date = serializers.DateField(required=False, allow_null=True)
@@ -142,18 +142,15 @@ class CreateCleanedDataSerializer(serializers.Serializer):
         child=serializers.CharField(),
         required=False,
         default=list,
-        help_text="List of feature IDs to include in statistics CSV"
+        help_text="List of feature IDs to include in statistics CSV",
     )
-    
+
     def validate(self, data):
         """Validate cleaning parameters"""
-        start_date = data.get('start_date')
-        end_date = data.get('end_date')
-        
-        if start_date and end_date and end_date < start_date:
-            raise serializers.ValidationError(
-                "end_date must be after start_date"
-            )
-        
-        return data
+        start_date = data.get("start_date")
+        end_date = data.get("end_date")
 
+        if start_date and end_date and end_date < start_date:
+            raise serializers.ValidationError("end_date must be after start_date")
+
+        return data

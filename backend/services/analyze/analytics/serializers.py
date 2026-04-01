@@ -16,7 +16,7 @@ class DatasetSerializer(serializers.ModelSerializer):
             'filename', 'file_path', 'rows_count', 'columns_count',
             'columns_metadata', 'uploaded_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'uploaded_at', 'updated_at']
+        read_only_fields = ["id", "uploaded_at", "updated_at"]
 
 
 class DatasetUploadSerializer(serializers.Serializer):

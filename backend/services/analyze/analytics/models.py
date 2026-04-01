@@ -7,11 +7,12 @@ class Dataset(models.Model):
     """
     Model to store uploaded CSV datasets
     """
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     workspace_id = models.IntegerField(null=True, blank=True, db_index=True)
     repository_id = models.IntegerField(null=True, blank=True, db_index=True)
-    platform = models.CharField(max_length=50, default='gitlab')
-    
+    platform = models.CharField(max_length=50, default="gitlab")
+
     filename = models.CharField(max_length=255)
     file_path = models.CharField(max_length=500)
     rows_count = models.IntegerField(default=0)
@@ -25,15 +26,15 @@ class Dataset(models.Model):
     
     uploaded_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    
+
     class Meta:
-        db_table = 'datasets'
-        ordering = ['-uploaded_at']
+        db_table = "datasets"
+        ordering = ["-uploaded_at"]
         indexes = [
-            models.Index(fields=['workspace_id', 'repository_id']),
-            models.Index(fields=['-uploaded_at']),
+            models.Index(fields=["workspace_id", "repository_id"]),
+            models.Index(fields=["-uploaded_at"]),
         ]
-    
+
     def __str__(self):
         return f"{self.filename} - {self.id}"
 
@@ -112,18 +113,17 @@ class Analysis(models.Model):
     """
     Model to store analysis requests and results
     """
+
     STATUS_CHOICES = [
-        ('pending', 'Pending'),
-        ('processing', 'Processing'),
-        ('completed', 'Completed'),
-        ('failed', 'Failed'),
+        ("pending", "Pending"),
+        ("processing", "Processing"),
+        ("completed", "Completed"),
+        ("failed", "Failed"),
     ]
-    
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     dataset = models.ForeignKey(
-        Dataset, 
-        on_delete=models.CASCADE, 
-        related_name='analyses'
+        Dataset, on_delete=models.CASCADE, related_name="analyses"
     )
     
     # Configuration de l'analyse
@@ -150,20 +150,20 @@ class Analysis(models.Model):
         default='pending'
     )
     error_message = models.TextField(null=True, blank=True)
-    
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     completed_at = models.DateTimeField(null=True, blank=True)
-    
+
     class Meta:
-        db_table = 'analyses'
-        ordering = ['-created_at']
+        db_table = "analyses"
+        ordering = ["-created_at"]
         indexes = [
             models.Index(fields=['status']),
             models.Index(fields=['metric_code']),
             models.Index(fields=['-created_at']),
         ]
-    
+
     def __str__(self):
         return f"Analysis {self.id} - {self.metric_code} - {self.status}"
 
@@ -172,6 +172,7 @@ class AnalysisResult(models.Model):
     """
     Model to store analysis results
     """
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     analysis = models.OneToOneField(
         Analysis, 
@@ -197,9 +198,9 @@ class AnalysisResult(models.Model):
         blank=True,
         help_text="Additional statistical information"
     )
-    
+
     created_at = models.DateTimeField(auto_now_add=True)
-    
+
     class Meta:
         db_table = 'analysis_results'
         ordering = ['-created_at']

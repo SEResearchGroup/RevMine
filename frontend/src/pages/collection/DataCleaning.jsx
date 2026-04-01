@@ -69,18 +69,18 @@ function DataCleaning() {
   // Selected filters
   const [selectedExtensions, setSelectedExtensions] = useState([]);
   const [selectedAuthors, setSelectedAuthors] = useState([]);
-  
+
   // Keyword filters - now an array of {field, keywords}
   const [keywordFilters, setKeywordFilters] = useState([]);
   const [currentKeywordField, setCurrentKeywordField] = useState("");
   const [currentKeywords, setCurrentKeywords] = useState("");
-  
+
   // Available keyword fields for selection
   const allKeywordFields = ["title", "description", "comments", "commit_message"];
   const availableKeywordFields = allKeywordFields.filter(
     field => !keywordFilters.some(filter => filter.field === field)
   );
-  
+
   // Date range for cleaning (subset of collection data)
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -136,7 +136,7 @@ function DataCleaning() {
       setAvailableAuthors(cleaningRes.data.available_filters.authors);
       setAvailableExtensions(cleaningRes.data.available_filters.file_extensions);
       setTotalItems(cleaningRes.data.total_items);
-      
+
       // Set default date range from collection filters
       if (collectionRes.data.collection_plan.filters) {
         setStartDate(collectionRes.data.collection_plan.filters.start_date || "");
@@ -168,14 +168,14 @@ function DataCleaning() {
 
   const handleAddKeywordFilter = () => {
     if (!currentKeywordField || !currentKeywords.trim()) return;
-    
+
     const keywordsList = currentKeywords
       .split(",")
       .map((k) => k.trim())
       .filter((k) => k);
-    
+
     if (keywordsList.length === 0) return;
-    
+
     setKeywordFilters([
       ...keywordFilters,
       { field: currentKeywordField, keywords: keywordsList }
@@ -405,7 +405,7 @@ function DataCleaning() {
               <p className="text-sm text-gray-600 mb-4">
                 You can narrow down this range for the cleaning operation:
               </p>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">

@@ -35,7 +35,7 @@ const DatasetSelectionSection = ({ onSelectDataset, onFileSelect }) => {
           id: cd.id,
           dataset_filename: cd.structured_csv_filename,
           created_at: cd.created_at,
-          status: cd.status, 
+          status: cd.status,
           results_count: cd.stats?.pull_requests_count ?? 0,
           repository_name: cd.repository_name,
           repository_full_name: cd.repository_full_name,

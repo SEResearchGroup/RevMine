@@ -31,10 +31,10 @@ class GitHubCollector:
         self.token = token
         self.repo_full_name = repo_full_name
         self.branch_name = branch_name
-        self.base_url = 'https://api.github.com'
+        self.base_url = "https://api.github.com"
         self.headers = {
-            'Authorization': f'token {token}',
-            'Accept': 'application/vnd.github.v3+json'
+            "Authorization": f"token {token}",
+            "Accept": "application/vnd.github.v3+json",
         }
         self.session = _create_session(self.headers)
         self.selected_metrics = selected_metrics
@@ -44,21 +44,21 @@ class GitHubCollector:
     def collect_all_data(self, filters=None, progress_callback=None, resume_from=None, existing_data=None):
         """
         Collect all pull request data with progress updates and resume support
-        
+
         Args:
             filters (dict): Date and status filters
             progress_callback (callable): Function to call with progress updates (current, total, message, item_data)
             resume_from (str): PR number to resume from (if resuming)
             existing_data (dict): Existing collected data (if resuming)
-        
+
         Returns:
             dict: All collected data organized by type
         """
         if existing_data:
             all_data = existing_data
         else:
-            all_data = {'pull_requests': []}
-        
+            all_data = {"pull_requests": []}
+
         try:
             # Fetch project creation date
             try:
@@ -77,36 +77,43 @@ class GitHubCollector:
             # Get collected PR numbers to skip
             collected_prs = set()
             if existing_data:
-                collected_prs = {pr['pull_request_number'] for pr in existing_data.get('pull_requests', [])}
-            
+                collected_prs = {
+                    pr["pull_request_number"]
+                    for pr in existing_data.get("pull_requests", [])
+                }
+
             # First pass: Collect all PRs to get accurate count
             logger.info("Collecting PRs...")
             all_prs = []
             page = 1
-            
+
             while True:
                 logger.info(f"Fetching page {page}")
                 prs = self._get_pull_requests_page(page, filters)
-                
+
                 if not prs:
                     break
-                
+
                 all_prs.extend(prs)
                 page += 1
-                
+
                 if page > 10:
                     break
-            
+
             # Filter out already collected PRs
             if collected_prs:
                 all_prs = [pr for pr in all_prs if pr['number'] not in collected_prs]
             
             total_prs = len(all_prs) + len(collected_prs)
-            logger.info(f"Total PRs to process: {len(all_prs)} (already collected: {len(collected_prs)})")
-            
+            logger.info(
+                f"Total PRs to process: {len(all_prs)} (already collected: {len(collected_prs)})"
+            )
+
             if progress_callback:
-                progress_callback(len(collected_prs), total_prs, "Starting collection...")
-            
+                progress_callback(
+                    len(collected_prs), total_prs, "Starting collection..."
+                )
+
             # Process each PR
             collected_count = len(collected_prs)
             failed_prs = []
@@ -119,13 +126,13 @@ class GitHubCollector:
                     failed_prs.append(pr['number'])
                     continue
                 if pr_data:
-                    all_data['pull_requests'].append(pr_data)
+                    all_data["pull_requests"].append(pr_data)
                     collected_count += 1
-                    
+
                     # Update progress with item data for incremental saving
                     if progress_callback:
                         progress_callback(
-                            collected_count, 
+                            collected_count,
                             total_prs,
                             f"Collected PR #{pr['number']}",
                             pr_data,
@@ -144,11 +151,11 @@ class GitHubCollector:
             logger.info(f"Collection completed: {len(all_data['pull_requests'])} unique PRs")
             
             return all_data
-            
+
         except Exception as e:
             logger.error(f"Error collecting data: {e}")
             raise
-    
+
     def _get_pull_requests_page(self, page, filters=None):
         """Get one page of pull requests"""
         try:
@@ -161,20 +168,22 @@ class GitHubCollector:
             response = self.session.get(
                 f"{self.base_url}/repos/{self.repo_full_name}/pulls",
                 params=params,
-                timeout=30
+                timeout=30,
             )
-            
+
             if response.status_code == 401:
-                raise Exception("GitHub token invalid or expired. Please update the token in workspace settings.")
-            
+                raise Exception(
+                    "GitHub token invalid or expired. Please update the token in workspace settings."
+                )
+
             if response.status_code == 404:
                 raise Exception(f"Repository not found: {self.repo_full_name}")
-            
+
             if response.status_code != 200:
                 raise Exception(f"GitHub API error: {response.status_code}")
-            
+
             return response.json()
-            
+
         except requests.exceptions.ConnectionError as e:
             logger.error(f"Network connection error: {e}")
             raise Exception(f"Network connection lost while fetching PRs: {str(e)}")
@@ -198,24 +207,28 @@ class GitHubCollector:
                 f"{self.base_url}/repos/{self.repo_full_name}/pulls/{pr_number}",
                 timeout=30
             )
-            
+
             if pr_response.status_code == 401:
                 raise Exception("GitHub token invalid or expired.")
-            
+
             if pr_response.status_code != 200:
-                logger.warning(f"Failed to fetch PR #{pr_number}: {pr_response.status_code}")
-                raise Exception(f"Failed to fetch PR #{pr_number}: HTTP {pr_response.status_code}")
-            
+                logger.warning(
+                    f"Failed to fetch PR #{pr_number}: {pr_response.status_code}"
+                )
+                raise Exception(
+                    f"Failed to fetch PR #{pr_number}: HTTP {pr_response.status_code}"
+                )
+
             pr_details = pr_response.json()
-            
+
             organized_pr = {
-                'pull_request_number': pr_number,
-                'details': pr_details,
-                'commits': [],
-                'comments': [],
-                'reviews': [],
-                'review_comments': [],
-                'files': []
+                "pull_request_number": pr_number,
+                "details": pr_details,
+                "commits": [],
+                "comments": [],
+                "reviews": [],
+                "review_comments": [],
+                "files": [],
             }
             
             # Get commits (only if selected)
@@ -297,7 +310,7 @@ class GitHubCollector:
                     raise Exception(f"Network error fetching files for PR #{pr_number}: {str(e)}")
             
             return organized_pr
-            
+
         except requests.exceptions.ConnectionError as e:
             logger.error(f"Network connection lost processing PR #{pr_number}: {e}")
             raise Exception(f"Network connection lost while processing PR #{pr_number}")
@@ -307,7 +320,7 @@ class GitHubCollector:
         except requests.exceptions.RequestException as e:
             logger.error(f"Network error processing PR {pr_number}: {e}")
             raise Exception(f"Network error processing PR #{pr_number}: {str(e)}")
-    
+
     def _get_commit_details(self, commit_sha):
         """Get commit details with file changes"""
         try:
@@ -315,12 +328,12 @@ class GitHubCollector:
                 f"{self.base_url}/repos/{self.repo_full_name}/commits/{commit_sha}",
                 timeout=30
             )
-            
+
             if response.status_code == 200:
                 return response.json()
-            
+
             return None
-            
+
         except Exception as e:
             logger.warning(f"Error getting commit details for {commit_sha}: {e}")
             return None

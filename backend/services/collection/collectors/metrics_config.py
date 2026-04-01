@@ -1,4 +1,3 @@
-
 GITHUB_METRICS = {
     "Pull Request Metadata": [
         {"value": "pr_title", "label": "PR Title"},
@@ -26,7 +25,10 @@ GITHUB_METRICS = {
         {"value": "pr_comment_body", "label": "Comment Content"},
     ],
     "Reviews": [
-        {"value": "review_state", "label": "Review State (approved/changes_requested/commented)"},
+        {
+            "value": "review_state",
+            "label": "Review State (approved/changes_requested/commented)",
+        },
         {"value": "review_author", "label": "Reviewer"},
         {"value": "review_date", "label": "Review Date"},
         {"value": "review_body", "label": "Review Comments"},
@@ -92,16 +94,16 @@ GITLAB_METRICS = {
 def get_metrics_for_platform(platform):
     """
     Get metrics based on platform, organized by category
-    
+
     Args:
         platform (str): 'github', 'gitlab', or 'gitlab_self'
-    
+
     Returns:
         dict: Metrics organized by category
     """
-    if platform == 'github':
+    if platform == "github":
         return GITHUB_METRICS
-    elif platform in ['gitlab', 'gitlab_self']:
+    elif platform in ["gitlab", "gitlab_self"]:
         return GITLAB_METRICS
     else:
         return {}
@@ -110,35 +112,35 @@ def get_metrics_for_platform(platform):
 def get_all_metric_values(platform):
     """
     Get flat list of all metric values for a platform
-    
+
     Args:
         platform (str): Platform name
-    
+
     Returns:
         list: List of all metric values
     """
     metrics = get_metrics_for_platform(platform)
     all_values = []
-    
+
     for category, metric_list in metrics.items():
-        all_values.extend([m['value'] for m in metric_list])
-    
+        all_values.extend([m["value"] for m in metric_list])
+
     return all_values
 
 
 def get_category_metric_values(platform, category):
     """
     Get all metric values for a specific category
-    
+
     Args:
         platform (str): Platform name
         category (str): Category name
-    
+
     Returns:
         list: List of metric values in the category
     """
     metrics = get_metrics_for_platform(platform)
-    
+
     if category in metrics:
         return [m['value'] for m in metrics[category]]
     

@@ -69,15 +69,15 @@ function Projects() {
 
   const handleEditClose = () => {
     setShowEditModal(false);
-    fetchWorkspaceData(); 
+    fetchWorkspaceData();
   };
 
   const handleImportClose = () => {
     setShowImportModal(false);
-    fetchWorkspaceData(); 
+    fetchWorkspaceData();
   };
 
- 
+
   const handleRepositoryClick = (repoId) => {
     navigate(`/workspaces/${id}/repositories/${repoId}/collect`);
   };

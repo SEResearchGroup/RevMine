@@ -70,7 +70,7 @@ function CollectionResults() {
   const { status, data } = collectionData;
   const stats = status.stats || {};
   const platform = repository.platform;
-  
+
   // Platform-specific terminology
   const itemTerm = platform === "github" ? "Pull Request" : "Merge Request";
   const itemTermPlural = platform === "github" ? "Pull Requests" : "Merge Requests";
@@ -282,16 +282,16 @@ function CollectionResults() {
         {/* Data Overview */}
         <div className="bg-white rounded-xl border border-gray-200 p-6">
           <h3 className="text-xl font-semibold mb-4">Data Overview</h3>
-          
+
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {Object.entries(stats).map(([key, value]) => {
               if (key.includes("_count")) {
                 let metricName = key.replace("_count", "").replace("_", " ");
-                
+
                 // Platform-specific naming
                 if (key === "pull_requests_count") metricName = itemTermPlural;
                 if (key === "merge_requests_count") metricName = itemTermPlural;
-                
+
                 return (
                   <div
                     key={key}
