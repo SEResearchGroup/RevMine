@@ -69,6 +69,17 @@ def _normalize_raw_data(raw_data, platform: str):
     return raw_data
 
 
+def _extract_files_from_item(item: dict, platform: str) -> list:
+    """Extract the list of modified files from an item, handling both platforms."""
+    if platform == 'github':
+        return item.get('files', [])
+    # GitLab: files are nested inside item['changes']['changes']
+    changes = item.get('changes', {})
+    if isinstance(changes, dict):
+        return changes.get('changes', []) or changes.get('diffs', [])
+    return []
+
+
 # =============================================================================
 # Exceptions for Service Layer
 # =============================================================================
@@ -573,7 +584,7 @@ class DataCleaningService:
                 authors.add(author)
 
             # File extensions
-            files = item.get("files", [])
+            files = _extract_files_from_item(item, collection.platform)
             for file in files:
                 filename = file.get("filename") or file.get("new_path")
                 if filename and "." in filename:

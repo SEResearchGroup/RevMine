@@ -205,18 +205,18 @@ services:
     networks:
       - app-network
 
-  ollama-service:
-    image: ollama/ollama:latest
-    container_name: ollama-service
-    hostname: ollama-service
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama_data:/root/.ollama
-    networks:
-      - app-network
-    restart: unless-stopped
-    logging: *default-logging
+  # ollama-service:
+  #   image: ollama/ollama:latest
+  #   container_name: ollama-service
+  #   hostname: ollama-service
+  #   ports:
+  #     - "11434:11434"
+  #   volumes:
+  #     - ollama_data:/root/.ollama
+  #   networks:
+  #     - app-network
+  #   restart: unless-stopped
+  #   logging: *default-logging
 
   api-gateway:
     build:
@@ -241,8 +241,8 @@ services:
         condition: service_healthy
       kafka:
         condition: service_healthy
-      llm-service:
-        condition: service_started
+      # llm-service:
+      #   condition: service_started
     volumes:
       - ./backend/api-gateway:/app
     networks:
@@ -306,8 +306,8 @@ services:
         condition: service_started
       kafka:
         condition: service_healthy
-      llm-service:
-        condition: service_started
+      # llm-service:
+      #   condition: service_started
     volumes:
       - ./backend/services/collection:/app
     networks:
@@ -340,8 +340,8 @@ services:
         condition: service_started
       kafka:
         condition: service_healthy
-      llm-service:
-        condition: service_started
+      # llm-service:
+      #   condition: service_started
     volumes:
       - ./backend/services/analyze:/app
     networks:
@@ -395,27 +395,27 @@ services:
       - app-network
     logging: *default-logging
 
-  llm-service:
-    build:
-      context: ./backend/services/llm
-    container_name: llm-service
-    hostname: llm-service
-    ports:
-      - "8004:8004"
-    env_file:
-      - ./backend/services/llm/.env
-    environment:
-      OLLAMA_DEFAULT_MODEL: deepseek-r1
-      OLLAMA_HOST: http://ollama-service:11434
-    depends_on:
-      - ollama-service
-    volumes:
-      - ./backend/services/llm:/app
-    networks:
-      - app-network
-    command: uvicorn main:app --host 0.0.0.0 --port 8004
-    restart: unless-stopped
-    logging: *default-logging
+  # llm-service:
+  #   build:
+  #     context: ./backend/services/llm
+  #   container_name: llm-service
+  #   hostname: llm-service
+  #   ports:
+  #     - "8004:8004"
+  #   env_file:
+  #     - ./backend/services/llm/.env
+  #   environment:
+  #     OLLAMA_DEFAULT_MODEL: deepseek-r1
+  #     OLLAMA_HOST: http://ollama-service:11434
+  #   depends_on:
+  #     - ollama-service
+  #   volumes:
+  #     - ./backend/services/llm:/app
+  #   networks:
+  #     - app-network
+  #   command: uvicorn main:app --host 0.0.0.0 --port 8004
+  #   restart: unless-stopped
+  #   logging: *default-logging
 
 volumes:
   kafka_data:
@@ -427,7 +427,7 @@ volumes:
   grafana_data:
   redis_data:
   minio_data:
-  ollama_data:
+  # ollama_data:
 
 networks:
   app-network:

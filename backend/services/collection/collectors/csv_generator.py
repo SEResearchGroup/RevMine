@@ -779,6 +779,15 @@ class CSVGenerator:
         self.platform = platform
         self.item_key = "pull_requests" if platform == "github" else "merge_requests"
 
+    def _get_item_files(self, item: dict) -> list:
+        """Extract the list of modified files from an item, handling both platforms."""
+        if self.platform == 'github':
+            return item.get('files', [])
+        changes = item.get('changes', {})
+        if isinstance(changes, dict):
+            return changes.get('changes', []) or changes.get('diffs', [])
+        return []
+
     def apply_filters(self, raw_data: dict, filters: dict) -> dict:
         """Apply filters to raw data"""
         items = raw_data.get(self.item_key, [])
@@ -787,7 +796,7 @@ class CSVGenerator:
         for item in items:
             # Filter by file extensions
             if filters.get("file_extensions"):
-                files = item.get("files", [])
+                files = self._get_item_files(item)
                 has_extension = False
 
                 for file in files:

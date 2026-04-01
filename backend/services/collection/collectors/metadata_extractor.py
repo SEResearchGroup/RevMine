@@ -9,6 +9,17 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def _extract_files_from_item(item: dict, platform: str) -> list:
+    """Extract the list of modified files from an item, handling both platforms."""
+    if platform == 'github':
+        return item.get('files') or []
+    # GitLab: files are nested inside item['changes']['changes']
+    changes = item.get('changes', {})
+    if isinstance(changes, dict):
+        return changes.get('changes', []) or changes.get('diffs', [])
+    return []
+
+
 def extract_cleaning_metadata(stream, platform: str) -> dict:
     """
     Stream-parse a JSON file to extract cleaning metadata.
@@ -59,7 +70,7 @@ def extract_cleaning_metadata(stream, platform: str) -> dict:
                 authors.add(author)
 
             # Extract file extensions
-            files = item.get('files') or []
+            files = _extract_files_from_item(item, platform)
             for f in files:
                 filename = f.get('filename') or f.get('new_path')
                 if filename and '.' in filename:
