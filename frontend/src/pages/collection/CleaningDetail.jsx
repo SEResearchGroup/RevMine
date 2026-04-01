@@ -15,7 +15,6 @@ import {
   Tag,
 } from "lucide-react";
 import { collectionService } from "../../services/api";
-import { DomPlatform } from "chart.js";
 
 function CleaningDetail() {
   const { workspaceId, repositoryId, collectionId, cleanedDataId } = useParams();

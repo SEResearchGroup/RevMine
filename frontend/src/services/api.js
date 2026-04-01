@@ -229,6 +229,10 @@ export const collectionService = {
     });
   },
 
+  generateAutomationDraft: (data) => {
+    return collectionApi.post("/automation/preview/", data, { timeout: 60000 });
+  },
+
   // Get branches for an existing collection plan
   getBranches: (planId) => {
     return collectionApi.get(`/plans/${planId}/branches/`);

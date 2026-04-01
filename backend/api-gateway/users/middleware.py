@@ -10,6 +10,7 @@ from .routing.handlers import (
 from .services.service_clients import (
     ConfigurationServiceClient,
     CollectionServiceClient,
+    LLMServiceClient,
 )
 
 logger = logging.getLogger(__name__)
@@ -48,12 +49,16 @@ class ServiceProxyMiddleware:
         # Initialization of service clients
         self.config_client = ConfigurationServiceClient(self.configuration_service_url)
         self.collection_client = CollectionServiceClient(self.collection_service_url)
+        self.llm_client = LLMServiceClient(self.llm_service_url)
 
         # Initialization of handlers
         self.workspace_handler = WorkspaceRequestHandler(self.configuration_service_url)
 
         self.collection_handler = CollectionRequestHandler(
-            self.collection_service_url, self.config_client, self.collection_client
+            self.collection_service_url,
+            self.config_client,
+            self.collection_client,
+            self.llm_client,
         )
 
         self.analysis_handler = AnalysisRequestHandler(
