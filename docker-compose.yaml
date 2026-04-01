@@ -1,3 +1,9 @@
+x-default-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
 
   kafka:
@@ -29,6 +35,72 @@ services:
       timeout: 10s
       retries: 10
       start_period: 30s
+    logging: *default-logging
+    networks:
+      - app-network
+
+  loki:
+    image: grafana/loki:2.9.8
+    container_name: loki
+    hostname: loki
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/config.yml
+    volumes:
+      - ./infrastructure/docker/logging/loki-config.yml:/etc/loki/config.yml:ro
+      - loki_data:/loki
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:3100/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    logging: *default-logging
+    networks:
+      - app-network
+
+  promtail:
+    image: grafana/promtail:2.9.8
+    container_name: promtail
+    hostname: promtail
+    ports:
+      - "9080:9080"
+    command: -config.file=/etc/promtail/config.yml
+    volumes:
+      - ./infrastructure/docker/logging/promtail-config.yml:/etc/promtail/config.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    depends_on:
+      loki:
+        condition: service_healthy
+    logging: *default-logging
+    networks:
+      - app-network
+
+  grafana:
+    image: grafana/grafana:11.1.0
+    container_name: grafana
+    hostname: grafana
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./infrastructure/docker/logging/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+    depends_on:
+      loki:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:3000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+    logging: *default-logging
     networks:
       - app-network
 
@@ -50,6 +122,7 @@ services:
         interval: 10s
         timeout: 5s
         retries: 5
+      logging: *default-logging
       networks:
         - app-network
   # Base de données pour API Gateway
@@ -69,6 +142,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    logging: *default-logging
     networks:
       - app-network
 
@@ -89,6 +163,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    logging: *default-logging
     networks:
       - app-network
 
@@ -112,6 +187,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    logging: *default-logging
 
   analyze-db:
       image: postgres:15
@@ -131,6 +207,7 @@ services:
         interval: 5s
         timeout: 5s
         retries: 5
+      logging: *default-logging
 
   # API Gateway
   api-gateway:
@@ -161,6 +238,7 @@ services:
       - app-network  
     command: sh -c "sleep 5 && python manage.py migrate && python manage.py runserver 0.0.0.0:8000"
     restart: unless-stopped
+    logging: *default-logging
 
   # Configuration Service
   configuration-service:
@@ -192,6 +270,7 @@ services:
       - app-network  
     command: sh -c "sleep 10 && python manage.py migrate --run-syncdb && python manage.py runserver 0.0.0.0:8001"
     restart: unless-stopped
+    logging: *default-logging
 
   # Collection Service
   collection-service:
@@ -223,6 +302,7 @@ services:
       - app-network  
     command: sh -c "sleep 10 && python manage.py migrate --run-syncdb && python manage.py runserver 0.0.0.0:8002"
     restart: unless-stopped
+    logging: *default-logging
 
 
   analyze-service:
@@ -253,6 +333,8 @@ services:
     networks:
       - app-network  
     command: sh -c "sleep 10 && python manage.py migrate --run-syncdb && python manage.py runserver 0.0.0.0:8003"
+    restart: unless-stopped
+    logging: *default-logging
 
 
   
@@ -263,6 +345,8 @@ volumes:
   collection_postgres_data:
   minio_data:
   analyze_postgres_data:
+  loki_data:
+  grafana_data:
 
 networks:
   app-network:
