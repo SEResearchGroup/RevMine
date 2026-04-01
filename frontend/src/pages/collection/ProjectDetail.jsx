@@ -1,10 +1,3 @@
-/**
- * frontend/src/pages/collection/ProjectDetail.jsx
- *
- * FIXED: Collections are NO LONGER created automatically on page load.
- * A collection is only created when the user explicitly clicks "Go to collect plan".
- */
-
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import {
@@ -41,12 +34,7 @@ function ProjectDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Collection plan - only set when user explicitly creates one
-  const [planId, setPlanId] = useState(null);
   const [platform, setPlatform] = useState("");
-
-  // Active collection info (if one already exists)
-  const [activeCollection, setActiveCollection] = useState(null);
 
   // Available metrics (categorized) - loaded WITHOUT creating a collection
   const [availableMetrics, setAvailableMetrics] = useState({});
@@ -76,8 +64,6 @@ function ProjectDetail() {
 
   // Collection History
   const [collectionHistory, setCollectionHistory] = useState([]);
-  const [loadingHistory, setLoadingHistory] = useState(false);
-
   // Delete confirmation modal
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [collectionToDelete, setCollectionToDelete] = useState(null);
@@ -196,10 +182,6 @@ function ProjectDetail() {
     }
   };
 
-  /**
-   * Load available metrics and branches WITHOUT creating a collection.
-   * This is the key fix - we no longer call startCollection() on page load.
-   */
   const loadMetricsAndBranches = async (repoPlatform) => {
     try {
       // Get available metrics (does NOT create a collection)
@@ -213,8 +195,6 @@ function ProjectDetail() {
       // If there's already an active collection, restore its settings
       if (metricsRes.data.has_active_collection && metricsRes.data.active_collection) {
         const existingCollection = metricsRes.data.active_collection;
-        setActiveCollection(existingCollection);
-        setPlanId(existingCollection.id);
 
         // Restore selected metrics if any
         if (existingCollection.selected_metrics?.length > 0) {
@@ -250,7 +230,6 @@ function ProjectDetail() {
 
   const fetchCollectionHistory = async () => {
     try {
-      setLoadingHistory(true);
       const res = await collectionService.getHistory(repositoryId);
       const collections = res.data.collections || [];
       setCollectionHistory(collections);
@@ -286,9 +265,7 @@ function ProjectDetail() {
       });
     } catch (err) {
       console.error("Error fetching history:", err);
-    } finally {
-      setLoadingHistory(false);
-    }
+    } 
   };
 
   /**
@@ -452,12 +429,12 @@ function ProjectDetail() {
       // 1. Return the existing active collection if it's still valid
       // 2. Mark stale collections as paused and create a new one
       // 3. Create a new collection if none exists
+      // alert("Creating collection plan. This may take a few moments...");
       const startRes = await collectionService.startCollection(
         workspaceId,
         repositoryId
       );
       const currentPlanId = startRes.data.collection_plan.id;
-      setPlanId(currentPlanId);
 
       // Configure metrics on the collection
       await collectionService.configureMetrics(currentPlanId, {

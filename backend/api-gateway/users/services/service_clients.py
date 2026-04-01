@@ -191,7 +191,6 @@ class CollectionServiceClient:
 
 def build_collection_payload(
     repository_details: dict,
-    workspace_token: str,
     repository_id: str,
     workspace_id: str,
 ) -> dict:
