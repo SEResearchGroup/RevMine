@@ -12,14 +12,16 @@ logger = logging.getLogger(__name__)
 class BaseProxyHandler:
     """Generic proxy handler for all services"""
 
-    def __init__(self, service_url, path_prefix):
+    def __init__(self, service_url, path_prefix, require_auth=True):
         """
         Args:
             service_url: Base URL of the service
             path_prefix: Path prefix to remove (e.g., '/api/workspaces')
+            require_auth: Whether the proxy requires a valid JWT
         """
         self.service_url = service_url
         self.path_prefix = path_prefix
+        self.require_auth = require_auth
 
     def build_target_url(self, request):
         """Build the target URL from the request"""
@@ -43,7 +45,7 @@ class BaseProxyHandler:
             JsonResponse or HttpResponse
         """
         # Extract user_id if not provided
-        if user_id is None:
+        if self.require_auth and user_id is None:
             user_id, error_response = extract_user_from_request(request)
             if error_response:
                 return error_response
@@ -53,7 +55,9 @@ class BaseProxyHandler:
         logger.info(f"Proxying {request.method} {request.path} → {target_url}")
 
         # Prepare headers
-        headers = {"X-User-ID": str(user_id)}
+        headers = {}
+        if user_id is not None:
+            headers["X-User-ID"] = str(user_id)
 
         # Prepare data
         body, data, files, content_type = prepare_request_data(request)

@@ -4,6 +4,7 @@ from django.conf import settings
 from .routing.handlers import (
     CollectionRequestHandler,
     AnalysisRequestHandler,
+    LLMRequestHandler,
     WorkspaceRequestHandler,
 )
 from .services.service_clients import (
@@ -40,6 +41,10 @@ class ServiceProxyMiddleware:
             settings, "ANALYZE_SERVICE_URL", "http://analyze-service:8003/api/analysis"
         )
 
+        self.llm_service_url = getattr(
+            settings, "LLM_SERVICE_URL", "http://llm-service:8004"
+        )
+
         # Initialization of service clients
         self.config_client = ConfigurationServiceClient(self.configuration_service_url)
         self.collection_client = CollectionServiceClient(self.collection_service_url)
@@ -54,11 +59,13 @@ class ServiceProxyMiddleware:
         self.analysis_handler = AnalysisRequestHandler(
             self.analyze_service_url, self.collection_service_url
         )
+        self.llm_handler = LLMRequestHandler(self.llm_service_url)
 
         logger.info("ServiceProxyMiddleware initialized")
         logger.info(f"   Configuration Service: {self.configuration_service_url}")
         logger.info(f"   Collection Service: {self.collection_service_url}")
         logger.info(f"   Analysis Service: {self.analyze_service_url}")
+        logger.info(f"   LLM Service: {self.llm_service_url}")
 
     def __call__(self, request):
         """Route les requêtes vers le handler approprié"""
@@ -74,6 +81,10 @@ class ServiceProxyMiddleware:
         # Analysis endpoints
         if request.path.startswith("/api/analysis"):
             return self.analysis_handler.handle(request)
+
+        # LLM endpoints
+        if request.path.startswith("/api/llm"):
+            return self.llm_handler.handle(request)
 
         # Other non-proxied requests
         return self.get_response(request)

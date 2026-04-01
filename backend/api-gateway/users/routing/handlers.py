@@ -18,6 +18,19 @@ class WorkspaceRequestHandler:
         return self.proxy.proxy_request(request)
 
 
+class LLMRequestHandler:
+    """Handler for LLM requests (simple proxy without JWT requirement)"""
+
+    def __init__(self, service_url):
+        self.proxy = BaseProxyHandler(
+            service_url, "/api/llm", require_auth=False
+        )
+
+    def handle(self, request):
+        """Direct proxy to the LLM service"""
+        return self.proxy.proxy_request(request)
+
+
 class CollectionRequestHandler:
     """Handler for collection requests"""
 
