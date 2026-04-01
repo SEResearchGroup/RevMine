@@ -1,379 +1,760 @@
+"""
+Analysis Service – Views
+========================
+Dynamic views for dataset management, metrics catalogue, and chart generation.
+
+Endpoints summary
+-----------------
+Datasets
+  GET  /datasets/                         → list datasets
+  POST /datasets/upload/                  → upload a new dataset (CSV)
+  GET  /datasets/<pk>/                    → dataset metadata
+  DELETE /datasets/<pk>/                  → delete dataset
+  GET  /datasets/<pk>/columns/            → column names + dtypes
+  GET  /datasets/<pk>/preview/            → first N rows
+  GET  /datasets/<pk>/available_metrics/  → metrics whose required_columns exist in dataset
+  GET  /datasets/<pk>/compatible_axes/    → valid (x, y) pairs for custom charts
+
+Metrics  (catalogue – read-only)
+  GET  /metrics/                          → full catalogue
+  GET  /metrics/categories/               → distinct category list
+  GET  /metrics/by_category/              → metrics grouped by category
+  GET  /metrics/<code>/                   → single metric detail
+
+Generate
+  POST /generate/                         → run analysis, return chart data + image
+
+Analyses  (history)
+  GET  /analyses/                         → list past analyses
+  POST /analyses/bulk_create/             → create multiple analyses at once
+  GET  /analyses/<pk>/                    → analysis metadata
+  DELETE /analyses/<pk>/                  → delete analysis
+  GET  /analyses/<pk>/result/             → chart_data + image of saved analysis
+  POST /analyses/<pk>/retry/              → re-run analysis
+"""
+
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.parsers import MultiPartParser, FormParser
 from django.shortcuts import get_object_or_404
-from django.core.files.storage import default_storage
 from django.utils import timezone
-from django.db import transaction
 
-import pandas as pd
-import os
-import base64
-from io import BytesIO
-import matplotlib
-matplotlib.use('Agg')  
-import matplotlib.pyplot as plt
-
-from .models import Dataset, Analysis, AnalysisResult
+from .models import Dataset, MetricDefinition, Analysis, AnalysisResult
+from .dataset_services import DatasetService
+from .analysis_service import AnalysisService
 from .serializers import (
     DatasetSerializer,
+    DatasetUploadSerializer,
+    MetricDefinitionSerializer,
     AnalysisSerializer,
-    AnalysisCreateSerializer,
     AnalysisListSerializer,
-    AnalysisResultSerializer
-)
-from .analysis_functions import (
-    load_data,
-    plot_commits_over_time,
-    plot_mr_creation_timeline,
-    plot_lead_time_distribution,
-    plot_commits_distribution,
-    plot_commiters_analysis,
-    plot_commit_time_analysis,
-    plot_code_churn,
-    plot_churn_scatter,
-    plot_mr_size_analysis,
-    plot_discussions_analysis,
-    plot_collaboration_metrics,
-    plot_comments_analysis,
-    plot_files_modified,
-    plot_filetypes_distribution,
-    plot_entropy_analysis,
-    plot_state_distribution,
-    plot_rework_analysis,
-    plot_correlation_matrix,
-    analyze_mr_complexity,
-    plot_project_comparison,
+    AnalysisResultSerializer,
 )
 
 
-class AnalysisCreateView(APIView):
-    """
-    API endpoint to create a new analysis request
-    POST: Upload CSV file and request analysis
-    """
-    parser_classes = (MultiPartParser, FormParser)
-    
-    def post(self, request):
-        serializer = AnalysisCreateSerializer(data=request.data)
-        if not serializer.is_valid():
-            return Response(
-                serializer.errors,
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        csv_file = serializer.validated_data['csv_file']
-        workspace_id = serializer.validated_data.get('workspace_id')
-        repository_id = serializer.validated_data.get('repository_id')
-        requested_charts = serializer.validated_data['requested_charts']
-        platform = serializer.validated_data.get('platform', 'gitlab')
-        try:
-            # Save CSV file
-            file_path = default_storage.save(
-                f'datasets/{csv_file.name}',
-                csv_file
-            )
-            full_path = default_storage.path(file_path)
-            
-            # Load data to get basic info
-            df = pd.read_csv(full_path)
-            
-            # Create dataset record
-            with transaction.atomic():
-                dataset = Dataset.objects.create(
-                    workspace_id=workspace_id,
-                    repository_id=repository_id,
-                    filename=csv_file.name,
-                    file_path=full_path,
-                    rows_count=len(df),
-                    columns_count=len(df.columns),
-                    platform=platform
-                )
-                
-                # Create analysis record
-                analysis = Analysis.objects.create(
-                    dataset=dataset,
-                    requested_charts=requested_charts,
-                    status='pending'
-                )
-            self._process_analysis(analysis, full_path, requested_charts, platform)
-            
-            response_serializer = AnalysisSerializer(analysis)
-            return Response(
-                response_serializer.data,
-                status=status.HTTP_201_CREATED
-            )
-            
-        except Exception as e:
-            return Response(
-                {'error': str(e)},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-    
-    def _generate_static_chart(self, df, chart_type, chart_data):
-        """
-        Generate static matplotlib chart for export
-        """
-        try:
-            plt.figure(figsize=(12, 6))
-            
-            chart_info = chart_data.get('data', {})
-            chart_plot_type = chart_info.get('type', 'bar')
-            
-            if chart_plot_type == 'line':
-                plt.plot(chart_info.get('labels', []), chart_info.get('values', []), marker='o')
-                plt.xlabel(chart_info.get('xLabel', ''))
-                plt.ylabel(chart_info.get('yLabel', ''))
-                
-            elif chart_plot_type == 'bar':
-                plt.bar(chart_info.get('labels', []), chart_info.get('values', []))
-                plt.xlabel(chart_info.get('xLabel', ''))
-                plt.ylabel(chart_info.get('yLabel', ''))
-                plt.xticks(rotation=45)
-                
-            elif chart_plot_type == 'histogram':
-                plt.hist(chart_info.get('values', []), bins=30, edgecolor='black')
-                plt.xlabel(chart_info.get('xLabel', ''))
-                plt.ylabel(chart_info.get('yLabel', ''))
-                
-            elif chart_plot_type == 'scatter':
-                plt.scatter(chart_info.get('x', []), chart_info.get('y', []), alpha=0.5)
-                plt.xlabel(chart_info.get('xLabel', ''))
-                plt.ylabel(chart_info.get('yLabel', ''))
-                
-            elif chart_plot_type == 'pie':
-                plt.pie(chart_info.get('values', []), labels=chart_info.get('labels', []), autopct='%1.1f%%')
-                
-            elif chart_plot_type == 'horizontal_bar':
-                plt.barh(chart_info.get('labels', []), chart_info.get('values', []))
-                plt.xlabel(chart_info.get('xLabel', ''))
-                plt.ylabel(chart_info.get('yLabel', ''))
-            
-            plt.title(chart_info.get('title', ''), fontsize=14, fontweight='bold')
-            plt.grid(True, alpha=0.3)
-            plt.tight_layout()
-            
-            # Convert to base64
-            buffer = BytesIO()
-            plt.savefig(buffer, format='png', bbox_inches='tight', dpi=100)
-            buffer.seek(0)
-            image_base64 = base64.b64encode(buffer.read()).decode()
-            plt.close()
-            
-            return image_base64
-            
-        except Exception as e:
-            print(f"Error generating static chart for {chart_type}: {str(e)}")
-            plt.close()
-            return None
-    
-    def _process_analysis(self, analysis, file_path, requested_charts, platform='gitlab'):
-        """
-        Process the analysis and generate chart data + static images
-        """
-        try:
-            analysis.status = 'processing'
-            analysis.save()
-            df = load_data(file_path)
-            
-            chart_functions = {
-                'commits_over_time': lambda: plot_commits_over_time(df),
-                'mr_creation_timeline': lambda: plot_mr_creation_timeline(df, "Creation_Date", "W"),
-                'lead_time_distribution': lambda: plot_lead_time_distribution(df),
-                'commits_distribution': lambda: plot_commits_distribution(df),
-                'commiters_analysis': lambda: plot_commiters_analysis(df), 
-                'commit_time_analysis': lambda: plot_commit_time_analysis(df),
-                'code_churn': lambda: plot_code_churn(df),
-                'churn_scatter': lambda: plot_churn_scatter(df),
-                'mr_size_analysis': lambda: plot_mr_size_analysis(df),
-                'discussions_analysis': lambda: plot_discussions_analysis(df),
-                'collaboration_metrics': lambda: plot_collaboration_metrics(df),
-                'comments_analysis': lambda: plot_comments_analysis(df),
-                'files_modified': lambda: plot_files_modified(df),
-                'filetypes_distribution': lambda: plot_filetypes_distribution(df),
-                'entropy_analysis': lambda: plot_entropy_analysis(df),
-                'state_distribution': lambda: plot_state_distribution(df),
-                'rework_analysis': lambda: plot_rework_analysis(df),
-                'correlation_matrix': lambda: plot_correlation_matrix(df),
-                'mr_complexity': lambda: analyze_mr_complexity(df),
-                'project_comparison': lambda: plot_project_comparison(df),
-            }
-            
-            # Generate each requested chart
-            print("Starting chart generation")
-            print(f"Requested charts: {len(requested_charts)}")
-            for chart_type in requested_charts:
-                if chart_type in chart_functions:
-                    try:
-                        print(f"Generating chart: {chart_type}")
-                        # Execute the chart function - returns {'data': {...}}
-                        result = chart_functions[chart_type]()
-                        
-                        # Generate static image for export
-                        static_image = self._generate_static_chart(df, chart_type, result)
-                        
-                        # Save result with both data and image
-                        AnalysisResult.objects.create(
-                            analysis=analysis,
-                            chart_type=chart_type,
-                            chart_data=result.get('data'),  
-                            chart_image=static_image  
-                        )
-                        
-                    except Exception as chart_error:
-                        # Log chart-specific error but continue
-                        print(f"Error generating {chart_type}: {str(chart_error)}")
-                        continue
-            print("Chart generation completed")
-            print(f"Total charts generated: {AnalysisResult.objects.filter(analysis=analysis).count()}")
-            analysis.status = 'completed'
-            analysis.completed_at = timezone.now()
-            analysis.save()
-            
-        except Exception as e:
-            analysis.status = 'failed'
-            analysis.error_message = str(e)
-            analysis.save()
-
-
-class AnalysisListView(APIView):
-    """
-    API endpoint to list all analyses
-    GET: List all analyses with optional filtering
-    """
-    def get(self, request):
-        analyses = Analysis.objects.all()
-        
-        # Filter by workspace_id
-        workspace_id = request.query_params.get('workspace_id')
-        if workspace_id:
-            analyses = analyses.filter(dataset__workspace_id=workspace_id)
-        
-        # Filter by repository_id
-        repository_id = request.query_params.get('repository_id')
-        if repository_id:
-            analyses = analyses.filter(dataset__repository_id=repository_id)
-        
-        # Filter by status
-        status_filter = request.query_params.get('status')
-        if status_filter:
-            analyses = analyses.filter(status=status_filter)
-        
-        serializer = AnalysisListSerializer(analyses, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
-
-
-class AnalysisDetailView(APIView):
-    """
-    API endpoint to retrieve, update, or delete a specific analysis
-    GET: Retrieve analysis details with results
-    DELETE: Delete an analysis and its related data
-    """
-    def get(self, request, analysis_id):
-        analysis = get_object_or_404(Analysis, id=analysis_id)
-        serializer = AnalysisSerializer(analysis)
-        return Response(serializer.data, status=status.HTTP_200_OK)
-    
-    def delete(self, request, analysis_id):
-        analysis = get_object_or_404(Analysis, id=analysis_id)
-        
-        # Delete associated dataset file
-        try:
-            if analysis.dataset.file_path and os.path.exists(analysis.dataset.file_path):
-                os.remove(analysis.dataset.file_path)
-        except Exception as e:
-            print(f"Error deleting file: {str(e)}")
-        
-        # Delete analysis (cascade will delete results and dataset)
-        analysis.delete()
-        
-        return Response(
-            {'message': 'Analysis deleted successfully'},
-            status=status.HTTP_204_NO_CONTENT
-        )
-
-
-class AnalysisExportView(APIView):
-    """
-    API endpoint to export analysis results with static images
-    GET: Generate PDF/ZIP with matplotlib charts
-    """
-    def get(self, request, analysis_id):
-        analysis = get_object_or_404(Analysis, id=analysis_id)
-        results = analysis.results.all()
-        
-        # Return static images for export
-        export_data = []
-        for result in results:
-            export_data.append({
-                'chart_type': result.chart_type,
-                'chart_image': result.chart_image,  # Static matplotlib image
-                'created_at': result.created_at
-            })
-        
-        return Response({
-            'analysis_id': str(analysis.id),
-            'status': analysis.status,
-            'charts': export_data
-        }, status=status.HTTP_200_OK)
-
+# ---------------------------------------------------------------------------
+# Dataset views
+# ---------------------------------------------------------------------------
 
 class DatasetListView(APIView):
-    """
-    API endpoint to list all datasets
-    GET: List all datasets with optional filtering
-    """
+    """GET /datasets/ – list all datasets."""
+
     def get(self, request):
-        datasets = Dataset.objects.all()
-        
-        # Filter by workspace_id
         workspace_id = request.query_params.get('workspace_id')
-        if workspace_id:
-            datasets = datasets.filter(workspace_id=workspace_id)
-        
-        # Filter by repository_id
         repository_id = request.query_params.get('repository_id')
-        if repository_id:
-            datasets = datasets.filter(repository_id=repository_id)
         
-        serializer = DatasetSerializer(datasets, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        queryset = Dataset.objects.all()
+        
+        if workspace_id:
+            queryset = queryset.filter(workspace_id=workspace_id)
+        if repository_id:
+            queryset = queryset.filter(repository_id=repository_id)
+        
+        queryset = queryset.order_by('-uploaded_at')
+        serializer = DatasetSerializer(queryset, many=True)
+        
+        return Response({
+            "count": queryset.count(),
+            "results": serializer.data
+        })
+
+
+class DatasetUploadView(APIView):
+    """
+    POST /datasets/upload/
+    Body (multipart): file, workspace_id (optional), repository_id (optional), platform
+    """
+    parser_classes = [MultiPartParser, FormParser]
+
+    def post(self, request):
+        serializer = DatasetUploadSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+        dataset = serializer.save()
+        return Response(DatasetSerializer(dataset).data, status=status.HTTP_201_CREATED)
 
 
 class DatasetDetailView(APIView):
-    """
-    API endpoint to retrieve or delete a specific dataset
-    GET: Retrieve dataset details
-    DELETE: Delete a dataset and its related analyses
-    """
-    def get(self, request, dataset_id):
-        dataset = get_object_or_404(Dataset, id=dataset_id)
+    """GET, DELETE /datasets/<pk>/"""
+
+    def get(self, request, pk):
+        dataset = get_object_or_404(Dataset, pk=pk)
         serializer = DatasetSerializer(dataset)
-        return Response(serializer.data, status=status.HTTP_200_OK)
-    
-    def delete(self, request, dataset_id):
-        dataset = get_object_or_404(Dataset, id=dataset_id)
-        # Delete file
+        return Response(serializer.data)
+
+    def delete(self, request, pk):
+        dataset = get_object_or_404(Dataset, pk=pk)
+        service = DatasetService()
+        service.delete_dataset(dataset)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class DatasetColumnsView(APIView):
+    """
+    GET /datasets/<pk>/columns/
+    Returns column names and inferred data-types.
+    """
+
+    def get(self, request, pk):
+        dataset = get_object_or_404(Dataset, pk=pk)
+        
+        columns = []
+        for col_name, meta in dataset.columns_metadata.items():
+            columns.append({
+                "name": col_name,
+                "dtype": meta.get('type', 'unknown'),
+                "nullable": meta.get('null_count', 0) > 0,
+                "non_null_count": meta.get('non_null_count', 0),
+                "null_count": meta.get('null_count', 0),
+            })
+        
+        return Response({
+            "dataset_id": str(pk),
+            "columns": columns,
+            "columns_metadata": dataset.columns_metadata
+        })
+
+
+class DatasetPreviewView(APIView):
+    """
+    GET /datasets/<pk>/preview/?rows=10
+    Returns first N rows of the dataset.
+    """
+
+    def get(self, request, pk):
+        dataset = get_object_or_404(Dataset, pk=pk)
+        n = int(request.query_params.get("rows", 10))
+        n = min(n, 100)  # Cap at 100 rows
+        
+        service = DatasetService()
+        df = service.load_dataframe(dataset)
+        
+        # Convert to JSON-serializable format
+        preview_data = df.head(n).to_dict('records')
+        
+        # Handle datetime serialization and NaN values
+        import math
+        for row in preview_data:
+            for key, value in row.items():
+                if hasattr(value, 'isoformat'):
+                    row[key] = value.isoformat()
+                elif isinstance(value, float) and math.isnan(value):
+                    row[key] = None
+        
+        return Response({
+            "dataset_id": str(pk),
+            "rows": preview_data,
+            "columns": list(df.columns),
+            "total_rows": len(df),
+            "preview_rows": len(preview_data)
+        })
+
+
+class DatasetAvailableMetricsView(APIView):
+    """
+    GET /datasets/<pk>/available_metrics/
+    Returns metrics whose required_columns are all present in the dataset.
+    """
+
+    def get(self, request, pk):
+        dataset = get_object_or_404(Dataset, pk=pk)
+        service = DatasetService()
+        
+        result = service.get_available_metrics(dataset)
+        available_columns = service.get_columns(dataset)
+        
+        return Response({
+            "dataset_id": str(pk),
+            "dataset_columns": available_columns,
+            "count": len(result['available_metrics']),
+            "metrics": MetricDefinitionSerializer(result['available_metrics'], many=True).data,
+            "missing_columns_by_metric": result['missing_columns_by_metric']
+        })
+
+
+class DatasetCompatibleAxesView(APIView):
+    """
+    GET /datasets/<pk>/compatible_axes/
+    Returns which columns are valid as X axis and which as Y axis
+    so the frontend can build a meaningful custom chart selector.
+
+    Rules:
+      - X axis: datetime, categorical, or integer columns (for grouping)
+      - Y axis: numeric columns (for aggregation)
+    """
+
+    def get(self, request, pk):
+        dataset = get_object_or_404(Dataset, pk=pk)
+        
+        x_axis_options = []
+        y_axis_options = []
+        
+        for col_name, meta in dataset.columns_metadata.items():
+            col_type = meta.get('type', 'unknown')
+            
+            # X-axis: datetime, categorical, or can be used for grouping
+            if col_type in ['datetime', 'datetime_string', 'categorical']:
+                x_axis_options.append({
+                    "column": col_name,
+                    "dtype": col_type,
+                    "label": col_name.replace('_', ' ').title(),
+                })
+            elif col_type == 'numeric':
+                # Numeric columns with low unique values can be used for grouping
+                unique_values = meta.get('unique_values', 0)
+                if unique_values and unique_values < 50:
+                    x_axis_options.append({
+                        "column": col_name,
+                        "dtype": "numeric_categorical",
+                        "label": col_name.replace('_', ' ').title(),
+                    })
+            
+            # Y-axis: numeric columns for aggregation
+            if col_type == 'numeric':
+                y_axis_options.append({
+                    "column": col_name,
+                    "dtype": "numeric",
+                    "label": col_name.replace('_', ' ').title(),
+                    "aggregations": ["sum", "mean", "median", "count", "min", "max"],
+                    "min": meta.get('min'),
+                    "max": meta.get('max'),
+                    "mean": meta.get('mean'),
+                })
+        
+        return Response({
+            "dataset_id": str(pk),
+            "x_axis": x_axis_options,
+            "y_axis": y_axis_options,
+            "time_aggregations": ["D", "W", "M", "Q", "Y"],
+            "supported_chart_types": ["bar", "line", "scatter", "area", "pie"],
+        })
+
+
+# ---------------------------------------------------------------------------
+# Metric views  (read-only catalogue)
+# ---------------------------------------------------------------------------
+
+class MetricListView(APIView):
+    """GET /metrics/ – full catalogue."""
+
+    def get(self, request):
+        metrics = MetricDefinition.objects.filter(is_active=True)
+        serializer = MetricDefinitionSerializer(metrics, many=True)
+        return Response({
+            "count": metrics.count(),
+            "metrics": serializer.data
+        })
+
+
+class MetricCategoriesView(APIView):
+    """GET /metrics/categories/ – distinct categories."""
+
+    def get(self, request):
+        categories = (
+            MetricDefinition.objects
+            .filter(is_active=True)
+            .values_list('category', flat=True)
+            .distinct()
+        )
+        return Response({"categories": sorted(set(categories))})
+
+
+class MetricByCategoryView(APIView):
+    """
+    GET /metrics/by_category/?category=timeseries
+    Returns metrics grouped by category (or filtered if category param provided).
+    """
+
+    def get(self, request):
+        category = request.query_params.get("category")
+        
+        metrics = MetricDefinition.objects.filter(is_active=True)
+        
+        if category:
+            metrics = metrics.filter(category=category)
+            serializer = MetricDefinitionSerializer(metrics, many=True)
+            return Response({
+                "category": category,
+                "count": metrics.count(),
+                "metrics": serializer.data
+            })
+        
+        # Group by category
+        by_category = {}
+        for metric in metrics:
+            if metric.category not in by_category:
+                by_category[metric.category] = []
+            by_category[metric.category].append(
+                MetricDefinitionSerializer(metric).data
+            )
+        
+        return Response(by_category)
+
+
+class MetricDetailView(APIView):
+    """GET /metrics/<code>/ – single metric."""
+
+    def get(self, request, code):
+        metric = get_object_or_404(MetricDefinition, code=code, is_active=True)
+        serializer = MetricDefinitionSerializer(metric)
+        return Response(serializer.data)
+
+
+# ---------------------------------------------------------------------------
+# Generate  (core chart generation endpoint)
+# ---------------------------------------------------------------------------
+
+class GenerateChartView(APIView):
+    """
+    POST /generate/
+
+    Accepts two modes:
+
+    Mode A – Predefined metric
+    --------------------------
+    {
+        "dataset_id": "<uuid>",
+        "metric_code": "commits_over_time",
+        "chart_type": "bar",              // optional, defaults to metric default
+        "time_aggregation": "M",          // optional (D | W | M | Q | Y)
+        "aggregation": "sum",             // optional
+        "filters": {}                     // optional
+    }
+
+    Mode B – Custom axes
+    --------------------
+    {
+        "dataset_id": "<uuid>",
+        "x_axis": "Creation_Date",
+        "y_axis": "#Commits",
+        "aggregation": "sum",
+        "chart_type": "line",
+        "time_aggregation": "M",
+        "filters": {}
+    }
+
+    Response (Chart.js / Recharts compatible)
+    -----------------------------------------
+    {
+        "analysis_id": "<uuid>",
+        "metric_code": "...",
+        "chart_type": "...",
+        "chart_data": { ... },            // Chart.js ready payload
+        "image_base64": "...",            // matplotlib PNG as base64
+        "statistics": {...},              // computed statistics
+        "generated_at": "..."
+    }
+    """
+
+    def post(self, request):
+        dataset_id = request.data.get("dataset_id")
+        metric_code = request.data.get("metric_code")
+        x_axis = request.data.get("x_axis")
+        y_axis = request.data.get("y_axis")
+        chart_type = request.data.get("chart_type")
+        aggregation = request.data.get("aggregation", "sum")
+        time_aggregation = request.data.get("time_aggregation", "M")
+        filters = request.data.get("filters", {})
+
+        # Validate dataset_id
+        if not dataset_id:
+            return Response(
+                {"error": "'dataset_id' is required."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Get dataset
+        dataset = get_object_or_404(Dataset, pk=dataset_id)
+        
+        # Determine mode and validate
+        if metric_code:
+            # Mode A: Predefined metric
+            metric = MetricDefinition.objects.filter(code=metric_code, is_active=True).first()
+            if not metric:
+                return Response(
+                    {"error": f"Metric '{metric_code}' not found."},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            chart_type = chart_type or metric.default_chart_type
+            
+            # Validate required columns exist
+            service = DatasetService()
+            available_columns = set(service.get_columns(dataset))
+            missing_columns = set(metric.required_columns) - available_columns
+            
+            if missing_columns:
+                return Response(
+                    {
+                        "error": f"Dataset is missing required columns for metric '{metric_code}'.",
+                        "missing_columns": list(missing_columns)
+                    },
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+                
+        elif x_axis and y_axis:
+            # Mode B: Custom axes
+            metric_code = "custom_chart"
+            chart_type = chart_type or "bar"
+            
+            # Validate columns exist
+            service = DatasetService()
+            available_columns = set(service.get_columns(dataset))
+            
+            if x_axis not in available_columns:
+                return Response(
+                    {"error": f"X-axis column '{x_axis}' not found in dataset."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            if y_axis not in available_columns:
+                return Response(
+                    {"error": f"Y-axis column '{y_axis}' not found in dataset."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        else:
+            return Response(
+                {"error": "Provide either 'metric_code' or both 'x_axis' and 'y_axis'."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Create Analysis record – only include x_axis / y_axis when they
+        # are explicitly provided so that analysis functions fall back to
+        # their own defaults via config.get('x_axis', '<default>').
+        config = {
+            "time_aggregation": time_aggregation,
+            "aggregation": aggregation,
+            "filters": filters,
+        }
+        if x_axis is not None:
+            config["x_axis"] = x_axis
+        if y_axis is not None:
+            config["y_axis"] = y_axis
+        
+        analysis = Analysis.objects.create(
+            dataset=dataset,
+            metric_code=metric_code,
+            chart_type=chart_type,
+            config=config,
+            status='pending'
+        )
+
         try:
-            if dataset.file_path and os.path.exists(dataset.file_path):
-                os.remove(dataset.file_path)
+            # Process analysis synchronously for immediate response
+            analysis_service = AnalysisService()
+            analysis_service.process_analysis(analysis)
+            
+            # Refresh from DB to get result
+            analysis.refresh_from_db()
+            
+            if analysis.status != 'completed':
+                return Response(
+                    {
+                        "error": "Analysis failed.",
+                        "message": analysis.error_message,
+                        "analysis_id": str(analysis.id)
+                    },
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+            
+            # Get result
+            result = analysis.result
+            
+            return Response(
+                {
+                    "analysis_id": str(analysis.id),
+                    "dataset_id": str(dataset_id),
+                    "metric_code": metric_code,
+                    "chart_type": chart_type,
+                    "x_axis": x_axis or config.get('x_axis'),
+                    "y_axis": y_axis or config.get('y_axis'),
+                    "aggregation": aggregation,
+                    "time_aggregation": time_aggregation,
+                    "chart_data": result.chart_data,
+                    "image_base64": result.chart_image,
+                    "statistics": result.statistics,
+                    "generated_at": analysis.completed_at.isoformat() if analysis.completed_at else None,
+                },
+                status=status.HTTP_201_CREATED,
+            )
+            
         except Exception as e:
-            print(f"Error deleting file: {str(e)}")
+            return Response(
+                {
+                    "error": "Analysis processing failed.",
+                    "message": str(e),
+                    "analysis_id": str(analysis.id)
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+# ---------------------------------------------------------------------------
+# Analysis views  (history)
+# ---------------------------------------------------------------------------
+
+class AnalysisListView(APIView):
+    """GET /analyses/ – list past analyses."""
+
+    def get(self, request):
+        dataset_id = request.query_params.get('dataset_id')
+        status_filter = request.query_params.get('status')
+        metric_code = request.query_params.get('metric_code')
         
-        dataset.delete()
+        queryset = Analysis.objects.select_related('dataset').prefetch_related('result')
         
+        if dataset_id:
+            queryset = queryset.filter(dataset_id=dataset_id)
+        if status_filter:
+            queryset = queryset.filter(status=status_filter)
+        if metric_code:
+            queryset = queryset.filter(metric_code=metric_code)
+        
+        queryset = queryset.order_by('-created_at')
+        serializer = AnalysisListSerializer(queryset, many=True)
+        
+        return Response({
+            "count": queryset.count(),
+            "results": serializer.data
+        })
+
+
+class AnalysisBulkCreateView(APIView):
+    """
+    POST /analyses/bulk_create/
+    Body: {
+        "dataset_id": "<uuid>",
+        "analyses": [
+            {"metric_code": "commits_over_time", "chart_type": "line", "config": {...}},
+            {"metric_code": "lead_time_distribution", "chart_type": "histogram"},
+            ...
+        ]
+    }
+    Creates multiple analyses and processes them.
+    """
+
+    def post(self, request):
+        dataset_id = request.data.get("dataset_id")
+        analyses_data = request.data.get("analyses", [])
+
+        if not dataset_id:
+            return Response(
+                {"error": "'dataset_id' is required."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if not analyses_data:
+            return Response(
+                {"error": "'analyses' array is required and cannot be empty."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        dataset = get_object_or_404(Dataset, pk=dataset_id)
+        
+        created_analyses = []
+        errors = []
+        
+        for idx, analysis_data in enumerate(analyses_data):
+            metric_code = analysis_data.get('metric_code')
+            chart_type = analysis_data.get('chart_type')
+            config = analysis_data.get('config', {})
+            
+            if not metric_code:
+                errors.append({
+                    "index": idx,
+                    "error": "'metric_code' is required."
+                })
+                continue
+            
+            # Validate metric exists
+            metric = MetricDefinition.objects.filter(code=metric_code, is_active=True).first()
+            if not metric:
+                errors.append({
+                    "index": idx,
+                    "error": f"Metric '{metric_code}' not found."
+                })
+                continue
+            
+            chart_type = chart_type or metric.default_chart_type
+            
+            # Create analysis
+            analysis = Analysis.objects.create(
+                dataset=dataset,
+                metric_code=metric_code,
+                chart_type=chart_type,
+                config=config,
+                status='pending'
+            )
+            
+            # Process analysis
+            try:
+                analysis_service = AnalysisService()
+                analysis_service.process_analysis(analysis)
+                analysis.refresh_from_db()
+            except Exception as e:
+                analysis.status = 'failed'
+                analysis.error_message = str(e)
+                analysis.save()
+            
+            created_analyses.append(analysis)
+
         return Response(
-            {'message': 'Dataset deleted successfully'},
-            status=status.HTTP_204_NO_CONTENT
+            {
+                "created": len(created_analyses),
+                "analyses": AnalysisSerializer(created_analyses, many=True).data,
+                "errors": errors if errors else None
+            },
+            status=status.HTTP_201_CREATED,
         )
 
 
-class AnalysisResultDetailView(APIView):
+class AnalysisDetailView(APIView):
+    """GET, DELETE /analyses/<pk>/ – analysis metadata."""
+
+    def get(self, request, pk):
+        analysis = get_object_or_404(
+            Analysis.objects.select_related('dataset').prefetch_related('result'),
+            pk=pk
+        )
+        serializer = AnalysisSerializer(analysis)
+        return Response(serializer.data)
+
+    def delete(self, request, pk):
+        analysis = get_object_or_404(Analysis, pk=pk)
+        analysis.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class AnalysisResultView(APIView):
     """
-    API endpoint to retrieve a specific analysis result
-    GET: Retrieve a single chart result
+    GET /analyses/<pk>/result/
+    Returns the saved chart_data + image of a completed analysis.
     """
-    def get(self, request, result_id):
-        result = get_object_or_404(AnalysisResult, id=result_id)
-        serializer = AnalysisResultSerializer(result)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def get(self, request, pk):
+        analysis = get_object_or_404(
+            Analysis.objects.select_related('dataset').prefetch_related('result'),
+            pk=pk
+        )
+        
+        if analysis.status == 'pending':
+            return Response(
+                {"error": "Analysis is still pending.", "status": analysis.status},
+                status=status.HTTP_202_ACCEPTED
+            )
+        
+        if analysis.status == 'processing':
+            return Response(
+                {"error": "Analysis is currently processing.", "status": analysis.status},
+                status=status.HTTP_202_ACCEPTED
+            )
+        
+        if analysis.status == 'failed':
+            return Response(
+                {
+                    "error": "Analysis failed.",
+                    "status": analysis.status,
+                    "message": analysis.error_message
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if not hasattr(analysis, 'result') or analysis.result is None:
+            return Response(
+                {"error": "Analysis result not found."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        result = analysis.result
+        
+        return Response({
+            "analysis_id": str(analysis.id),
+            "dataset_id": str(analysis.dataset_id),
+            "metric_code": analysis.metric_code,
+            "chart_type": analysis.chart_type,
+            "config": analysis.config,
+            "status": analysis.status,
+            "chart_data": result.chart_data,
+            "image_base64": result.chart_image,
+            "statistics": result.statistics,
+            "generated_at": analysis.completed_at.isoformat() if analysis.completed_at else None,
+        })
+
+
+class AnalysisRetryView(APIView):
+    """
+    POST /analyses/<pk>/retry/
+    Re-runs the analysis (e.g. after a dataset update or a previous failure).
+    """
+
+    def post(self, request, pk):
+        analysis = get_object_or_404(Analysis, pk=pk)
+        
+        if analysis.status not in ['failed', 'completed']:
+            return Response(
+                {"error": "Only failed or completed analyses can be retried."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Reset status
+        analysis.status = 'pending'
+        analysis.error_message = None
+        analysis.completed_at = None
+        analysis.save()
+        
+        # Delete old result if exists
+        if hasattr(analysis, 'result') and analysis.result:
+            analysis.result.delete()
+        
+        try:
+            # Process analysis
+            analysis_service = AnalysisService()
+            analysis_service.process_analysis(analysis)
+            analysis.refresh_from_db()
+            
+            if analysis.status == 'completed':
+                result = analysis.result
+                return Response({
+                    "analysis_id": str(analysis.id),
+                    "status": analysis.status,
+                    "message": "Analysis has been re-executed successfully.",
+                    "chart_data": result.chart_data,
+                    "image_base64": result.chart_image,
+                    "statistics": result.statistics,
+                    "generated_at": analysis.completed_at.isoformat() if analysis.completed_at else None,
+                })
+            else:
+                return Response({
+                    "analysis_id": str(analysis.id),
+                    "status": analysis.status,
+                    "message": "Analysis retry failed.",
+                    "error": analysis.error_message
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                
+        except Exception as e:
+            return Response({
+                "analysis_id": str(analysis.id),
+                "status": "failed",
+                "message": "Analysis retry failed.",
+                "error": str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

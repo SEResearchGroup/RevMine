@@ -76,6 +76,21 @@ class MinIOClient:
                 response.close()
                 response.release_conn()
     
+    def get_json_bytes(self, filename: str) -> bytes:
+        """Retrieve JSON data from MinIO as raw bytes (for streaming downloads)"""
+        response = None
+        try:
+            response = self.client.get_object(self.bucket_name, filename)
+            data = response.read()
+            return data
+        except S3Error as e:
+            logger.error(f"Error retrieving JSON bytes from MinIO: {e}")
+            return None
+        finally:
+            if response:
+                response.close()
+                response.release_conn()
+    
     def save_csv(self, csv_content: str, filename: str) -> bool:
         """Save CSV data to MinIO"""
         try:
@@ -134,6 +149,30 @@ class MinIOClient:
         except S3Error:
             return False
     
+    def save_stream(self, file_stream, filename: str, length: int, content_type: str = 'application/json') -> bool:
+        """Stream a file directly to MinIO without loading the full content into memory."""
+        try:
+            self.client.put_object(
+                self.bucket_name,
+                filename,
+                file_stream,
+                length=length,
+                content_type=content_type,
+            )
+            logger.info(f"Successfully streamed {filename} ({length} bytes) to MinIO")
+            return True
+        except S3Error as e:
+            logger.error(f"Error streaming to MinIO: {e}")
+            return False
+
+    def get_object_stream(self, filename: str):
+        """Get a streaming response from MinIO. Caller must close and release."""
+        try:
+            return self.client.get_object(self.bucket_name, filename)
+        except S3Error as e:
+            logger.error(f"Error getting stream from MinIO: {e}")
+            return None
+
     def delete_file(self, filename: str) -> bool:
         """Delete file from MinIO"""
         try:

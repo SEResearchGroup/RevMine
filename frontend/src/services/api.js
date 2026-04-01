@@ -300,7 +300,7 @@ export const collectionService = {
   },
 
   createCleanedData: (data) => {
-    return collectionApi.post('/cleaned-data/', data);
+    return collectionApi.post('/cleaned-data/', data, { timeout: 300000 });
   },
 
   getCleanedDataDetail: (cleanedDataId) => {
@@ -321,89 +321,134 @@ export const collectionService = {
     const response = await collectionApi.get('/datasets/');
     return response.data;
   },
+
+  uploadExternalCollection: (file, platform, name, onUploadProgress) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('platform', platform);
+    formData.append('name', name);
+    return collectionApi.post('/upload-external/', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 1800000, // 30 minutes – large files up to 5 GB
+      onUploadProgress,
+    });
+  },
 };
 
 export const analyzeApi = createApiInstance(
-  "http://localhost:8003/api/analyze"
+  "http://localhost:8000/api/analysis"
 );
 
 export const analyzeService = {
-  // Create new analysis
-  createAnalysis: async (formData) => {
-    const response = await analysisApi.post("/create/", formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
+  // ========== DATASETS ==========
+  getDatasets: async () => {
+    const response = await analyzeApi.get('/datasets/');
+    return response.data;
+  },
+
+  uploadDataset: async (file, metadata = {}) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    Object.keys(metadata).forEach(key => {
+      formData.append(key, metadata[key]);
+    });
+    const response = await analyzeApi.post('/datasets/upload/', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 60000,
     });
     return response.data;
   },
 
-  // Get all analyses with optional filters
-  getAnalyses: async (filters = {}) => {
-    const params = new URLSearchParams();
-    if (filters.workspace_id)
-      params.append("workspace_id", filters.workspace_id);
-    if (filters.repository_id)
-      params.append("repository_id", filters.repository_id);
-    if (filters.status) params.append("status", filters.status);
-
-    const response = await analysisApi.get(
-      `/${params.toString() ? "?" + params.toString() : ""}`
-    );
-    return response.data;
-  },
-
-  // Get specific analysis details with results
-  getAnalysisById: async (analysisId) => {
-    const response = await analysisApi.get(`/${analysisId}/`);
-    return response.data;
-  },
-
-  // Delete an analysis
-  deleteAnalysis: async (analysisId) => {
-    const response = await analysisApi.delete(`/${analysisId}/`);
-    return response.data;
-  },
-
-  // Get all datasets with optional filters
-  getDatasets: async (filters = {}) => {
-    const params = new URLSearchParams();
-    if (filters.workspace_id)
-      params.append("workspace_id", filters.workspace_id);
-    if (filters.repository_id)
-      params.append("repository_id", filters.repository_id);
-
-    const response = await analysisApi.get(
-      `/datasets/${params.toString() ? "?" + params.toString() : ""}`
-    );
-    return response.data;
-  },
-
-  // Get specific dataset
   getDatasetById: async (datasetId) => {
-    const response = await analysisApi.get(`/datasets/${datasetId}/`);
+    const response = await analyzeApi.get(`/datasets/${datasetId}/`);
     return response.data;
   },
 
-  // Delete a dataset
   deleteDataset: async (datasetId) => {
-    const response = await analysisApi.delete(`/datasets/${datasetId}/`);
+    const response = await analyzeApi.delete(`/datasets/${datasetId}/`);
     return response.data;
   },
 
-  // Get specific result
-  getResultById: async (resultId) => {
-    const response = await analysisApi.get(`/results/${resultId}/`);
+  getDatasetColumns: async (datasetId) => {
+    const response = await analyzeApi.get(`/datasets/${datasetId}/columns/`);
     return response.data;
   },
 
-  exportSingleChart: async (analysisId) => {
-    const response = await analysisApi.get(`/analyses/${analysisId}/export/`);
+  getAvailableMetrics: async (datasetId) => {
+    const response = await analyzeApi.get(`/datasets/${datasetId}/available_metrics/`);
     return response.data;
   },
 
-  exportPdfReport: async (analysisId) => {
-    const response = await analysisApi.get(`/analyses/${analysisId}/export/`);
+  getCompatibleAxes: async (datasetId) => {
+    const response = await analyzeApi.get(`/datasets/${datasetId}/compatible_axes/`);
+    return response.data;
+  },
+
+  previewDataset: async (datasetId) => {
+    const response = await analyzeApi.get(`/datasets/${datasetId}/preview/`);
+    return response.data;
+  },
+
+  // ========== METRICS ==========
+  getMetrics: async () => {
+    const response = await analyzeApi.get('/metrics/');
+    return response.data;
+  },
+
+  getMetricById: async (metricId) => {
+    const response = await analyzeApi.get(`/metrics/${metricId}/`);
+    return response.data;
+  },
+
+  getMetricCategories: async () => {
+    const response = await analyzeApi.get('/metrics/categories/');
+    return response.data;
+  },
+
+  getMetricsByCategory: async () => {
+    const response = await analyzeApi.get('/metrics/by_category/');
+    return response.data;
+  },
+
+  // ========== GENERATE (core endpoint) ==========
+  generateChart: async (payload) => {
+    const response = await analyzeApi.post('/generate/', payload, { timeout: 120000 });
+    return response.data;
+  },
+
+  // ========== ANALYSES ==========
+  getAnalyses: async (datasetId = null) => {
+    let url = '/analyses/';
+    if (datasetId) url += `?dataset_id=${datasetId}`;
+    const response = await analyzeApi.get(url);
+    return response.data;
+  },
+
+  bulkCreateAnalyses: async (datasetId, analyses) => {
+    const response = await analyzeApi.post('/analyses/bulk_create/', {
+      dataset_id: datasetId,
+      analyses,
+    }, { timeout: 300000 });
+    return response.data;
+  },
+
+  getAnalysisById: async (analysisId) => {
+    const response = await analyzeApi.get(`/analyses/${analysisId}/`);
+    return response.data;
+  },
+
+  deleteAnalysis: async (analysisId) => {
+    const response = await analyzeApi.delete(`/analyses/${analysisId}/`);
+    return response.data;
+  },
+
+  getAnalysisResult: async (analysisId) => {
+    const response = await analyzeApi.get(`/analyses/${analysisId}/result/`);
+    return response.data;
+  },
+
+  retryAnalysis: async (analysisId) => {
+    const response = await analyzeApi.post(`/analyses/${analysisId}/retry/`);
     return response.data;
   },
 };

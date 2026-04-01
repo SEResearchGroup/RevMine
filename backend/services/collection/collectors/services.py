@@ -60,6 +60,14 @@ def resolve_workspace_token(user_id: int, workspace_id: int, platform: str) -> s
     return token
 
 
+def _normalize_raw_data(raw_data, platform: str):
+    """Normalize raw data: external uploads may be a plain list instead of a dict."""
+    if isinstance(raw_data, list):
+        item_key = 'pull_requests' if platform == 'github' else 'merge_requests'
+        return {item_key: raw_data}
+    return raw_data
+
+
 # =============================================================================
 # Exceptions for Service Layer
 # =============================================================================
@@ -502,6 +510,20 @@ class DataCleaningService:
         if collection.status != 'completed':
             raise CollectionStateError('Can only clean completed collections')
         
+        # Use pre-computed metadata if available (external uploads)
+        if collection.cleaning_metadata:
+            meta = collection.cleaning_metadata
+            return {
+                'collection_plan_id': collection.id,
+                'platform': collection.platform,
+                'total_items': meta.get('total_items', 0),
+                'available_filters': {
+                    'authors': meta.get('authors', []),
+                    'file_extensions': meta.get('file_extensions', []),
+                }
+            }
+        
+        # Fallback: load from MinIO (for non-external / legacy collections)
         minio_client = MinIOClient()
         
         if not collection.raw_data_filename:
@@ -511,6 +533,8 @@ class DataCleaningService:
         
         if not raw_data:
             raise StorageError('Raw data not found in storage')
+        
+        raw_data = _normalize_raw_data(raw_data, collection.platform)
         
         # Extract metadata for filters
         item_key = 'pull_requests' if collection.platform == 'github' else 'merge_requests'
@@ -559,6 +583,8 @@ class DataCleaningService:
         raw_data = minio_client.get_json(collection.raw_data_filename)
         if not raw_data:
             raise StorageError('Raw data not found in storage')
+        
+        raw_data = _normalize_raw_data(raw_data, collection.platform)
         
         # Apply filters and generate CSV
         csv_generator = CSVGenerator(collection.platform)
@@ -624,7 +650,8 @@ class CleanedDataService:
         collection: Collection,
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,
-        filters: Optional[Dict] = None
+        filters: Optional[Dict] = None,
+        selected_features: Optional[list] = None
     ) -> CleanedData:
         """Create a new cleaned data instance with filtered CSV files."""
         if collection.status != 'completed':
@@ -636,16 +663,49 @@ class CleanedDataService:
             start_date=start_date,
             end_date=end_date,
             filters=filters or {},
+            selected_features=selected_features or [],
             status='in_progress'
         )
         
         try:
-            # Get raw data from MinIO
+            # Get raw data - use streaming for external/large collections
             minio_client = MinIOClient()
-            raw_data = minio_client.get_json(collection.raw_data_filename)
             
-            if not raw_data:
-                raise StorageError("Raw data not found in MinIO")
+            if collection.is_external:
+                # Stream-parse from MinIO to avoid loading full JSON into memory
+                from .metadata_extractor import _ReplayStream
+                import ijson
+                
+                item_key = 'pull_requests' if collection.platform == 'github' else 'merge_requests'
+                stream = minio_client.get_object_stream(collection.raw_data_filename)
+                if not stream:
+                    raise StorageError("Raw data not found in MinIO")
+                
+                try:
+                    # Peek to detect format (list vs dict)
+                    first_byte = b''
+                    while True:
+                        b = stream.read(1)
+                        if not b:
+                            break
+                        if b not in (b' ', b'\n', b'\r', b'\t', b'\xef', b'\xbb', b'\xbf'):
+                            first_byte = b
+                            break
+                    
+                    is_list = (first_byte == b'[')
+                    replayed = _ReplayStream(first_byte, stream)
+                    prefix = 'item' if is_list else f'{item_key}.item'
+                    
+                    items = list(ijson.items(replayed, prefix))
+                    raw_data = {item_key: items}
+                finally:
+                    stream.close()
+                    stream.release_conn()
+            else:
+                raw_data = minio_client.get_json(collection.raw_data_filename)
+                if not raw_data:
+                    raise StorageError("Raw data not found in MinIO")
+                raw_data = _normalize_raw_data(raw_data, collection.platform)
             
             # Apply date filters if provided
             filtered_data = CleanedDataService._filter_data_by_date(
@@ -665,7 +725,7 @@ class CleanedDataService:
             structured_csv = csv_generator.generate_csv(filtered_data)
             
             stats_generator = StatisticsCSVGenerator(collection.platform)
-            statistics_csv = stats_generator.generate_statistics_csv(filtered_data, collection)
+            statistics_csv = stats_generator.generate_statistics_csv(filtered_data, collection, selected_features=selected_features)
             
             # Generate filenames for CSV files
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -790,7 +850,6 @@ class CleanedDataService:
         except Exception as e:
             logger.error(f"Error getting CSV for download: {e}")
             return None
-
 
 # =============================================================================
 # User Datasets Service

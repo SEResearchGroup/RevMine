@@ -1,6 +1,7 @@
 """Collection Views - HTTP orchestration layer."""
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework import status
 from django.shortcuts import get_object_or_404
 from django.http import HttpResponse, FileResponse
@@ -699,7 +700,8 @@ class CreateCleanedDataView(UserIdRequiredMixin, APIView):
                 collection=collection,
                 start_date=validated_data.get('start_date'),
                 end_date=validated_data.get('end_date'),
-                filters=validated_data.get('filters')
+                filters=validated_data.get('filters'),
+                selected_features=validated_data.get('selected_features')
             )
             
             return Response({
@@ -827,6 +829,120 @@ class DownloadCleanedDataCSVView(View):
             content_type='text/csv'
         )
         return response
+
+
+# =============================================================================
+# External Upload View
+# =============================================================================
+
+class UploadExternalCollectionView(UserIdRequiredMixin, APIView):
+    """Upload an externally collected JSON file as a new collection.
+
+    Designed for large files (up to 6 GB).  The uploaded file is streamed
+    directly from Django's temp-file to MinIO — it is never fully loaded
+    into memory.
+    """
+
+    parser_classes = [MultiPartParser, FormParser]
+
+    def post(self, request):
+        user_id = self.get_user_id(request)
+        if not user_id:
+            return self.user_id_error_response()
+
+        uploaded_file = request.FILES.get('file')
+        if not uploaded_file:
+            return Response(
+                {'error': 'No file provided. Send a JSON file as "file".'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        platform = request.POST.get('platform', '').lower()
+        if platform not in ('github', 'gitlab'):
+            return Response(
+                {'error': 'Platform must be "github" or "gitlab".'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        name = request.POST.get('name', 'external-upload').strip()
+
+        # ---- Lightweight JSON validation (read only the first bytes) ----
+        first_chunk = uploaded_file.read(1024)
+        stripped = first_chunk.lstrip()
+        if not stripped or stripped[0:1] not in (b'{', b'['):
+            return Response(
+                {'error': 'File does not appear to be valid JSON (must start with { or [).'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        uploaded_file.seek(0)  # rewind for MinIO upload
+
+        # ---- Stream the file directly to MinIO ----
+        file_size = uploaded_file.size
+
+        from .minio_client import MinIOClient
+        minio_client = MinIOClient()
+
+        # Create DB record first (need the id for the filename)
+        collection = Collection.objects.create(
+            user=user_id,
+            workspace_id=0,
+            repository_id=0,
+            repository_name=name,
+            repository_full_name=f"external/{name}",
+            platform=platform,
+            token_encrypted='',
+            status='completed',
+            total_items=0,
+            collected_items=0,
+            is_external=True,
+        )
+
+        filename = minio_client.generate_filename(name, collection.id, 'json')
+
+        try:
+            saved = minio_client.save_stream(uploaded_file, filename, file_size)
+        except Exception as exc:
+            logger.error(f"MinIO streaming upload failed: {exc}")
+            collection.delete()
+            return Response(
+                {'error': 'Failed to store file. Please try again.'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+        if not saved:
+            collection.delete()
+            return Response(
+                {'error': 'Failed to store file. Please try again.'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+        collection.raw_data_filename = filename
+        collection.save(update_fields=['raw_data_filename'])
+
+        # Stream-extract cleaning metadata (authors, extensions, count) without
+        # loading the full file into memory.
+        try:
+            from .metadata_extractor import extract_cleaning_metadata
+            obj_stream = minio_client.get_object_stream(filename)
+            if obj_stream:
+                try:
+                    metadata = extract_cleaning_metadata(obj_stream, platform)
+                    collection.cleaning_metadata = metadata
+                    collection.total_items = metadata.get('total_items', 0)
+                    collection.collected_items = collection.total_items
+                    collection.save(update_fields=['cleaning_metadata', 'total_items', 'collected_items'])
+                finally:
+                    obj_stream.close()
+                    obj_stream.release_conn()
+        except Exception as exc:
+            logger.warning(f"Metadata extraction failed (non-fatal): {exc}")
+
+        serializer = CollectionSerializer(collection)
+        return Response({
+            'success': True,
+            'message': 'External collection uploaded successfully.',
+            'collection': serializer.data,
+        }, status=status.HTTP_201_CREATED)
 
 
 class UserDatasetsView(UserIdRequiredMixin, APIView):

@@ -4,6 +4,7 @@ from django.utils import timezone
 from .models import Collection
 from .github_collector import GitHubCollector
 from .gitlab_collector import GitLabCollector
+from .metrics_config import get_required_endpoints
 from .minio_client import MinIOClient
 from kafka_utils.client import KafkaClient
 from kafka_utils.topics import Topics
@@ -116,63 +117,39 @@ def execute_collection_task(plan_id, resume=False):
         if resume and collection.raw_data_filename:
             existing_data = minio_client.get_json(collection.raw_data_filename) or {}
         
+        # Compute required endpoints based on selected metrics
+        selected_metrics = collection.selected_metrics or []
+        required_endpoints = get_required_endpoints(collection.platform, selected_metrics) if selected_metrics else None
+        logger.info(f"Selected metrics: {selected_metrics}")
+        logger.info(f"Required endpoints: {required_endpoints}")
+
         # Initialize collector with resume capability
         if collection.platform == 'github':
             collector = GitHubCollector(
                 token=collection.token_encrypted,
                 repo_full_name=collection.repository_full_name,
-                branch_name=collection.branch_name
+                branch_name=collection.branch_name,
+                selected_metrics=selected_metrics
             )
         else:
             collector = GitLabCollector(
                 token=collection.token_encrypted,
                 repo_full_name=collection.repository_full_name,
                 branch_name=collection.branch_name,
-                project_id=collection.external_id
+                project_id=collection.external_id,  
+                selected_metrics=selected_metrics
             )
+        collector.required_endpoints = required_endpoints
         
-        # Progress callback with incremental saving and cancellation check
-        def save_progress(current, total, message="", item_data=None):
-            nonlocal raw_data_filename
-            
-            # Check if collection was cancelled/deleted
-            if cancellation_registry.is_cancelled(plan_id):
-                logger.info(f"Collection {plan_id} was cancelled, stopping...")
-                # Clean up MinIO file if it exists
-                if raw_data_filename:
-                    try:
-                        minio_client.delete_file(raw_data_filename)
-                        logger.info(f"Cleaned up MinIO file {raw_data_filename} for cancelled collection")
-                    except Exception as cleanup_error:
-                        logger.warning(f"Could not clean up MinIO file: {cleanup_error}")
-                raise CollectionCancelledException(f"Collection {plan_id} was cancelled")
-            
-            # Also check if collection still exists in database
-            if not Collection.objects.filter(id=plan_id).exists():
-                logger.info(f"Collection {plan_id} no longer exists in database, stopping...")
-                # Clean up MinIO file if it exists
-                if raw_data_filename:
-                    try:
-                        minio_client.delete_file(raw_data_filename)
-                        logger.info(f"Cleaned up MinIO file {raw_data_filename} for deleted collection")
-                    except Exception as cleanup_error:
-                        logger.warning(f"Could not clean up MinIO file: {cleanup_error}")
-                raise CollectionCancelledException(f"Collection {plan_id} was deleted")
-            
+        # Progress callback with incremental saving
+        def save_progress(current, total, message="", item_data=None, all_data=None):
             try:
                 collection.refresh_from_db()
                 collection.collected_items = current
                 collection.total_items = total
                 
-                # Save item data incrementally
-                if item_data:
-                    item_type = 'pull_requests' if collection.platform == 'github' else 'merge_requests'
-                    
-                    if item_type not in existing_data:
-                        existing_data[item_type] = []
-                    
-                    existing_data[item_type].append(item_data)
-                    
+                # Save accumulated data incrementally (all_data is managed by the collector)
+                if item_data and all_data is not None:
                     # Update last collected item
                     item_number = item_data.get('pull_request_number') or item_data.get('merge_request_id')
                     collection.last_collected_item_id = str(item_number)
@@ -186,7 +163,7 @@ def execute_collection_task(plan_id, resume=False):
                         )
                         raw_data_filename = collection.raw_data_filename
                     
-                    minio_client.save_json(existing_data, collection.raw_data_filename)
+                    minio_client.save_json(all_data, collection.raw_data_filename)
                 
                 collection.save(update_fields=['collected_items', 'total_items', 'last_collected_item_id', 'raw_data_filename'])
                 logger.info(f"Progress: {current}/{total} - {message}")

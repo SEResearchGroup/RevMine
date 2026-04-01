@@ -27,20 +27,20 @@ const FEATURES_CONFIG = [
   { id: 'Lead_Time', label: 'Lead Time', description: 'Time from creation to close/merge (in minutes)', category: 'Time Metrics' },
   { id: '#Discussions', label: 'Discussions Count', description: 'Number of discussion threads or comments', category: 'Collaboration' },
   { id: '#Commits', label: 'Commits Count', description: 'Total number of commits in the PR/MR', category: 'Basic Info' },
-  { id: 'Mean_Time_between_commits', label: 'Mean Time Between Commits', description: 'Average time interval between consecutive commits (seconds)', category: 'Time Metrics' },
+  { id: 'Mean_Time_between_commits', label: 'Mean Time Between Commits', description: 'Average time between consecutive commits (in seconds)', category: 'Time Metrics' },
   { id: 'Commiters', label: 'Committers List', description: 'Set of unique committer names', category: 'Collaboration' },
   { id: '#UniqueCommiters', label: 'Unique Committers', description: 'Number of unique people who made commits', category: 'Collaboration' },
-  { id: 'nb_minor_author', label: 'Minor Authors', description: 'Authors who contributed <50% of commits', category: 'Collaboration' },
-  { id: 'nb_major_author', label: 'Major Authors', description: 'Authors who contributed ≥50% of commits', category: 'Collaboration' },
-  { id: 'delta_time', label: 'Delta Time', description: 'Days since Unix epoch (for time-series analysis)', category: 'Time Metrics' },
+  { id: 'nb_minor_author', label: 'Minor Authors', description: 'Authors who contributed <5% of commits', category: 'Collaboration' },
+  { id: 'nb_major_author', label: 'Major Authors', description: 'Authors who contributed ≥5% of commits', category: 'Collaboration' },
+  { id: 'delta_time', label: 'Delta Time', description: 'Time from project creation to PR/MR creation (in seconds)', category: 'Time Metrics' },
   { id: 'churn_addition', label: 'Churn Additions', description: 'Total lines added across all commits', category: 'Code Metrics' },
   { id: 'churn_deletions', label: 'Churn Deletions', description: 'Total lines deleted across all commits', category: 'Code Metrics' },
-  { id: 'initial_size', label: 'Initial Size', description: 'Total size of PR/MR (additions + deletions)', category: 'Code Metrics' },
+  { id: 'initial_size', label: 'Initial Size', description: 'Lines changed in commits before MR/PR creation', category: 'Code Metrics' },
   { id: 'hist_entropy', label: 'Historical Entropy', description: 'Shannon entropy of file change distribution (code spread)', category: 'Code Metrics' },
   { id: 'modified_files', label: 'Modified Files', description: 'Number of files changed in the PR/MR', category: 'Code Metrics' },
   { id: 'filetypes', label: 'File Types', description: 'Number of unique file extensions modified', category: 'Code Metrics' },
   { id: 'state', label: 'State', description: 'Current state of PR/MR (open, merged, closed)', category: 'Basic Info' },
-  { id: 'rework_size', label: 'Rework Size', description: 'Estimated lines changed after review feedback', category: 'Code Metrics' },
+  { id: 'rework_size', label: 'Rework Size', description: 'Lines changed in commits after first review comment', category: 'Code Metrics' },
   { id: '#people', label: 'People Count', description: 'Total unique people involved (authors, reviewers, discussers)', category: 'Collaboration' },
   { id: '#reviewers', label: 'Reviewers Count', description: 'Number of unique reviewers', category: 'Collaboration' },
   { id: '#commiters', label: 'Committers Count', description: 'Number of unique committers', category: 'Collaboration' },
@@ -58,6 +58,7 @@ function DataCleaning() {
   const [workspace, setWorkspace] = useState(null);
   const [collection, setCollection] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(null);
   const [processing, setProcessing] = useState(false);
 
   // Available options
@@ -103,17 +104,34 @@ function DataCleaning() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [wsRes, reposRes, collectionRes, cleaningRes] = await Promise.all([
-        workspaceService.getById(workspaceId),
-        workspaceService.getRepositories(workspaceId),
+      const isExternal = workspaceId === "0" || !workspaceId;
+
+      const promises = [
         collectionService.getStatus(collectionId),
         collectionService.getCleaningConfig(collectionId),
-      ]);
+      ];
+      if (!isExternal) {
+        promises.push(
+          workspaceService.getById(workspaceId),
+          workspaceService.getRepositories(workspaceId)
+        );
+      }
 
-      setWorkspace(wsRes.data);
-      const repo = reposRes.data.find((r) => r.id === parseInt(repositoryId));
-      setRepository(repo);
+      const results = await Promise.all(promises);
+      const collectionRes = results[0];
+      const cleaningRes = results[1];
+
       setCollection(collectionRes.data.collection_plan);
+
+      if (!isExternal) {
+        setWorkspace(results[2].data);
+        const repo = results[3].data.find((r) => r.id === parseInt(repositoryId));
+        setRepository(repo);
+      } else {
+        // For external collections, create a minimal repository-like object from collection data
+        const col = collectionRes.data.collection_plan;
+        setRepository({ name: col.repository_name, full_name: col.repository_full_name || col.repository_name, platform: col.platform });
+      }
 
       setAvailableAuthors(cleaningRes.data.available_filters.authors);
       setAvailableExtensions(cleaningRes.data.available_filters.file_extensions);
@@ -126,6 +144,7 @@ function DataCleaning() {
       }
     } catch (err) {
       console.error("Error fetching data:", err);
+      setFetchError(err.message);
     } finally {
       setLoading(false);
     }
@@ -235,10 +254,26 @@ function DataCleaning() {
   const platform = repository?.platform || "github";
   const itemTerm = platform === "github" ? "PR" : "MR";
 
-  if (loading || !repository) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-gray-500">Loading...</div>
+      </div>
+    );
+  }
+
+  if (fetchError || !repository) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-red-500 mb-4">{fetchError || "Failed to load collection data"}</p>
+          <button
+            onClick={() => { setFetchError(null); fetchData(); }}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            Retry
+          </button>
+        </div>
       </div>
     );
   }
@@ -290,14 +325,14 @@ function DataCleaning() {
 
             <div className="flex gap-4">
               <button
-                onClick={() => navigate(`/workspaces/${workspaceId}/repositories/${repositoryId}/collection/${collectionId}`)}
+                onClick={() => navigate(workspaceId === "0" || !workspaceId ? `/external/collection/${collectionId}` : `/workspaces/${workspaceId}/repositories/${repositoryId}/collection/${collectionId}`)}
                 className="flex-1 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
               >
                 Back to Collection
               </button>
               {createdCleanedData && (
                 <button
-                  onClick={() => navigate(`/workspaces/${workspaceId}/repositories/${repositoryId}/collection/${collectionId}/cleaned-data/${createdCleanedData.id}`)}
+                  onClick={() => navigate(workspaceId === "0" || !workspaceId ? `/external/collection/${collectionId}/cleaned-data/${createdCleanedData.id}` : `/workspaces/${workspaceId}/repositories/${repositoryId}/collection/${collectionId}/cleaned-data/${createdCleanedData.id}`)}
                   className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
                 >
                   View CleanedData Details
@@ -316,7 +351,9 @@ function DataCleaning() {
         <button
           onClick={() =>
             navigate(
-              `/workspaces/${workspaceId}/repositories/${repositoryId}/collection/${collectionId}`
+              workspaceId === "0" || !workspaceId
+                ? `/external/collection/${collectionId}`
+                : `/workspaces/${workspaceId}/repositories/${repositoryId}/collection/${collectionId}`
             )
           }
           className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-6"

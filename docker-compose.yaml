@@ -125,6 +125,7 @@ services:
       logging: *default-logging
       networks:
         - app-network
+  
   # Base de données pour API Gateway
   gateway-db:
     image: postgres:15
@@ -166,7 +167,6 @@ services:
     logging: *default-logging
     networks:
       - app-network
-
 
   # Database for Collection Service
   collection-db:
@@ -304,7 +304,6 @@ services:
     restart: unless-stopped
     logging: *default-logging
 
-
   analyze-service:
     build:
       context: ./backend/services/analyze
@@ -335,9 +334,52 @@ services:
     command: sh -c "sleep 10 && python manage.py migrate --run-syncdb && python manage.py runserver 0.0.0.0:8003"
     restart: unless-stopped
     logging: *default-logging
-
-
+    
+  # Celery Worker for Analyze Service
+  celery-worker:
+    build:
+      context: ./backend/services/analyze
+    container_name: celery-worker
+    hostname: celery-worker
+    env_file:
+      - ./backend/services/analyze/.env
+    environment:
+      DATABASE_HOST: analyze-db
+      DATABASE_NAME: analyze_db
+      DATABASE_USER: postgres
+      DATABASE_PASSWORD: postgres
+      DATABASE_PORT: 5432
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+    depends_on:
+      analyze-db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./backend/services/analyze:/app
+    networks:
+      - app-network
+    command: celery -A analyze_service worker --loglevel=info
+    restart: unless-stopped
   
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"  
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - app-network
+
+
 volumes:
   kafka_data:
   gateway_postgres_data:
@@ -347,6 +389,7 @@ volumes:
   analyze_postgres_data:
   loki_data:
   grafana_data:
+  redis_data:
 
 networks:
   app-network:

@@ -154,6 +154,13 @@ MINIO_ACCESS_KEY = os.getenv("MINIO_ACCESS_KEY")
 MINIO_SECRET_KEY = os.getenv("MINIO_SECRET_KEY")
 MINIO_BUCKET_NAME = os.getenv("MINIO_BUCKET_NAME")
 MINIO_SECURE = os.getenv("MINIO_SECURE", "False").lower() == "true"
+
+# --- Large file upload support (up to 6 GB) ---
+DATA_UPLOAD_MAX_MEMORY_SIZE = 6 * 1024 * 1024 * 1024      # 6 GB
+FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024             # 10 MB – beyond this Django writes to a temp file
+FILE_UPLOAD_HANDLERS = [
+    'django.core.files.uploadhandler.TemporaryFileUploadHandler',
+]
 # Logging Configuration 
 LOGGING = {
     'version': 1,

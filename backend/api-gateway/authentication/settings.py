@@ -215,3 +215,11 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# --- Large file upload support (up to 6 GB) ---
+# Files larger than 10 MB are written to a temp file on disk.
+DATA_UPLOAD_MAX_MEMORY_SIZE = 6 * 1024 * 1024 * 1024      # 6 GB
+FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024             # 10 MB
+FILE_UPLOAD_HANDLERS = [
+    'django.core.files.uploadhandler.TemporaryFileUploadHandler',
+]

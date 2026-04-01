@@ -14,14 +14,18 @@ import CollectionDetail from "../pages/collection/CollectionDetail";
 import CleaningDetail from "../pages/collection/CleaningDetail";
 import DataCleaning from "../pages/collection/DataCleaning";
 import DataCleaningList from "../pages/collection/DataCleaningList";
+import ExternalCollectionDetail from "../pages/collection/ExternalCollectionDetail";
 import {
   GitHubCallback,
   GitLabCallback,
   GoogleCallback,
 } from "../pages/auth/OAuthCallbacks";
 import Profile from "../pages/profile/Profile";
-import AnalysisPage from "../pages/Analysis/AnalysisPage";
-import AnalysisHistoryPage from "../pages/Analysis/AnalysisHistoryPage";
+
+// Analysis Pages
+import DatasetSelectionPage from "../pages/Analysis/DatasetSelectionPage";
+import MetricsSelectionPage from "../pages/Analysis/MetricsSelectionPage";
+import AnalysisDashboardPage from "../pages/Analysis/AnalysisDashboardPage";
 
 const AppRoutes = () => {
   return (
@@ -46,6 +50,9 @@ const AppRoutes = () => {
         <Route path="/workspaces" element={<Workspaces />} />
         <Route path="/workspaces/:id" element={<Projects />} />
         <Route path="/data-cleaning" element={<DataCleaningList />} />
+        <Route path="/external/collection/:collectionId" element={<ExternalCollectionDetail />} />
+        <Route path="/external/collection/:collectionId/cleaned-data/new" element={<DataCleaning />} />
+        <Route path="/external/collection/:collectionId/cleaned-data/:cleanedDataId" element={<CleaningDetail />} />
 
         <Route
           path="/workspaces/:workspaceId/repositories/:repositoryId/collect"
@@ -71,12 +78,11 @@ const AppRoutes = () => {
           path="/workspaces/:workspaceId/repositories/:repositoryId/collection/:collectionId/cleaned-data/:cleanedDataId" 
           element={<CleaningDetail />} 
         />
-          <Route 
-          path="/workspaces/:workspaceId/repositories/:repositoryId/revmine/analyze" 
-          element={<AnalysisPage />} 
-        />
-        <Route path="/analysis" element={<AnalysisPage />} />
-        <Route path="/analysis/history" element={<AnalysisHistoryPage />} />
+        
+        {/* Analysis Routes */}
+        <Route path="/analysis" element={<DatasetSelectionPage />} />
+        <Route path="/analysis/:datasetId/metrics" element={<MetricsSelectionPage />} />
+        <Route path="/analysis/:datasetId/dashboard" element={<AnalysisDashboardPage />} />
 
         <Route path="/profile" element={<Profile />} />
       </Route>

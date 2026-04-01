@@ -1,0 +1,381 @@
+# Analytics API Test File
+# ========================
+# Use with REST Client extension in VS Code or similar HTTP clients
+# 
+# Variables - Update these with your actual values
+@baseUrl = http://localhost:8000/api/analysis
+@datasetId = {{$guid}}
+@analysisId = {{$guid}}
+@authToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzcyMTQ4OTEyLCJpYXQiOjE3NzIxNDUzMTIsImp0aSI6IjhkMmY4YTNkN2NlNDQ3ZmQ4ZTIwZTFkNjg5MzZhMDRiIiwidXNlcl9pZCI6IjEifQ.6nDFjDr9ydYQhuCK_omTz8wZ8RqQ0HBIMlB84Eg37gQ
+
+###############################################################################
+# DATASETS
+###############################################################################
+
+### List all datasets
+GET {{baseUrl}}/datasets/ HTTP/1.1
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+### List datasets filtered by workspace
+GET {{baseUrl}}/datasets/?workspace_id=1 HTTP/1.1
+Content-Type: application/json
+
+### Upload a new dataset (CSV file)
+# @name uploadDataset
+POST {{baseUrl}}/datasets/upload/ HTTP/1.1
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
+
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="file"; filename="test_data.csv"
+Content-Type: text/csv
+
+Creation_Date,#Commits,Lead_Time,churn_addition,churn_deletions,initial_mr_size,#UniqueCommiters,#Discussions,modified_files,state
+2024-01-15,3,1.5,150,50,100,2,4,8,merged
+2024-01-20,5,2.3,220,80,140,3,6,12,merged
+2024-02-01,2,0.8,80,30,50,1,2,4,closed
+2024-02-10,8,4.2,450,150,300,4,10,20,merged
+2024-02-15,1,0.5,40,10,30,1,1,2,merged
+2024-03-01,4,3.1,280,120,160,2,5,10,opened
+2024-03-10,6,2.8,320,100,220,3,8,14,merged
+2024-03-20,3,1.9,180,60,120,2,3,6,closed
+2024-04-05,7,3.5,400,140,260,4,9,18,merged
+2024-04-15,2,1.2,100,40,60,1,2,5,merged
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="workspace_id"
+
+1
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="platform"
+
+gitlab
+------WebKitFormBoundary7MA4YWxkTrZu0gW--
+
+### Get dataset detail (replace with actual dataset ID)
+# @name getDataset
+GET {{baseUrl}}/datasets/{{datasetId}}/ HTTP/1.1
+Content-Type: application/json
+
+### Get dataset columns
+GET {{baseUrl}}/datasets/{{datasetId}}/columns/ HTTP/1.1
+Content-Type: application/json
+
+### Get dataset preview (first 10 rows)
+GET {{baseUrl}}/datasets/{{datasetId}}/preview/?rows=10 HTTP/1.1
+Content-Type: application/json
+
+### Get available metrics for dataset
+GET {{baseUrl}}/datasets/{{datasetId}}/available_metrics/ HTTP/1.1
+Content-Type: application/json
+
+### Get compatible axes for custom charts
+GET {{baseUrl}}/datasets/{{datasetId}}/compatible_axes/ HTTP/1.1
+Content-Type: application/json
+
+### Delete a dataset
+DELETE {{baseUrl}}/datasets/{{datasetId}}/ HTTP/1.1
+Content-Type: application/json
+
+
+###############################################################################
+# METRICS (Read-only catalogue)
+###############################################################################
+
+### List all metrics
+GET {{baseUrl}}/metrics/ HTTP/1.1
+Content-Type: application/json
+
+### Get metric categories
+GET {{baseUrl}}/metrics/categories/ HTTP/1.1
+Content-Type: application/json
+
+### Get metrics by category (all grouped)
+GET {{baseUrl}}/metrics/by_category/ HTTP/1.1
+Content-Type: application/json
+
+### Get metrics filtered by category
+GET {{baseUrl}}/metrics/by_category/?category=timeseries HTTP/1.1
+Content-Type: application/json
+
+### Get metrics filtered by category (distribution)
+GET {{baseUrl}}/metrics/by_category/?category=distribution HTTP/1.1
+Content-Type: application/json
+
+### Get single metric detail
+GET {{baseUrl}}/metrics/commits_over_time/ HTTP/1.1
+Content-Type: application/json
+
+### Get custom chart metric detail
+GET {{baseUrl}}/metrics/custom_chart/ HTTP/1.1
+Content-Type: application/json
+
+
+###############################################################################
+# GENERATE CHART (Core endpoint)
+###############################################################################
+
+### Generate chart - Mode A: Predefined metric (commits_over_time)
+# @name generateChart1
+POST {{baseUrl}}/generate/ HTTP/1.1
+Content-Type: application/json
+
+{
+    "dataset_id": "{{datasetId}}",
+    "metric_code": "commits_over_time",
+    "chart_type": "line",
+    "time_aggregation": "M",
+    "aggregation": "sum"
+}
+
+### Generate chart - Mode A: MR Creation Timeline
+POST {{baseUrl}}/generate/ HTTP/1.1
+Content-Type: application/json
+
+{
+    "dataset_id": "{{datasetId}}",
+    "metric_code": "mr_creation_timeline",
+    "chart_type": "bar",
+    "time_aggregation": "W"
+}
+
+### Generate chart - Mode A: Lead Time Distribution
+POST {{baseUrl}}/generate/ HTTP/1.1
+Content-Type: application/json
+
+{
+    "dataset_id": "{{datasetId}}",
+    "metric_code": "lead_time_distribution",
+    "chart_type": "histogram"
+}
+
+### Generate chart - Mode A: State Distribution (Pie chart)
+POST {{baseUrl}}/generate/ HTTP/1.1
+Content-Type: application/json
+
+{
+    "dataset_id": "{{datasetId}}",
+    "metric_code": "state_distribution",
+    "chart_type": "pie"
+}
+
+### Generate chart - Mode A: Code Churn Analysis
+POST {{baseUrl}}/generate/ HTTP/1.1
+Content-Type: application/json
+
+{
+    "dataset_id": "{{datasetId}}",
+    "metric_code": "code_churn",
+    "chart_type": "bar"
+}
+
+### Generate chart - Mode A: Churn Scatter (correlation)
+POST {{baseUrl}}/generate/ HTTP/1.1
+Content-Type: application/json
+
+{
+    "dataset_id": "{{datasetId}}",
+    "metric_code": "churn_scatter",
+    "chart_type": "scatter"
+}
+
+### Generate chart - Mode B: Custom axes (bar chart)
+POST {{baseUrl}}/generate/ HTTP/1.1
+Content-Type: application/json
+
+{
+    "dataset_id": "{{datasetId}}",
+    "x_axis": "state",
+    "y_axis": "#Commits",
+    "aggregation": "sum",
+    "chart_type": "bar"
+}
+
+### Generate chart - Mode B: Custom axes (line chart with time)
+POST {{baseUrl}}/generate/ HTTP/1.1
+Content-Type: application/json
+
+{
+    "dataset_id": "{{datasetId}}",
+    "x_axis": "Creation_Date",
+    "y_axis": "churn_addition",
+    "aggregation": "sum",
+    "chart_type": "line",
+    "time_aggregation": "M"
+}
+
+### Generate chart - Mode B: Custom scatter plot
+POST {{baseUrl}}/generate/ HTTP/1.1
+Content-Type: application/json
+
+{
+    "dataset_id": "{{datasetId}}",
+    "x_axis": "churn_addition",
+    "y_axis": "churn_deletions",
+    "chart_type": "scatter"
+}
+
+### Generate chart - With filters
+POST {{baseUrl}}/generate/ HTTP/1.1
+Content-Type: application/json
+
+{
+    "dataset_id": "{{datasetId}}",
+    "metric_code": "commits_over_time",
+    "chart_type": "bar",
+    "time_aggregation": "M",
+    "filters": {
+        "state": "merged"
+    }
+}
+
+### Generate chart - Error case: missing dataset_id
+POST {{baseUrl}}/generate/ HTTP/1.1
+Content-Type: application/json
+
+{
+    "metric_code": "commits_over_time"
+}
+
+### Generate chart - Error case: invalid metric
+POST {{baseUrl}}/generate/ HTTP/1.1
+Content-Type: application/json
+
+{
+    "dataset_id": "{{datasetId}}",
+    "metric_code": "invalid_metric_code"
+}
+
+
+###############################################################################
+# ANALYSES (History)
+###############################################################################
+
+### List all analyses
+GET {{baseUrl}}/analyses/ HTTP/1.1
+Content-Type: application/json
+
+### List analyses filtered by dataset
+GET {{baseUrl}}/analyses/?dataset_id={{datasetId}} HTTP/1.1
+Content-Type: application/json
+
+### List analyses filtered by status
+GET {{baseUrl}}/analyses/?status=completed HTTP/1.1
+Content-Type: application/json
+
+### List analyses filtered by metric
+GET {{baseUrl}}/analyses/?metric_code=commits_over_time HTTP/1.1
+Content-Type: application/json
+
+### Bulk create analyses
+POST {{baseUrl}}/analyses/bulk_create/ HTTP/1.1
+Content-Type: application/json
+
+{
+    "dataset_id": "{{datasetId}}",
+    "analyses": [
+        {
+            "metric_code": "commits_over_time",
+            "chart_type": "line",
+            "config": {
+                "time_aggregation": "M",
+                "aggregation": "sum"
+            }
+        },
+        {
+            "metric_code": "lead_time_distribution",
+            "chart_type": "histogram"
+        },
+        {
+            "metric_code": "state_distribution",
+            "chart_type": "pie"
+        }
+    ]
+}
+
+### Get analysis detail
+GET {{baseUrl}}/analyses/{{analysisId}}/ HTTP/1.1
+Content-Type: application/json
+
+### Get analysis result (chart data + image)
+GET {{baseUrl}}/analyses/{{analysisId}}/result/ HTTP/1.1
+Content-Type: application/json
+
+### Retry a failed or completed analysis
+POST {{baseUrl}}/analyses/{{analysisId}}/retry/ HTTP/1.1
+Content-Type: application/json
+
+### Delete an analysis
+DELETE {{baseUrl}}/analyses/{{analysisId}}/ HTTP/1.1
+Content-Type: application/json
+
+
+###############################################################################
+# COMPLETE WORKFLOW EXAMPLE
+###############################################################################
+
+# Step 1: Upload a dataset
+# Use the "Upload a new dataset" request above
+
+# Step 2: Get the dataset ID from the response and save it
+# @datasetId = <uuid-from-upload-response>
+
+# Step 3: Check available metrics
+# Use "Get available metrics for dataset" request
+
+# Step 4: Generate a chart
+# Use one of the "Generate chart" requests
+
+# Step 5: View analysis history
+# Use "List analyses filtered by dataset" request
+
+# Step 6: Get chart result for display
+# Use "Get analysis result" request
+
+###############################################################################
+# NOTES
+###############################################################################
+
+# Chart Data Format (Chart.js compatible):
+# {
+#     "type": "line" | "bar" | "scatter" | "pie" | "histogram" | "area",
+#     "data": {
+#         "labels": ["Jan", "Feb", "Mar", ...],
+#         "datasets": [{
+#             "label": "Commits (sum)",
+#             "data": [12, 19, 8, ...],
+#             "backgroundColor": "rgba(...)",
+#             "borderColor": "rgba(...)"
+#         }]
+#     },
+#     "options": {
+#         "title": "Chart Title",
+#         "xLabel": "X Axis Label",
+#         "yLabel": "Y Axis Label"
+#     }
+# }
+
+# Time Aggregation Options:
+# - D: Daily
+# - W: Weekly  
+# - M: Monthly
+# - Q: Quarterly
+# - Y: Yearly
+
+# Aggregation Methods:
+# - sum: Sum of values
+# - mean: Average
+# - median: Median value
+# - count: Count of records
+# - min: Minimum value
+# - max: Maximum value
+# - std: Standard deviation
+
+# Supported Chart Types by Metric:
+# - commits_over_time: line, bar, area
+# - mr_creation_timeline: bar, line, area
+# - lead_time_distribution: histogram, box
+# - commits_distribution: bar, histogram
+# - state_distribution: pie, bar
+# - code_churn: bar, histogram
+# - churn_scatter: scatter
+# - custom_chart: bar, line, scatter, area, pie

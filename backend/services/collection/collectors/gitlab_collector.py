@@ -1,4 +1,6 @@
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 from datetime import datetime
 import logging
 import urllib3
@@ -8,18 +10,39 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 logger = logging.getLogger(__name__)
 
 
+def _create_session(headers, verify=True, max_retries=5, backoff_factor=1):
+    """Create a requests.Session with retry + exponential backoff."""
+    session = requests.Session()
+    session.headers.update(headers)
+    session.verify = verify
+    retry = Retry(
+        total=max_retries,
+        backoff_factor=backoff_factor,
+        status_forcelist=[429, 500, 502, 503, 504],
+        allowed_methods=['GET'],
+        raise_on_status=False,
+    )
+    adapter = HTTPAdapter(max_retries=retry)
+    session.mount('https://', adapter)
+    session.mount('http://', adapter)
+    return session
+
+
 class GitLabCollector:
     """Collects data from GitLab API with resume capability"""
     
-    def __init__(self, token, repo_full_name, base_url='https://gitlab.com/api/v4', branch_name=None, project_id=None):
+    def __init__(self, token, repo_full_name, base_url='https://gitlab.com/api/v4', branch_name=None, project_id=None, selected_metrics=None):
         self.token = token
         self.repo_full_name = repo_full_name
         self.branch_name = branch_name
         self.base_url = base_url
         self.headers = {'PRIVATE-TOKEN': token}
         # self.headers = {'Authorization': f'Bearer {token}'}
-
-        self.project_id = project_id 
+        self.session = _create_session(self.headers, verify=False)
+        self.project_id = project_id  # Can be passed directly from external_id
+        self.selected_metrics = selected_metrics
+        self.required_endpoints = None  # Computed lazily
+        self.project_created_at = None  # Fetched from API
     
     def collect_all_data(self, filters=None, progress_callback=None, resume_from=None, existing_data=None):
         """
@@ -49,6 +72,21 @@ class GitLabCollector:
             
             logger.info(f"Project ID: {self.project_id}")
             
+            # Fetch project creation date if not already set (e.g. when project_id was passed directly)
+            if not self.project_created_at and self.project_id:
+                try:
+                    response = self.session.get(
+                        f"{self.base_url}/projects/{self.project_id}",
+                        timeout=30
+                    )
+                    if response.status_code == 200:
+                        self.project_created_at = response.json().get('created_at')
+                except Exception as e:
+                    logger.warning(f"Could not fetch project creation date: {e}")
+            
+            # Store project_created_at in the data for later use by CSV generator
+            all_data['project_created_at'] = self.project_created_at
+            
             # Get collected MR IIDs to skip
             collected_mrs = set()
             if existing_data:
@@ -77,8 +115,7 @@ class GitLabCollector:
                     break
             
             # Filter out already collected MRs
-            if resume_from:
-                resume_mr_iid = int(resume_from)
+            if collected_mrs:
                 all_mrs = [mr for mr in all_mrs if mr['iid'] not in collected_mrs]
             
             total_mrs = len(all_mrs) + len(collected_mrs)
@@ -89,9 +126,15 @@ class GitLabCollector:
             
             # Process each MR
             collected_count = len(collected_mrs)
+            failed_mrs = []
             
             for mr in all_mrs:
-                mr_data = self._process_merge_request(mr['iid'])
+                try:
+                    mr_data = self._process_merge_request(mr['iid'])
+                except Exception as e:
+                    logger.warning(f"Skipping MR !{mr['iid']} due to error: {e}")
+                    failed_mrs.append(mr['iid'])
+                    continue
                 if mr_data:
                     all_data['merge_requests'].append(mr_data)
                     collected_count += 1
@@ -102,10 +145,20 @@ class GitLabCollector:
                             collected_count,
                             total_mrs,
                             f"Collected MR !{mr['iid']}",
-                            mr_data
+                            mr_data,
+                            all_data
                         )
             
-            logger.info(f"Collection completed: {collected_count} MRs")
+            if failed_mrs:
+                logger.warning(f"Failed to collect {len(failed_mrs)} MRs: {failed_mrs}")
+            
+            # Deduplicate MRs by merge_request_id as a safety net
+            seen = {}
+            for mr in all_data['merge_requests']:
+                seen[mr['merge_request_id']] = mr
+            all_data['merge_requests'] = list(seen.values())
+            
+            logger.info(f"Collection completed: {len(all_data['merge_requests'])} unique MRs")
             
             return all_data
             
@@ -114,18 +167,18 @@ class GitLabCollector:
             raise
     
     def _get_project_id(self):
-        """Get GitLab project ID from full name"""
+        """Get GitLab project ID and creation date from full name"""
         try:
             encoded_path = self.repo_full_name.replace('/', '%2F')
-            response = requests.get(
+            response = self.session.get(
                 f"{self.base_url}/projects/{encoded_path}",
-                headers=self.headers,
-                verify=False,
                 timeout=30
             )
             
             if response.status_code == 200:
-                return str(response.json()['id'])
+                project_data = response.json()
+                self.project_created_at = project_data.get('created_at')
+                return str(project_data['id'])
             
             return None
             
@@ -174,11 +227,9 @@ class GitLabCollector:
             
             logger.info(f"Fetching MRs with params: {params}")
             
-            response = requests.get(
+            response = self.session.get(
                 f"{self.base_url}/projects/{self.project_id}/merge_requests",
-                headers=self.headers,
                 params=params,
-                verify=False,
                 timeout=30
             )
             
@@ -207,13 +258,18 @@ class GitLabCollector:
             logger.error(f"Network error fetching MR page: {e}")
             raise Exception(f"Erreur réseau lors de la connexion à GitLab: {str(e)}")
     
+    def _needs_endpoint(self, endpoint_key):
+        """Check if a given endpoint category is needed based on selected metrics."""
+        if self.required_endpoints is None:
+            # No metric filtering — collect everything
+            return True
+        return endpoint_key in self.required_endpoints
+
     def _process_merge_request(self, mr_iid):
         """Process a single merge request - raises exception on network errors"""
         try:
-            mr_response = requests.get(
+            mr_response = self.session.get(
                 f"{self.base_url}/projects/{self.project_id}/merge_requests/{mr_iid}",
-                headers=self.headers,
-                verify=False,
                 timeout=30
             )
             
@@ -235,73 +291,70 @@ class GitLabCollector:
                 'changes': []
             }
             
-            # Get commits
-            try:
-                commits_response = requests.get(
-                    f"{self.base_url}/projects/{self.project_id}/merge_requests/{mr_iid}/commits",
-                    headers=self.headers,
-                    params={'per_page': 9999},
-                    verify=False,
-                    timeout=30
-                )
-                
-                if commits_response.status_code == 200:
-                    commits = commits_response.json()
-                    for commit in commits:
-                        commit_diff = self._get_commit_diff(commit['short_id'])
-                        organized_mr['commits'].append({
-                            'commit_id': commit['short_id'],
-                            'details': commit,
-                            'changesHist': commit_diff
-                        })
-            except requests.exceptions.RequestException as e:
-                logger.error(f"Network error fetching commits for MR !{mr_iid}: {e}")
-                raise Exception(f"Erreur réseau lors de la récupération des commits pour MR !{mr_iid}: {str(e)}")
+            # Get commits (only if selected)
+            if self._needs_endpoint('commits'):
+                try:
+                    commits_response = self.session.get(
+                        f"{self.base_url}/projects/{self.project_id}/merge_requests/{mr_iid}/commits",
+                        params={'per_page': 9999},
+                        timeout=30
+                    )
+                    
+                    if commits_response.status_code == 200:
+                        commits = commits_response.json()
+                        for commit in commits:
+                            commit_diff = self._get_commit_diff(commit['short_id'])
+                            organized_mr['commits'].append({
+                                'commit_id': commit['short_id'],
+                                'details': commit,
+                                'changesHist': commit_diff
+                            })
+                except requests.exceptions.RequestException as e:
+                    logger.error(f"Network error fetching commits for MR !{mr_iid}: {e}")
+                    raise Exception(f"Erreur réseau lors de la récupération des commits pour MR !{mr_iid}: {str(e)}")
             
-            # Get discussions
-            try:
-                discussions_response = requests.get(
-                    f"{self.base_url}/projects/{self.project_id}/merge_requests/{mr_iid}/discussions",
-                    headers=self.headers,
-                    verify=False,
-                    timeout=30
-                )
-                
-                if discussions_response.status_code == 200:
-                    organized_mr['discussions'] = discussions_response.json()
-            except requests.exceptions.RequestException as e:
-                logger.error(f"Network error fetching discussions for MR !{mr_iid}: {e}")
-                raise Exception(f"Erreur réseau lors de la récupération des discussions pour MR !{mr_iid}: {str(e)}")
+            # Get discussions (only if selected)
+            if self._needs_endpoint('discussions'):
+                try:
+                    discussions_response = self.session.get(
+                        f"{self.base_url}/projects/{self.project_id}/merge_requests/{mr_iid}/discussions",
+                        timeout=30
+                    )
+                    
+                    if discussions_response.status_code == 200:
+                        organized_mr['discussions'] = discussions_response.json()
+                except requests.exceptions.RequestException as e:
+                    logger.error(f"Network error fetching discussions for MR !{mr_iid}: {e}")
+                    raise Exception(f"Erreur réseau lors de la récupération des discussions pour MR !{mr_iid}: {str(e)}")
             
-            # Get notes
-            try:
-                notes_response = requests.get(
-                    f"{self.base_url}/projects/{self.project_id}/merge_requests/{mr_iid}/notes",
-                    headers=self.headers,
-                    verify=False,
-                    timeout=30
-                )
-                
-                if notes_response.status_code == 200:
-                    organized_mr['notes'] = notes_response.json()
-            except requests.exceptions.RequestException as e:
-                logger.error(f"Network error fetching notes for MR !{mr_iid}: {e}")
-                raise Exception(f"Erreur réseau lors de la récupération des notes pour MR !{mr_iid}: {str(e)}")
+            # Get notes (only if selected)
+            if self._needs_endpoint('notes'):
+                try:
+                    notes_response = self.session.get(
+                        f"{self.base_url}/projects/{self.project_id}/merge_requests/{mr_iid}/notes",
+                        timeout=30
+                    )
+                    
+                    if notes_response.status_code == 200:
+                        organized_mr['notes'] = notes_response.json()
+                except requests.exceptions.RequestException as e:
+                    logger.error(f"Network error fetching notes for MR !{mr_iid}: {e}")
+                    raise Exception(f"Erreur réseau lors de la récupération des notes pour MR !{mr_iid}: {str(e)}")
             
-            # Get changes
-            try:
-                changes_response = requests.get(
-                    f"{self.base_url}/projects/{self.project_id}/merge_requests/{mr_iid}/changes",
-                    headers=self.headers,
-                    verify=False,
-                    timeout=30
-                )
-                
-                if changes_response.status_code == 200:
-                    organized_mr['changes'] = changes_response.json()
-            except requests.exceptions.RequestException as e:
-                logger.error(f"Network error fetching changes for MR !{mr_iid}: {e}")
-                raise Exception(f"Erreur réseau lors de la récupération des changements pour MR !{mr_iid}: {str(e)}")
+            # Get changes (only if selected)
+            if self._needs_endpoint('changes'):
+                try:
+                    changes_response = self.session.get(
+                        f"{self.base_url}/projects/{self.project_id}/merge_requests/{mr_iid}/changes",
+                        params={'access_raw_diffs': 'true'},
+                        timeout=30
+                    )
+                    
+                    if changes_response.status_code == 200:
+                        organized_mr['changes'] = changes_response.json()
+                except requests.exceptions.RequestException as e:
+                    logger.error(f"Network error fetching changes for MR !{mr_iid}: {e}")
+                    raise Exception(f"Erreur réseau lors de la récupération des changements pour MR !{mr_iid}: {str(e)}")
             
             return organized_mr
             
@@ -318,10 +371,8 @@ class GitLabCollector:
     def _get_commit_diff(self, commit_id):
         """Get commit diff"""
         try:
-            response = requests.get(
+            response = self.session.get(
                 f"{self.base_url}/projects/{self.project_id}/repository/commits/{commit_id}/diff",
-                headers=self.headers,
-                verify=False,
                 timeout=30
             )
             

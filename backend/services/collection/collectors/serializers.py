@@ -83,6 +83,7 @@ class CollectionSerializer(serializers.ModelSerializer):
             'stats',
             'error_message',
             'raw_data_filename',
+            'is_external',
         ]
         read_only_fields = [
             'id', 
