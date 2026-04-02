@@ -2,12 +2,15 @@ import React, { useState, useEffect } from "react";
 import { workspaceService } from "../../services/api";
 
 const ImportRepositoriesModal = ({ workspaceId, onClose }) => {
+  const [activeTab, setActiveTab] = useState("workspace");
   const [remoteRepos, setRemoteRepos] = useState([]);
   const [selectedRepos, setSelectedRepos] = useState([]);
   const [importedRepoIds, setImportedRepoIds] = useState([]);
+  const [directRepositoryId, setDirectRepositoryId] = useState("");
   const [isLoadingRepos, setIsLoadingRepos] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [importComplete, setImportComplete] = useState(false);
+  const [importedCount, setImportedCount] = useState(0);
 
   useEffect(() => {
     loadData();
@@ -43,20 +46,39 @@ const ImportRepositoriesModal = ({ workspaceId, onClose }) => {
   };
 
   const handleImportRepositories = async () => {
-    const newReposToImport = selectedRepos.filter(
-      (repoId) => !importedRepoIds.includes(repoId)
-    );
+    const trimmedDirectRepositoryId = directRepositoryId.trim();
+    const repositoryIdsToImport =
+      activeTab === "workspace"
+        ? selectedRepos.filter((repoId) => !importedRepoIds.includes(repoId))
+        : trimmedDirectRepositoryId
+        ? [trimmedDirectRepositoryId]
+        : [];
 
-    if (newReposToImport.length === 0) {
-      alert("No new repositories to import");
+    if (repositoryIdsToImport.length === 0) {
+      alert(
+        activeTab === "workspace"
+          ? "No new repositories to import"
+          : "Please enter a repository ID"
+      );
+      return;
+    }
+
+    if (
+      activeTab === "direct" &&
+      importedRepoIds.includes(trimmedDirectRepositoryId)
+    ) {
+      alert("This repository is already imported");
       return;
     }
 
     setIsImporting(true);
     try {
-      await workspaceService.importRepositories(workspaceId, {
-        repository_ids: newReposToImport,
+      const response = await workspaceService.importRepositories(workspaceId, {
+        repository_ids: repositoryIdsToImport,
       });
+      setImportedCount(
+        response.data?.imported_count ?? repositoryIdsToImport.length
+      );
       setImportComplete(true);
     } catch (error) {
       console.error("Error importing repositories:", error);
@@ -67,22 +89,24 @@ const ImportRepositoriesModal = ({ workspaceId, onClose }) => {
   };
 
   const toggleRepoSelection = (repoId) => {
-    if (importedRepoIds.includes(repoId)) {
+    const normalizedRepoId = String(repoId);
+
+    if (importedRepoIds.includes(normalizedRepoId)) {
       return;
     }
 
     setSelectedRepos((prev) =>
-      prev.includes(repoId)
-        ? prev.filter((id) => id !== repoId)
-        : [...prev, repoId]
+      prev.includes(normalizedRepoId)
+        ? prev.filter((id) => id !== normalizedRepoId)
+        : [...prev, normalizedRepoId]
     );
   };
 
   const toggleSelectAll = () => {
     const selectableRepos = remoteRepos.filter(
-      (repo) => !importedRepoIds.includes(repo.id)
+      (repo) => !importedRepoIds.includes(String(repo.id))
     );
-    const selectableIds = selectableRepos.map((repo) => repo.id);
+    const selectableIds = selectableRepos.map((repo) => String(repo.id));
 
     const allSelectableSelected = selectableIds.every((id) =>
       selectedRepos.includes(id)
@@ -104,6 +128,16 @@ const ImportRepositoriesModal = ({ workspaceId, onClose }) => {
   const newSelectedCount = selectedRepos.filter(
     (id) => !importedRepoIds.includes(id)
   ).length;
+  const trimmedDirectRepositoryId = directRepositoryId.trim();
+  const isDirectRepoAlreadyImported =
+    trimmedDirectRepositoryId.length > 0 &&
+    importedRepoIds.includes(trimmedDirectRepositoryId);
+  const readyToImportCount =
+    activeTab === "workspace"
+      ? newSelectedCount
+      : trimmedDirectRepositoryId && !isDirectRepoAlreadyImported
+      ? 1
+      : 0;
 
   if (importComplete) {
     return (
@@ -129,7 +163,7 @@ const ImportRepositoriesModal = ({ workspaceId, onClose }) => {
               Import successful!
             </h3>
             <p className="text-sm sm:text-base text-gray-600 mb-6">
-              <strong>{newSelectedCount}</strong> repository(s) imported
+              <strong>{importedCount}</strong> repository(s) imported
               successfully
             </p>
             <button
@@ -154,7 +188,7 @@ const ImportRepositoriesModal = ({ workspaceId, onClose }) => {
                 Import repositories
               </h2>
               <p className="text-xs sm:text-sm text-gray-500 mt-1">
-                {selectedRepos.length} repository(s) selected
+                {readyToImportCount} repository(s) ready to import
                 {importedRepoIds.length > 0 && (
                   <span className="text-blue-600">
                     {" "}
@@ -185,12 +219,37 @@ const ImportRepositoriesModal = ({ workspaceId, onClose }) => {
         </div>
 
         <div className="px-4 sm:px-6 py-6 sm:py-8">
-          {isLoadingRepos ? (
+          <div className="inline-flex rounded-lg bg-gray-100 p-1 mb-6">
+            <button
+              type="button"
+              onClick={() => setActiveTab("workspace")}
+              className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                activeTab === "workspace"
+                  ? "bg-white text-blue-700 shadow-sm"
+                  : "text-gray-600 hover:text-gray-900"
+              }`}
+            >
+              Workspace repositories
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("direct")}
+              className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                activeTab === "direct"
+                  ? "bg-white text-blue-700 shadow-sm"
+                  : "text-gray-600 hover:text-gray-900"
+              }`}
+            >
+              Import by ID
+            </button>
+          </div>
+
+          {activeTab === "workspace" && isLoadingRepos ? (
             <div className="text-center py-12">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
               <p className="text-gray-600 text-sm">Loading repositories...</p>
             </div>
-          ) : remoteRepos.length === 0 ? (
+          ) : activeTab === "workspace" && remoteRepos.length === 0 ? (
             <div className="text-center py-12 bg-gray-50 rounded-lg">
               <svg
                 className="w-16 h-16 text-gray-400 mx-auto mb-4"
@@ -210,6 +269,50 @@ const ImportRepositoriesModal = ({ workspaceId, onClose }) => {
                 No repositories found to import
               </p>
             </div>
+          ) : activeTab === "direct" ? (
+            <div className="space-y-5">
+              <div className="rounded-lg border border-blue-100 bg-blue-50 p-4">
+                <p className="text-sm text-blue-900">
+                  Import a repository by entering its GitHub or GitLab external
+                  ID, even if it does not appear in this workspace list.
+                </p>
+              </div>
+
+              <div>
+                <label
+                  htmlFor="direct-repository-id"
+                  className="block text-sm font-medium text-gray-700 mb-2"
+                >
+                  Repository ID
+                </label>
+                <input
+                  id="direct-repository-id"
+                  type="text"
+                  value={directRepositoryId}
+                  onChange={(event) =>
+                    setDirectRepositoryId(event.target.value)
+                  }
+                  placeholder="Example: 123456789"
+                  className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                />
+                <p className="text-xs text-gray-500 mt-2">
+                  Use the external repository ID from the Git provider.
+                </p>
+              </div>
+
+              {isDirectRepoAlreadyImported && (
+                <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+                  This repository is already imported in the workspace.
+                </div>
+              )}
+
+              {!isDirectRepoAlreadyImported && trimmedDirectRepositoryId && (
+                <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700">
+                  Repository <strong>{trimmedDirectRepositoryId}</strong> is
+                  ready to import.
+                </div>
+              )}
+            </div>
           ) : (
             <div className="space-y-4">
               <div className="flex justify-between items-center">
@@ -219,8 +322,8 @@ const ImportRepositoriesModal = ({ workspaceId, onClose }) => {
                     className="px-3 sm:px-4 py-2 text-xs sm:text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
                   >
                     {remoteRepos
-                      .filter((r) => !importedRepoIds.includes(r.id))
-                      .every((r) => selectedRepos.includes(r.id))
+                      .filter((r) => !importedRepoIds.includes(String(r.id)))
+                      .every((r) => selectedRepos.includes(String(r.id)))
                       ? "Deselect All"
                       : "Select All"}
                   </button>
@@ -308,12 +411,12 @@ const ImportRepositoriesModal = ({ workspaceId, onClose }) => {
 
           <button
             onClick={handleImportRepositories}
-            disabled={isImporting || newSelectedCount === 0}
+            disabled={isImporting || readyToImportCount === 0}
             className="px-4 sm:px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
           >
             {isImporting
               ? "Importing..."
-              : `Import ${newSelectedCount > 0 ? `(${newSelectedCount})` : ""}`}
+              : `Import ${readyToImportCount > 0 ? `(${readyToImportCount})` : ""}`}
           </button>
         </div>
       </div>

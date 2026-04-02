@@ -309,7 +309,8 @@ workspace_repositories_schema = extend_schema(
 repository_import_schema = extend_schema(
     summary="Import selected repositories",
     description=(
-        "Import the selected Git repositories into the database using their external IDs."
+        "Import Git repositories into the database using their external IDs, "
+        "whether they come from the workspace repository list or are provided directly."
     ),
     tags=["Repositories"],
     parameters=[
@@ -327,7 +328,10 @@ repository_import_schema = extend_schema(
                 "repository_ids": {
                     "type": "array",
                     "items": {"type": "string"},
-                    "description": "List of external IDs (GitHub/GitLab) of the repositories to import",
+                    "description": (
+                        "List of external IDs (GitHub/GitLab) of the repositories "
+                        "to import, including repositories provided manually by ID"
+                    ),
                 }
             },
             "required": ["repository_ids"],
