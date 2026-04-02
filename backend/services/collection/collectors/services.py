@@ -385,6 +385,26 @@ class CollectionService:
         return collection
 
     @staticmethod
+    def pause_collection(collection: Collection) -> Collection:
+        """Pause a running collection. Keeps data in DB and MinIO for later resume."""
+        if collection.status != "in_progress":
+            raise CollectionStateError(
+                f"Cannot pause collection with status: {collection.status}"
+            )
+
+        # Signal the background thread to stop
+        cancellation_registry.cancel(collection.id)
+
+        # Update status to paused
+        collection.status = "paused"
+        collection.paused_at = timezone.now()
+        collection.error_message = "Collection paused by user"
+        collection.save()
+
+        logger.info(f"Collection {collection.id} paused by user")
+        return collection
+
+    @staticmethod
     def get_collection_status(collection: Collection) -> Dict[str, Any]:
         """Get the current status of a collection."""
         return {

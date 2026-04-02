@@ -11,6 +11,9 @@ import {
   AlertTriangle,
   WifiOff,
   Loader2,
+  Pause,
+  Trash2,
+  StopCircle,
 } from "lucide-react";
 import { collectionService, workspaceService } from "../../services/api";
 import {
@@ -54,6 +57,8 @@ function CollectionProgress() {
     message: "",
     warnings: [],
   });
+  const [showStopModal, setShowStopModal] = useState(false);
+  const [isStopping, setIsStopping] = useState(false);
 
   const consecutiveErrorsRef = useRef(0);
   const automaticTransitionStartedRef = useRef(false);
@@ -263,6 +268,58 @@ function CollectionProgress() {
     runAutomaticCleaning();
   };
 
+  const handlePauseCollection = async () => {
+    try {
+      setIsStopping(true);
+      await collectionService.pauseCollection(planId);
+      setShowStopModal(false);
+      navigate(
+        `/workspaces/${workspaceId}/repositories/${repositoryId}/collect`,
+        {
+          state: {
+            interruptedCollection: {
+              id: planId,
+              collected_items: status?.collected_items || 0,
+              total_items: status?.total_items || 0,
+              progress_percentage: status?.progress_percentage || 0,
+              last_collected_item:
+                status?.last_collected_item ||
+                status?.collection_plan?.last_collected_item_id,
+              can_resume: true,
+            },
+          },
+        }
+      );
+    } catch (err) {
+      setErrorMessage(
+        getApiErrorMessage(err, "Failed to pause collection")
+      );
+      setShowStopModal(false);
+      setShowErrorModal(true);
+    } finally {
+      setIsStopping(false);
+    }
+  };
+
+  const handleCancelCollection = async () => {
+    try {
+      setIsStopping(true);
+      await collectionService.deleteCollection(planId);
+      setShowStopModal(false);
+      navigate(
+        `/workspaces/${workspaceId}/repositories/${repositoryId}/collect`
+      );
+    } catch (err) {
+      setErrorMessage(
+        getApiErrorMessage(err, "Failed to cancel collection")
+      );
+      setShowStopModal(false);
+      setShowErrorModal(true);
+    } finally {
+      setIsStopping(false);
+    }
+  };
+
   if (loading || !repository) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -456,10 +513,97 @@ function CollectionProgress() {
                   </p>
                 </div>
               </div>
+
+              {collectionStatusValue === "in_progress" && (
+                <div className="mt-4 flex justify-center">
+                  <button
+                    onClick={() => setShowStopModal(true)}
+                    className="flex items-center gap-2 px-5 py-2.5 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 transition-colors"
+                  >
+                    <StopCircle className="w-4 h-4" />
+                    Stop Collection
+                  </button>
+                </div>
+              )}
             </>
           )}
         </div>
       </div>
+
+      {showStopModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full mx-4 p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
+                <StopCircle className="w-6 h-6 text-red-600" />
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900">
+                Stop Collection
+              </h3>
+            </div>
+
+            {status && (status.collected_items > 0 || status.total_items > 0) && (
+              <div className="mb-4 bg-gray-50 border border-gray-200 rounded-lg p-4">
+                <div className="flex justify-between text-sm text-gray-600">
+                  <span>Current progress</span>
+                  <span className="font-medium text-gray-900">
+                    {status.collected_items} / {status.total_items} {itemLabel}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            <p className="text-gray-600 mb-6">
+              Choose how you want to stop the collection:
+            </p>
+
+            <div className="flex flex-col gap-3">
+              <button
+                onClick={handlePauseCollection}
+                disabled={isStopping}
+                className="w-full flex items-center gap-3 px-4 py-3 border border-yellow-300 bg-yellow-50 text-yellow-900 rounded-lg hover:bg-yellow-100 transition-colors disabled:opacity-50"
+              >
+                <Pause className="w-5 h-5 text-yellow-600 shrink-0" />
+                <div className="text-left">
+                  <p className="font-medium">Pause &amp; keep data</p>
+                  <p className="text-xs text-yellow-700">
+                    Stop now and resume later from where it left off
+                  </p>
+                </div>
+              </button>
+
+              <button
+                onClick={handleCancelCollection}
+                disabled={isStopping}
+                className="w-full flex items-center gap-3 px-4 py-3 border border-red-300 bg-red-50 text-red-900 rounded-lg hover:bg-red-100 transition-colors disabled:opacity-50"
+              >
+                <Trash2 className="w-5 h-5 text-red-600 shrink-0" />
+                <div className="text-left">
+                  <p className="font-medium">Cancel &amp; delete</p>
+                  <p className="text-xs text-red-700">
+                    Stop and permanently delete all collected data
+                  </p>
+                </div>
+              </button>
+
+              <button
+                onClick={() => setShowStopModal(false)}
+                disabled={isStopping}
+                className="w-full px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+              >
+                Continue collecting
+              </button>
+            </div>
+
+            {isStopping && (
+              <div className="mt-4 flex items-center justify-center gap-2 text-sm text-gray-500">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Stopping collection...
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {showErrorModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">

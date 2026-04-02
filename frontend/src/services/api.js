@@ -258,6 +258,11 @@ export const collectionService = {
     return collectionApi.post(`/plans/${planId}/resume/`);
   },
 
+  // Pause collection (keep data for later resume)
+  pauseCollection: (planId) => {
+    return collectionApi.post(`/plans/${planId}/pause/`);
+  },
+
   // Get collection status
   getStatus: (planId) => {
     return collectionApi.get(`/plans/${planId}/status/`);

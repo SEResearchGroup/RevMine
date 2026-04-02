@@ -394,6 +394,31 @@ class ResumeCollectionView(UserIdRequiredMixin, APIView):
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
+class PauseCollectionView(UserIdRequiredMixin, APIView):
+    """Pause a running collection (keeps data for later resume)"""
+
+    def post(self, request, plan_id):
+        user_id = self.get_user_id(request)
+        if not user_id:
+            return self.user_id_error_response()
+
+        collection = get_object_or_404(Collection, id=plan_id, user=user_id)
+
+        try:
+            collection = CollectionService.pause_collection(collection)
+
+            return Response(
+                {
+                    "success": True,
+                    "message": "Collection paused. You can resume it later.",
+                    "collection_plan": CollectionSerializer(collection).data,
+                }
+            )
+
+        except CollectionStateError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
 class CollectionPlanListView(UserIdRequiredMixin, APIView):
     """List all collections for a user"""
 

@@ -97,9 +97,19 @@ class GitLabCollector:
                     for mr in existing_data.get("merge_requests", [])
                 }
 
-            # First pass: Collect all MRs to get accurate count
-            logger.info("Collecting MRs...")
-            all_mrs = []
+            # Get total MR count using the iid trick (single API call)
+            total_mrs = self._get_total_mr_count(filters)
+            logger.info(f"Total MR count (from latest iid): {total_mrs}")
+
+            # Immediately report total so the frontend can display it during pagination
+            if progress_callback and total_mrs > 0:
+                progress_callback(
+                    len(collected_mrs), total_mrs, "Starting collection..."
+                )
+
+            # Process MRs page by page — no pre-scan needed
+            collected_count = len(collected_mrs)
+            failed_mrs = []
             page = 1
 
             while True:
@@ -111,55 +121,43 @@ class GitLabCollector:
                     break
 
                 logger.info(f"Found {len(mrs)} MRs on page {page}")
-                all_mrs.extend(mrs)
+
+                for mr in mrs:
+                    # Skip already collected MRs (resume support)
+                    if mr['iid'] in collected_mrs:
+                        continue
+
+                    try:
+                        mr_data = self._process_merge_request(mr['iid'])
+                    except Exception as e:
+                        logger.warning(f"Skipping MR !{mr['iid']} due to error: {e}")
+                        failed_mrs.append(mr['iid'])
+                        continue
+
+                    if mr_data:
+                        all_data["merge_requests"].append(mr_data)
+                        collected_count += 1
+
+                        if progress_callback:
+                            progress_callback(
+                                collected_count,
+                                total_mrs,
+                                f"Collected MR !{mr['iid']}",
+                                mr_data,
+                                all_data
+                            )
+
                 page += 1
 
-                # Safety limit to prevent infinite loops
-                if page > 50:
-                    logger.warning("Reached page limit (50), stopping pagination")
-                    break
-
-            # Filter out already collected MRs
-            if collected_mrs:
-                all_mrs = [mr for mr in all_mrs if mr['iid'] not in collected_mrs]
-            
-            total_mrs = len(all_mrs) + len(collected_mrs)
-            logger.info(
-                f"Total MRs to process: {len(all_mrs)} (already collected: {len(collected_mrs)})"
-            )
-
-            if progress_callback:
-                progress_callback(
-                    len(collected_mrs), total_mrs, "Starting collection..."
-                )
-
-            # Process each MR
-            collected_count = len(collected_mrs)
-            failed_mrs = []
-            
-            for mr in all_mrs:
-                try:
-                    mr_data = self._process_merge_request(mr['iid'])
-                except Exception as e:
-                    logger.warning(f"Skipping MR !{mr['iid']} due to error: {e}")
-                    failed_mrs.append(mr['iid'])
-                    continue
-                if mr_data:
-                    all_data["merge_requests"].append(mr_data)
-                    collected_count += 1
-
-                    # Update progress with item data for incremental saving
-                    if progress_callback:
-                        progress_callback(
-                            collected_count,
-                            total_mrs,
-                            f"Collected MR !{mr['iid']}",
-                            mr_data,
-                            all_data
-                        )
-            
             if failed_mrs:
                 logger.warning(f"Failed to collect {len(failed_mrs)} MRs: {failed_mrs}")
+
+            # Update total_mrs to actual count now that we've seen all pages
+            total_mrs = collected_count
+            if progress_callback:
+                progress_callback(
+                    collected_count, total_mrs, "Finalizing..."
+                )
             
             # Deduplicate MRs by merge_request_id as a safety net
             seen = {}
@@ -194,6 +192,42 @@ class GitLabCollector:
         except Exception as e:
             logger.error(f"Error getting project ID: {e}")
             return None
+
+    def _get_total_mr_count(self, filters=None):
+        """
+        Get total MR count using the iid trick: fetch per_page=1 to get the
+        latest MR, then read its 'iid' field which equals the total MR number.
+        Falls back to x-total header if available, or 0 if both fail.
+        """
+        try:
+            params = {
+                "page": 1,
+                "per_page": 1,
+                "state": "all",
+            }
+
+            response = self.session.get(
+                f"{self.base_url}/projects/{self.project_id}/merge_requests",
+                params=params,
+                timeout=30
+            )
+
+            if response.status_code == 200:
+                # Try x-total header first (most accurate with filters)
+                x_total = response.headers.get('x-total')
+                if x_total:
+                    return int(x_total)
+
+                # Fallback: use iid of the latest MR (works for unfiltered "all" queries)
+                data = response.json()
+                if data and len(data) > 0:
+                    latest_iid = data[0].get('iid', 0)
+                    return latest_iid
+
+            return 0
+        except Exception as e:
+            logger.warning(f"Could not get total MR count: {e}")
+            return 0
 
     def _get_merge_requests_page(self, page, filters=None):
         """Get one page of merge requests"""

@@ -15,6 +15,7 @@ from .views import (
     DataCleaningConfigView,
     ApplyFiltersAndCreateCSVView,
     ResumeCollectionView,
+    PauseCollectionView,
     CollectionCleanedDataListView,
     CreateCleanedDataView,
     CleanedDataDetailView,
@@ -66,6 +67,11 @@ urlpatterns = [
         "plans/<int:plan_id>/resume/",
         ResumeCollectionView.as_view(),
         name="collection-resume",
+    ),
+    path(
+        "plans/<int:plan_id>/pause/",
+        PauseCollectionView.as_view(),
+        name="collection-pause",
     ),
     # Data cleaning and structuring
     path(

@@ -146,6 +146,12 @@ def execute_collection_task(plan_id, resume=False):
         # Progress callback with incremental saving
         def save_progress(current, total, message="", item_data=None, all_data=None):
             try:
+                # Check if collection was paused or cancelled
+                if cancellation_registry.is_cancelled(plan_id):
+                    cancellation_registry.remove(plan_id)
+                    logger.info(f"Collection {plan_id} stopped by cancellation registry")
+                    raise CollectionCancelledException(f"Collection {plan_id} was stopped")
+
                 collection.refresh_from_db()
                 collection.collected_items = current
                 collection.total_items = total
@@ -177,6 +183,8 @@ def execute_collection_task(plan_id, resume=False):
                     except:
                         pass
                 raise CollectionCancelledException(f"Collection {plan_id} was deleted")
+            except CollectionCancelledException:
+                raise
             except Exception as e:
                 logger.error(f"Error saving progress: {e}")
 
@@ -229,13 +237,19 @@ def execute_collection_task(plan_id, resume=False):
     except CollectionCancelledException as e:
         logger.info(f"Collection {plan_id} was cancelled: {e}")
         cancellation_registry.remove(plan_id)
-        # Clean up any remaining MinIO file
-        if raw_data_filename:
-            try:
-                minio_client.delete_file(raw_data_filename)
-                logger.info(f"Final cleanup of MinIO file {raw_data_filename}")
-            except Exception as cleanup_error:
-                logger.warning(f"Could not clean up MinIO file during cancellation: {cleanup_error}")
+        # Only clean up MinIO file if the collection was fully deleted (not paused)
+        try:
+            Collection.objects.get(id=plan_id)
+            # Collection still exists (paused) — keep MinIO data
+            logger.info(f"Collection {plan_id} was paused, keeping MinIO data")
+        except Collection.DoesNotExist:
+            # Collection was deleted — clean up MinIO file
+            if raw_data_filename:
+                try:
+                    minio_client.delete_file(raw_data_filename)
+                    logger.info(f"Final cleanup of MinIO file {raw_data_filename}")
+                except Exception as cleanup_error:
+                    logger.warning(f"Could not clean up MinIO file during cancellation: {cleanup_error}")
     except Exception as e:
         logger.error(f"Collection failed for {plan_id}: {e}")
         cancellation_registry.remove(plan_id)
