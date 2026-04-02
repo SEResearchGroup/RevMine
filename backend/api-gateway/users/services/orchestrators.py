@@ -4,6 +4,14 @@ import requests
 from django.http import JsonResponse
 
 from ..utils.request_utils import parse_json_body
+from .collection_automation import (
+    DEFAULT_LLM_MODEL,
+    CollectionAutomationValidationError,
+    build_collection_automation_debug_context,
+    build_llm_collection_prompt,
+    normalize_collection_automation_payload,
+    sanitize_user_prompt,
+)
 from .service_clients import (
     ServiceClientError,
     build_collection_payload,
@@ -14,9 +22,10 @@ logger = logging.getLogger(__name__)
 
 
 class CollectionOrchestrator:
-    def __init__(self, config_client, collection_client):
+    def __init__(self, config_client, collection_client, llm_client):
         self.config_client = config_client
         self.collection_client = collection_client
+        self.llm_client = llm_client
 
     def start_collection(self, request, user_id):
         """
@@ -103,6 +112,99 @@ class CollectionOrchestrator:
             if e.detail:
                 error_response["detail"] = e.detail
             return JsonResponse(error_response, status=e.status_code)
+
+    def preview_automatic_collection(self, request, user_id):
+        """Generate, validate, and normalize an automatic collection draft."""
+        body_data, error_response = parse_json_body(request)
+        if error_response:
+            return error_response
+
+        repository_id = body_data.get("repository_id")
+        workspace_id = body_data.get("workspace_id")
+        model = body_data.get("model") or DEFAULT_LLM_MODEL
+
+        try:
+            prompt = sanitize_user_prompt(body_data.get("prompt"))
+        except CollectionAutomationValidationError as exc:
+            return JsonResponse({"error": str(exc)}, status=400)
+
+        if not repository_id or not workspace_id:
+            return JsonResponse(
+                {"error": "repository_id and workspace_id are required"},
+                status=400,
+            )
+
+        logger.info(
+            "Generating automatic collection draft for repository=%s workspace=%s model=%s prompt_length=%s",
+            repository_id,
+            workspace_id,
+            model,
+            len(prompt),
+        )
+
+        try:
+            llm_response = None
+            repository_details = self.config_client.get_repository(
+                workspace_id, repository_id, user_id
+            )
+            llm_prompt = build_llm_collection_prompt(repository_details, prompt)
+            llm_response, llm_status = self.llm_client.generate_collection_draft(
+                prompt=llm_prompt,
+                model=model,
+            )
+
+            if llm_status >= 400:
+                detail = llm_response.get("detail") if isinstance(llm_response, dict) else None
+                error_body = {
+                    "error": "Failed to generate automatic draft",
+                    "detail": detail or llm_response,
+                }
+                return JsonResponse(error_body, status=llm_status)
+            
+            branches_payload = build_branches_payload(repository_details, workspace_id)
+            branches_response, branches_status = self.collection_client.get_branches(
+                branches_payload,
+                user_id,
+            )
+            available_branches = []
+            if branches_status < 400 and isinstance(branches_response, dict):
+                available_branches = branches_response.get("branches") or []
+            else:
+                logger.warning(
+                    "Could not fetch branches for automatic draft validation: status=%s",
+                    branches_status,
+                )
+
+            normalized = normalize_collection_automation_payload(
+                llm_payload=llm_response,
+                repository_details=repository_details,
+                available_branches=available_branches,
+            )
+
+            normalized["available_branches"] = available_branches
+            return JsonResponse({"success": True, **normalized}, status=200)
+
+        except CollectionAutomationValidationError as exc:
+            debug_context = build_collection_automation_debug_context(llm_response)
+            logger.warning(
+                "Automatic draft validation failed for repository=%s workspace=%s: %s | debug=%s",
+                repository_id,
+                workspace_id,
+                exc,
+                debug_context,
+            )
+            return JsonResponse(
+                {
+                    "error": str(exc),
+                    "detail": debug_context,
+                },
+                status=422,
+            )
+        except ServiceClientError as e:
+            error_body = {"error": e.message}
+            if e.detail:
+                error_body["detail"] = e.detail
+            return JsonResponse(error_body, status=e.status_code)
 
 
 class AnalysisOrchestrator:

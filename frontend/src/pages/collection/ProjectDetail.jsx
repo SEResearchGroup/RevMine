@@ -1,10 +1,3 @@
-/**
- * frontend/src/pages/collection/ProjectDetail.jsx
- *
- * FIXED: Collections are NO LONGER created automatically on page load.
- * A collection is only created when the user explicitly clicks "Go to collect plan".
- */
-
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import {
@@ -30,6 +23,18 @@ import {
 } from "lucide-react";
 import { workspaceService, collectionService } from "../../services/api";
 import CollectPlanModal from "../../components/collection/CollectPlanModal";
+import AutomaticCollectionReview from "../../components/collection/AutomaticCollectionReview";
+import { persistAutomaticWorkflow } from "../../components/collection/automaticWorkflow";
+
+const getApiErrorMessage = (error, fallbackMessage) => {
+  return (
+    error?.response?.data?.error ||
+    error?.response?.data?.detail?.message ||
+    error?.response?.data?.detail ||
+    error?.message ||
+    fallbackMessage
+  );
+};
 
 function ProjectDetail() {
   const { workspaceId, repositoryId } = useParams();
@@ -41,12 +46,7 @@ function ProjectDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Collection plan - only set when user explicitly creates one
-  const [planId, setPlanId] = useState(null);
   const [platform, setPlatform] = useState("");
-
-  // Active collection info (if one already exists)
-  const [activeCollection, setActiveCollection] = useState(null);
 
   // Available metrics (categorized) - loaded WITHOUT creating a collection
   const [availableMetrics, setAvailableMetrics] = useState({});
@@ -69,15 +69,25 @@ function ProjectDetail() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [selectedStatus, setSelectedStatus] = useState(["open", "closed", "merged"]);
+  const [collectionMode, setCollectionMode] = useState("manual");
+
+  // Automatic mode
+  const [automationPrompt, setAutomationPrompt] = useState("");
+  const [automationDraft, setAutomationDraft] = useState(null);
+  const [automationWarnings, setAutomationWarnings] = useState([]);
+  const [automationLoading, setAutomationLoading] = useState(false);
+  const [automationExecuting, setAutomationExecuting] = useState(false);
+  const [automationError, setAutomationError] = useState(null);
 
   // Modal
   const [showPlanModal, setShowPlanModal] = useState(false);
   const [collectionPlan, setCollectionPlan] = useState(null);
+  const [collectionPlanMode, setCollectionPlanMode] = useState("manual");
+  const [collectionPlanAutomationContext, setCollectionPlanAutomationContext] =
+    useState(null);
 
   // Collection History
   const [collectionHistory, setCollectionHistory] = useState([]);
-  const [loadingHistory, setLoadingHistory] = useState(false);
-
   // Delete confirmation modal
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [collectionToDelete, setCollectionToDelete] = useState(null);
@@ -89,6 +99,7 @@ function ProjectDetail() {
 
   // Loading state for creating collection
   const [creatingCollection, setCreatingCollection] = useState(false);
+  const [pendingActionType, setPendingActionType] = useState(null);
 
   // Interrupted collection notification (only for paused/failed, NOT in_progress)
   const [interruptedNotifications, setInterruptedNotifications] = useState([]);
@@ -196,10 +207,6 @@ function ProjectDetail() {
     }
   };
 
-  /**
-   * Load available metrics and branches WITHOUT creating a collection.
-   * This is the key fix - we no longer call startCollection() on page load.
-   */
   const loadMetricsAndBranches = async (repoPlatform) => {
     try {
       // Get available metrics (does NOT create a collection)
@@ -213,8 +220,6 @@ function ProjectDetail() {
       // If there's already an active collection, restore its settings
       if (metricsRes.data.has_active_collection && metricsRes.data.active_collection) {
         const existingCollection = metricsRes.data.active_collection;
-        setActiveCollection(existingCollection);
-        setPlanId(existingCollection.id);
 
         // Restore selected metrics if any
         if (existingCollection.selected_metrics?.length > 0) {
@@ -250,7 +255,6 @@ function ProjectDetail() {
 
   const fetchCollectionHistory = async () => {
     try {
-      setLoadingHistory(true);
       const res = await collectionService.getHistory(repositoryId);
       const collections = res.data.collections || [];
       setCollectionHistory(collections);
@@ -286,9 +290,7 @@ function ProjectDetail() {
       });
     } catch (err) {
       console.error("Error fetching history:", err);
-    } finally {
-      setLoadingHistory(false);
-    }
+    } 
   };
 
   /**
@@ -410,6 +412,68 @@ function ProjectDetail() {
     );
   }, [selectedMetrics, availableMetrics]);
 
+  const applyAutomationCollectionToForm = (collectionDraft) => {
+    if (!collectionDraft) return;
+
+    setSelectedMetrics(collectionDraft.selected_metrics || []);
+    setSelectedBranch(collectionDraft.branch_name || "");
+    setStartDate(collectionDraft.start_date || "");
+    setEndDate(collectionDraft.end_date || "");
+    setSelectedStatus(
+      collectionDraft.status?.length > 0
+        ? collectionDraft.status
+        : ["open", "closed", "merged"]
+    );
+  };
+
+  const buildMetricLabels = () => {
+    const labels = {};
+    Object.values(availableMetrics).forEach((metricList) => {
+      metricList.forEach((metric) => {
+        labels[metric.value] = metric.label;
+      });
+    });
+    return labels;
+  };
+
+  const buildAutomaticWorkflowPayload = () => {
+    if (!automationDraft) {
+      return null;
+    }
+
+    return {
+      type: "automatic",
+      prompt: automationPrompt,
+      warnings: automationWarnings,
+      draft: automationDraft,
+    };
+  };
+
+  const handleGenerateAutomationDraft = async () => {
+    try {
+      setAutomationLoading(true);
+      setAutomationError(null);
+      setAutomationDraft(null);
+      setAutomationWarnings([]);
+
+      const response = await collectionService.generateAutomationDraft({
+        workspace_id: Number(workspaceId),
+        repository_id: Number(repositoryId),
+        prompt: automationPrompt,
+      });
+
+      setAutomationDraft(response.data.draft);
+      setAutomationWarnings(response.data.warnings || []);
+      applyAutomationCollectionToForm(response.data.draft.collection);
+    } catch (err) {
+      setAutomationError(
+        getApiErrorMessage(err, "Failed to generate an automatic draft.")
+      );
+    } finally {
+      setAutomationLoading(false);
+    }
+  };
+
   /**
    * Handle "Go to collect plan" button click.
    * Check for incomplete collections first, then create if confirmed.
@@ -431,6 +495,7 @@ function ProjectDetail() {
     );
 
     if (incomplete.length > 0) {
+      setPendingActionType("manual");
       setIncompleteCollections(incomplete);
       setShowIncompleteWarning(true);
       return;
@@ -440,11 +505,31 @@ function ProjectDetail() {
     await proceedWithNewCollection();
   };
 
+  const handleApproveAutomation = async () => {
+    if (!automationDraft) {
+      return;
+    }
+
+    const incomplete = collectionHistory.filter(
+      (collection) => ["paused", "failed", "in_progress"].includes(collection.status)
+    );
+
+    if (incomplete.length > 0) {
+      setPendingActionType("automatic");
+      setIncompleteCollections(incomplete);
+      setShowIncompleteWarning(true);
+      return;
+    }
+
+    await proceedWithAutomaticCollectionPlan();
+  };
+
   /**
    * Actually create the new collection after confirmation
    */
   const proceedWithNewCollection = async () => {
     setShowIncompleteWarning(false);
+    setPendingActionType(null);
     setCreatingCollection(true);
 
     try {
@@ -452,12 +537,12 @@ function ProjectDetail() {
       // 1. Return the existing active collection if it's still valid
       // 2. Mark stale collections as paused and create a new one
       // 3. Create a new collection if none exists
+      // alert("Creating collection plan. This may take a few moments...");
       const startRes = await collectionService.startCollection(
         workspaceId,
         repositoryId
       );
       const currentPlanId = startRes.data.collection_plan.id;
-      setPlanId(currentPlanId);
 
       // Configure metrics on the collection
       await collectionService.configureMetrics(currentPlanId, {
@@ -470,6 +555,8 @@ function ProjectDetail() {
 
       // Get validation summary
       const validateRes = await collectionService.validatePlan(currentPlanId);
+      setCollectionPlanMode("manual");
+      setCollectionPlanAutomationContext(null);
       setCollectionPlan(validateRes.data);
       setShowPlanModal(true);
     } catch (err) {
@@ -479,14 +566,60 @@ function ProjectDetail() {
     }
   };
 
+  const proceedWithAutomaticCollectionPlan = async () => {
+    if (!automationDraft) {
+      return;
+    }
+
+    setShowIncompleteWarning(false);
+    setPendingActionType(null);
+    setAutomationExecuting(true);
+    setAutomationError(null);
+
+    try {
+      const startRes = await collectionService.startCollection(
+        workspaceId,
+        repositoryId
+      );
+      const currentPlanId = startRes.data.collection_plan.id;
+
+      await collectionService.configureMetrics(currentPlanId, {
+        selected_metrics: automationDraft.collection.selected_metrics,
+        start_date: automationDraft.collection.start_date || null,
+        end_date: automationDraft.collection.end_date || null,
+        status: automationDraft.collection.status,
+        branch_name: automationDraft.collection.branch_name,
+      });
+
+      const validateRes = await collectionService.validatePlan(currentPlanId);
+      setCollectionPlanMode("automatic");
+      setCollectionPlanAutomationContext(buildAutomaticWorkflowPayload());
+      setCollectionPlan(validateRes.data);
+      setShowPlanModal(true);
+    } catch (err) {
+      setAutomationError(
+        getApiErrorMessage(err, "Failed to prepare the automatic workflow.")
+      );
+    } finally {
+      setAutomationExecuting(false);
+    }
+  };
+
   const handleStartCollection = async () => {
     try {
       const planIdToUse = collectionPlan.collection_plan.id;
       await collectionService.executeCollection(planIdToUse);
 
+      const progressState = {};
+      if (collectionPlanMode === "automatic" && collectionPlanAutomationContext) {
+        persistAutomaticWorkflow(planIdToUse, collectionPlanAutomationContext);
+        progressState.automaticWorkflow = collectionPlanAutomationContext;
+      }
+
       // Navigate to progress page
       navigate(
-        `/workspaces/${workspaceId}/repositories/${repositoryId}/collection/${planIdToUse}/progress`
+        `/workspaces/${workspaceId}/repositories/${repositoryId}/collection/${planIdToUse}/progress`,
+        { state: progressState }
       );
     } catch (err) {
       alert("Error starting collection: " + err.message);
@@ -609,6 +742,8 @@ function ProjectDetail() {
       />
     </div>
   );
+
+  const metricLabels = buildMetricLabels();
 
   if (loading) {
     return (
@@ -851,214 +986,250 @@ function ProjectDetail() {
             {collectionHistory.length > 0 ? 'Configure a New Collection' : 'Configure Collection'}
           </h2>
 
-          {/* Branch Selection */}
           <div className="mb-8">
-            <h3 className="text-lg font-medium mb-4">Select Branch</h3>
-
-            <div className="relative">
+            <p className="text-sm font-medium text-gray-700 mb-3">Collection mode</p>
+            <div className="inline-flex rounded-xl border border-gray-200 bg-gray-50 p-1">
               <button
-                onClick={() => setShowBranchDropdown(!showBranchDropdown)}
-                disabled={loadingBranches}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg flex items-center justify-between hover:bg-gray-50 disabled:opacity-50"
+                onClick={() => setCollectionMode("manual")}
+                className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+                  collectionMode === "manual"
+                    ? "bg-white text-blue-700 shadow-sm"
+                    : "text-gray-600 hover:text-gray-900"
+                }`}
               >
-                <span className="text-gray-700">
-                  {loadingBranches
-                    ? "Loading branches..."
-                    : selectedBranch || "Select a branch"}
-                </span>
-                <ChevronDown className="w-5 h-5 text-gray-400" />
+                Manual mode
               </button>
-
-              {showBranchDropdown && (
-                <div className="absolute z-10 w-full mt-2 bg-white border border-gray-200 rounded-lg shadow-lg max-h-64 overflow-y-auto">
-                  {branches.map((branch) => (
-                    <button
-                      key={branch.name}
-                      onClick={() => {
-                        setSelectedBranch(branch.name);
-                        setShowBranchDropdown(false);
-                      }}
-                      className={`w-full px-4 py-3 text-left hover:bg-gray-50 flex items-center justify-between ${
-                        selectedBranch === branch.name ? "bg-blue-50" : ""
-                      }`}
-                    >
-                      <span className="text-gray-700">{branch.name}</span>
-                      {branch.protected && (
-                        <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded">
-                          Protected
-                        </span>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              )}
+              <button
+                onClick={() => setCollectionMode("automatic")}
+                className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+                  collectionMode === "automatic"
+                    ? "bg-white text-sky-700 shadow-sm"
+                    : "text-gray-600 hover:text-gray-900"
+                }`}
+              >
+                Automatic mode
+              </button>
             </div>
           </div>
 
-          {/* Select Metrics by Category */}
-          <div className="mb-8">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-medium">Select Metrics</h3>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={selectAll}
-                  onChange={handleSelectAll}
-                  className="w-5 h-5 text-blue-600"
-                />
-                <span className="text-sm text-gray-700">Select All</span>
-              </label>
-            </div>
+          {collectionMode === "manual" ? (
+            <>
+              {/* Branch Selection */}
+              <div className="mb-8">
+                <h3 className="text-lg font-medium mb-4">Select Branch</h3>
 
-            {/* Search bar */}
-            <div className="relative mb-4">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-              <input
-                type="text"
-                placeholder="Search for Metrics..."
-                value={searchMetric}
-                onChange={(e) => setSearchMetric(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
+                <div className="relative">
+                  <button
+                    onClick={() => setShowBranchDropdown(!showBranchDropdown)}
+                    disabled={loadingBranches}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg flex items-center justify-between hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    <span className="text-gray-700">
+                      {loadingBranches
+                        ? "Loading branches..."
+                        : selectedBranch || "Select a branch"}
+                    </span>
+                    <ChevronDown className="w-5 h-5 text-gray-400" />
+                  </button>
 
-            {/* Metrics by Category */}
-            <div className="space-y-2 max-h-96 overflow-y-auto border border-gray-200 rounded-lg p-4">
-              {Object.entries(availableMetrics)
-                .map(([category, metrics]) => {
-                  // Filter metrics based on search
-                  const filteredMetrics = searchMetric
-                    ? metrics.filter(
-                        (metric) =>
-                          metric.label.toLowerCase().includes(searchMetric.toLowerCase()) ||
-                          metric.value.toLowerCase().includes(searchMetric.toLowerCase())
-                      )
-                    : metrics;
-
-                  // Skip category if no metrics match
-                  if (filteredMetrics.length === 0) return null;
-
-                  return (
-                    <div key={category} className="border border-gray-200 rounded-lg">
-                      {/* Category Header */}
-                      <div className="bg-gray-50 px-4 py-3 flex items-center justify-between">
-                        <div className="flex items-center gap-3 flex-1">
-                          <button
-                            onClick={() => toggleCategoryExpansion(category)}
-                            className="text-gray-600 hover:text-gray-900"
-                          >
-                            {expandedCategories[category] ? (
-                              <ChevronDown className="w-5 h-5" />
-                            ) : (
-                              <ChevronRight className="w-5 h-5" />
-                            )}
-                          </button>
-                          <label className="flex items-center gap-3 cursor-pointer flex-1">
-                            <input
-                              type="checkbox"
-                              checked={isCategorySelected(category)}
-                              onChange={() => toggleCategory(category)}
-                              className="w-5 h-5 text-blue-600"
-                            />
-                            <span className="font-medium text-gray-900">
-                              {category}
+                  {showBranchDropdown && (
+                    <div className="absolute z-10 w-full mt-2 bg-white border border-gray-200 rounded-lg shadow-lg max-h-64 overflow-y-auto">
+                      {branches.map((branch) => (
+                        <button
+                          key={branch.name}
+                          onClick={() => {
+                            setSelectedBranch(branch.name);
+                            setShowBranchDropdown(false);
+                          }}
+                          className={`w-full px-4 py-3 text-left hover:bg-gray-50 flex items-center justify-between ${
+                            selectedBranch === branch.name ? "bg-blue-50" : ""
+                          }`}
+                        >
+                          <span className="text-gray-700">{branch.name}</span>
+                          {branch.protected && (
+                            <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded">
+                              Protected
                             </span>
-                          </label>
-                        </div>
-                        <span className="text-sm text-gray-500">
-                          {filteredMetrics.length} metric{filteredMetrics.length !== 1 ? "s" : ""}
-                        </span>
-                      </div>
-
-                      {/* Category Metrics */}
-                      {expandedCategories[category] && (
-                        <div className="p-2">
-                          {filteredMetrics.map((metric) => (
-                            <label
-                              key={metric.value}
-                              className="flex items-center gap-3 p-3 hover:bg-gray-50 rounded-lg cursor-pointer"
-                            >
-                              <input
-                                type="checkbox"
-                                checked={selectedMetrics.includes(metric.value)}
-                                onChange={() => toggleMetric(metric.value)}
-                                className="w-5 h-5 text-blue-600"
-                              />
-                              <span className="text-gray-700">{metric.label}</span>
-                            </label>
-                          ))}
-                        </div>
-                      )}
+                          )}
+                        </button>
+                      ))}
                     </div>
-                  );
-                })
-                .filter(Boolean)}
-            </div>
-
-            <p className="text-sm text-gray-500 mt-2">
-              {selectedMetrics.length} metric{selectedMetrics.length !== 1 ? "s" : ""}{" "}
-              selected
-            </p>
-          </div>
-
-          {/* Apply Filters */}
-          <div>
-            <h3 className="text-lg font-medium mb-4">Apply Filters</h3>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Start Date
-                </label>
-                <input
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
+                  )}
+                </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  End Date
-                </label>
-                <input
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Status
-              </label>
-              <div className="flex gap-4">
-                {["open", "closed", "merged"].map((status) => (
-                  <label key={status} className="flex items-center gap-2">
+              {/* Select Metrics by Category */}
+              <div className="mb-8">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-medium">Select Metrics</h3>
+                  <label className="flex items-center gap-2 cursor-pointer">
                     <input
                       type="checkbox"
-                      checked={selectedStatus.includes(status)}
-                      onChange={() => toggleStatus(status)}
+                      checked={selectAll}
+                      onChange={handleSelectAll}
                       className="w-5 h-5 text-blue-600"
                     />
-                    <span className="text-gray-700 capitalize">{status}</span>
+                    <span className="text-sm text-gray-700">Select All</span>
                   </label>
-                ))}
-              </div>
-            </div>
-          </div>
+                </div>
 
-          {/* Go to Collect Plan button */}
-          <button
-            onClick={handleGoToPlan}
-            disabled={selectedMetrics.length === 0 || !selectedBranch || creatingCollection}
-            className="mt-8 w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
-          >
-            {creatingCollection ? "Creating collection plan..." : "Go to collect plan →"}
-          </button>
+                <div className="relative mb-4">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+                  <input
+                    type="text"
+                    placeholder="Search for Metrics..."
+                    value={searchMetric}
+                    onChange={(e) => setSearchMetric(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div className="space-y-2 max-h-96 overflow-y-auto border border-gray-200 rounded-lg p-4">
+                  {Object.entries(availableMetrics)
+                    .map(([category, metrics]) => {
+                      const filteredMetrics = searchMetric
+                        ? metrics.filter(
+                            (metric) =>
+                              metric.label.toLowerCase().includes(searchMetric.toLowerCase()) ||
+                              metric.value.toLowerCase().includes(searchMetric.toLowerCase())
+                          )
+                        : metrics;
+
+                      if (filteredMetrics.length === 0) return null;
+
+                      return (
+                        <div key={category} className="border border-gray-200 rounded-lg">
+                          <div className="bg-gray-50 px-4 py-3 flex items-center justify-between">
+                            <div className="flex items-center gap-3 flex-1">
+                              <button
+                                onClick={() => toggleCategoryExpansion(category)}
+                                className="text-gray-600 hover:text-gray-900"
+                              >
+                                {expandedCategories[category] ? (
+                                  <ChevronDown className="w-5 h-5" />
+                                ) : (
+                                  <ChevronRight className="w-5 h-5" />
+                                )}
+                              </button>
+                              <label className="flex items-center gap-3 cursor-pointer flex-1">
+                                <input
+                                  type="checkbox"
+                                  checked={isCategorySelected(category)}
+                                  onChange={() => toggleCategory(category)}
+                                  className="w-5 h-5 text-blue-600"
+                                />
+                                <span className="font-medium text-gray-900">
+                                  {category}
+                                </span>
+                              </label>
+                            </div>
+                            <span className="text-sm text-gray-500">
+                              {filteredMetrics.length} metric{filteredMetrics.length !== 1 ? "s" : ""}
+                            </span>
+                          </div>
+
+                          {expandedCategories[category] && (
+                            <div className="p-2">
+                              {filteredMetrics.map((metric) => (
+                                <label
+                                  key={metric.value}
+                                  className="flex items-center gap-3 p-3 hover:bg-gray-50 rounded-lg cursor-pointer"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={selectedMetrics.includes(metric.value)}
+                                    onChange={() => toggleMetric(metric.value)}
+                                    className="w-5 h-5 text-blue-600"
+                                  />
+                                  <span className="text-gray-700">{metric.label}</span>
+                                </label>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })
+                    .filter(Boolean)}
+                </div>
+
+                <p className="text-sm text-gray-500 mt-2">
+                  {selectedMetrics.length} metric{selectedMetrics.length !== 1 ? "s" : ""}{" "}
+                  selected
+                </p>
+              </div>
+
+              {/* Apply Filters */}
+              <div>
+                <h3 className="text-lg font-medium mb-4">Apply Filters</h3>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Start Date
+                    </label>
+                    <input
+                      type="date"
+                      value={startDate}
+                      onChange={(e) => setStartDate(e.target.value)}
+                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      End Date
+                    </label>
+                    <input
+                      type="date"
+                      value={endDate}
+                      onChange={(e) => setEndDate(e.target.value)}
+                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Status
+                  </label>
+                  <div className="flex gap-4">
+                    {["open", "closed", "merged"].map((status) => (
+                      <label key={status} className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={selectedStatus.includes(status)}
+                          onChange={() => toggleStatus(status)}
+                          className="w-5 h-5 text-blue-600"
+                        />
+                        <span className="text-gray-700 capitalize">{status}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <button
+                onClick={handleGoToPlan}
+                disabled={selectedMetrics.length === 0 || !selectedBranch || creatingCollection}
+                className="mt-8 w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+              >
+                {creatingCollection ? "Creating collection plan..." : "Go to collect plan →"}
+              </button>
+            </>
+          ) : (
+            <AutomaticCollectionReview
+              draft={automationDraft}
+              warnings={automationWarnings}
+              metricLabels={metricLabels}
+              generating={automationLoading}
+              submitting={automationExecuting}
+              error={automationError}
+              onGenerate={handleGenerateAutomationDraft}
+              onApprove={handleApproveAutomation}
+              prompt={automationPrompt}
+              onPromptChange={setAutomationPrompt}
+            />
+          )}
         </div>
       </div>
 
@@ -1066,7 +1237,9 @@ function ProjectDetail() {
       {showPlanModal && collectionPlan && (
         <CollectPlanModal
           plan={collectionPlan}
-          repository={repository}
+          mode={collectionPlanMode}
+          automationDraft={collectionPlanAutomationContext?.draft}
+          warnings={collectionPlanAutomationContext?.warnings || []}
           onClose={() => setShowPlanModal(false)}
           onStartCollection={handleStartCollection}
         />
@@ -1176,13 +1349,22 @@ function ProjectDetail() {
 
             <div className="flex gap-3">
               <button
-                onClick={() => setShowIncompleteWarning(false)}
+                onClick={() => {
+                  setShowIncompleteWarning(false);
+                  setPendingActionType(null);
+                }}
                 className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
               >
                 Cancel
               </button>
               <button
-                onClick={proceedWithNewCollection}
+                onClick={() => {
+                  if (pendingActionType === "automatic") {
+                    proceedWithAutomaticCollectionPlan();
+                    return;
+                  }
+                  proceedWithNewCollection();
+                }}
                 className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
               >
                 Create New Collection

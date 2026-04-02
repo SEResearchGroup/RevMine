@@ -189,6 +189,44 @@ class CollectionServiceClient:
             )
 
 
+class LLMServiceClient:
+    """Client for communicating with the LLM service."""
+
+    def __init__(self, base_url: str):
+        self.base_url = base_url.rstrip("/")
+
+    def generate_collection_draft(
+        self,
+        *,
+        prompt: str,
+        model: str,
+        endpoint: str = "openrouter",
+    ) -> tuple[dict, int]:
+        """Generate a structured collection draft from a natural-language prompt."""
+        url = f"{self.base_url}/{endpoint.lstrip('/')}"
+        logger.info("Requesting LLM draft from: %s", url)
+
+        try:
+            response = requests.post(
+                url,
+                json={"user_message": prompt, "model": model},
+                headers={"Content-Type": "application/json"},
+                timeout=60,
+            )
+            try:
+                response_data = response.json()
+            except ValueError:
+                response_data = {"detail": response.text or "Empty response"}
+            return response_data, response.status_code
+        except requests.RequestException as e:
+            logger.error("LLM service error: %s", e)
+            raise ServiceClientError(
+                message="LLM service unavailable",
+                status_code=503,
+                detail=str(e),
+            )
+
+
 def build_collection_payload(
     repository_details: dict,
     repository_id: str,

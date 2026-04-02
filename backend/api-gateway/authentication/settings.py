@@ -102,6 +102,8 @@ CONFIGURATION_SERVICE_URL = os.getenv(
     "CONFIGURATION_SERVICE_URL", "http://configuration-service:8001/api/workspaces"
 )
 
+LLM_SERVICE_URL = os.getenv("LLM_SERVICE_URL", "http://llm-service:8004")
+
 COLLECTION_SERVICE_URL = os.getenv(
     "COLLECTION_SERVICE_URL",
     "http://collection-service:8002/api/collections",  # Running locally for development

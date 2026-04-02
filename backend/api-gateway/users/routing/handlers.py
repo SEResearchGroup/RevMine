@@ -18,12 +18,29 @@ class WorkspaceRequestHandler:
         return self.proxy.proxy_request(request)
 
 
+class LLMRequestHandler:
+    """Handler for LLM requests (simple proxy without JWT requirement)"""
+
+    def __init__(self, service_url):
+        self.proxy = BaseProxyHandler(
+            service_url, "/api/llm", require_auth=False
+        )
+
+    def handle(self, request):
+        """Direct proxy to the LLM service"""
+        return self.proxy.proxy_request(request)
+
+
 class CollectionRequestHandler:
     """Handler for collection requests"""
 
-    def __init__(self, service_url, config_client, collection_client):
+    def __init__(self, service_url, config_client, collection_client, llm_client):
         self.proxy = BaseProxyHandler(service_url, "/api/collections")
-        self.orchestrator = CollectionOrchestrator(config_client, collection_client)
+        self.orchestrator = CollectionOrchestrator(
+            config_client,
+            collection_client,
+            llm_client,
+        )
 
     def handle(self, request):
         """Route to orchestrator or simple proxy based on endpoint"""
@@ -40,6 +57,12 @@ class CollectionRequestHandler:
         # Endpoint /branches requires orchestration
         if request.path == "/api/collections/branches/" and request.method == "POST":
             return self.orchestrator.get_branches(request, user_id)
+
+        if request.path in {
+            "/api/collections/automation/preview",
+            "/api/collections/automation/preview/",
+        } and request.method == "POST":
+            return self.orchestrator.preview_automatic_collection(request, user_id)
 
         # Other endpoints: simple proxy
         return self.proxy.proxy_request(request, user_id)

@@ -1,5 +1,6 @@
 from typing import Dict, List, Optional, Tuple
 from datetime import datetime
+from urllib.parse import quote
 import requests
 from django.utils import timezone
 from .models import Workspace, Repository
@@ -189,6 +190,67 @@ class RepositoryService:
             }
 
     @staticmethod
+    def fetch_repository_by_id(
+        platform: str, token: str, repository_id: str, url: Optional[str] = None
+    ) -> Dict:
+        """
+        Fetch a single repository from the Git API using its external ID.
+
+        This is used as a fallback when the repository is not part of the
+        workspace's default repository listing but is still accessible, such as
+        a public repository.
+        """
+        try:
+            client = GitAPIClient(platform, token, url)
+            endpoint = (
+                f"/repositories/{repository_id}"
+                if platform == "github"
+                else f"/projects/{quote(str(repository_id), safe='')}"
+            )
+
+            response = client.get(endpoint)
+
+            if response.status_code == 200:
+                return {
+                    "success": True,
+                    "message": "Repository found",
+                    "repository": response.json(),
+                }
+            elif response.status_code == 401:
+                return {
+                    "success": False,
+                    "message": "Invalid or expired token",
+                    "repository": None,
+                }
+            elif response.status_code in [403, 404]:
+                return {
+                    "success": False,
+                    "message": "Repository not found or inaccessible",
+                    "repository": None,
+                }
+            else:
+                return {
+                    "success": False,
+                    "message": f"API error: {response.status_code}",
+                    "repository": None,
+                }
+
+        except ValueError as e:
+            return {"success": False, "message": str(e), "repository": None}
+        except requests.Timeout:
+            return {
+                "success": False,
+                "message": "Timeout: server not responding",
+                "repository": None,
+            }
+        except requests.RequestException as e:
+            return {
+                "success": False,
+                "message": f"Connection error: {str(e)}",
+                "repository": None,
+            }
+
+    @staticmethod
     def _get_list_params(platform: str) -> Dict:
         """Return optimal parameters based on the platform."""
         if platform == "github":
@@ -201,9 +263,13 @@ class RepositoryService:
             return {"per_page": 100, "order_by": "updated_at", "membership": True}
 
     @staticmethod
+    def _get_normalizer(platform: str) -> "BaseNormalizer":
+        return GitHubNormalizer() if platform == "github" else GitLabNormalizer()
+
+    @staticmethod
     def _normalize_all(repos_data: List[Dict], platform: str) -> List[Dict]:
         """Normalize a list of repositories."""
-        normalizer = GitHubNormalizer() if platform == "github" else GitLabNormalizer()
+        normalizer = RepositoryService._get_normalizer(platform)
         return [normalizer.normalize(repo) for repo in repos_data]
 
     @staticmethod
@@ -221,6 +287,12 @@ class RepositoryService:
             Tuple (imported repositories, errors)
         """
         print(f"Importing repositories for workspace {workspace.id}...")
+        normalized_repository_ids = []
+        for repository_id in repository_ids:
+            normalized_id = str(repository_id).strip()
+            if normalized_id and normalized_id not in normalized_repository_ids:
+                normalized_repository_ids.append(normalized_id)
+
         result = RepositoryService.fetch_repositories(
             workspace.platform, workspace.get_token(), workspace.url
         )
@@ -232,28 +304,60 @@ class RepositoryService:
         # Filter the selected repositories
 
         all_repos = result["repositories"]
-        selected = [
-            repo
-            for repo in all_repos
-            if str(repo.get("id")) in [str(rid) for rid in repository_ids]
-        ]
+        repositories_by_id = {
+            str(repo.get("id")): repo for repo in all_repos if repo.get("id") is not None
+        }
+        selected = []
+        missing_repository_ids = []
+
+        for repository_id in normalized_repository_ids:
+            repository = repositories_by_id.get(repository_id)
+            if repository:
+                selected.append(repository)
+            else:
+                missing_repository_ids.append(repository_id)
 
         print(f"Selected {len(selected)} repositories for import.")
-        print(f"Repository IDs to import: {repository_ids}")
+        print(f"Repository IDs to import: {normalized_repository_ids}")
+
+        errors = []
+        for repository_id in missing_repository_ids:
+            fetch_result = RepositoryService.fetch_repository_by_id(
+                workspace.platform,
+                workspace.get_token(),
+                repository_id,
+                workspace.url,
+            )
+            if fetch_result["success"] and fetch_result.get("repository"):
+                selected.append(fetch_result["repository"])
+            else:
+                errors.append(
+                    {
+                        "repository": repository_id,
+                        "error": fetch_result["message"],
+                    }
+                )
+
         if not selected:
+            if errors:
+                raise ValueError(errors[0]["error"])
             raise ValueError("No repositories found with provided IDs")
 
         # Import each repository
         imported = []
-        errors = []
         for repo_data in selected:
             try:
                 repo = RepositoryService._import_single(workspace, repo_data)
                 print(f"Imported repository: {repo.full_name}")
                 imported.append(repo)
             except Exception as e:
-                print(f"Error importing repository {repo_data.get('name')}: {str(e)}")
-                errors.append({"repository": repo_data.get("name"), "error": str(e)})
+                repository_label = (
+                    repo_data.get("name")
+                    or repo_data.get("full_name")
+                    or repo_data.get("id")
+                )
+                print(f"Error importing repository {repository_label}: {str(e)}")
+                errors.append({"repository": repository_label, "error": str(e)})
 
         # Update the sync date
         workspace.last_sync = timezone.now()
@@ -264,9 +368,7 @@ class RepositoryService:
     @staticmethod
     def _import_single(workspace: Workspace, repo_data: Dict) -> Repository:
         """Import a single repository."""
-        normalizer = (
-            GitHubNormalizer() if workspace.platform == "github" else GitLabNormalizer()
-        )
+        normalizer = RepositoryService._get_normalizer(workspace.platform)
 
         normalized = normalizer.normalize_for_db(repo_data)
         print(f"Importing repository: {normalized['full_name']}")

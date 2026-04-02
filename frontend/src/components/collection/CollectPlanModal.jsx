@@ -1,14 +1,28 @@
 import { X } from "lucide-react";
+import { FEATURE_LABELS, KEYWORD_FIELD_LABELS } from "./collectionFeatureConfig";
 
-function CollectPlanModal({ plan, repository, onClose, onStartCollection }) {
-  const { summary, collection_plan } = plan;
+function CollectPlanModal({
+  plan,
+  mode = "manual",
+  automationDraft = null,
+  warnings = [],
+  onClose,
+  onStartCollection,
+}) {
+  const { summary } = plan;
+  const isAutomatic = mode === "automatic";
+  const cleaningDraft = automationDraft?.cleaning;
+  const keywordFilters = cleaningDraft?.filters?.keyword_filters || [];
+  const selectedFeatures = cleaningDraft?.selected_features || [];
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <h2 className="text-2xl font-semibold">Collect Plan</h2>
+          <h2 className="text-2xl font-semibold">
+            {isAutomatic ? "Automatic Workflow Review" : "Collect Plan"}
+          </h2>
           <button
             onClick={onClose}
             className="p-2 hover:bg-gray-100 rounded-lg transition"
@@ -64,13 +78,102 @@ function CollectPlanModal({ plan, repository, onClose, onStartCollection }) {
             </div>
           </div>
 
+          {isAutomatic && cleaningDraft && (
+            <div>
+              <h3 className="font-semibold text-gray-900 mb-3">
+                Automatic Cleaning Draft
+              </h3>
+              <div className="bg-gray-50 rounded-lg p-4 space-y-4">
+                <div className="flex justify-between gap-4">
+                  <span className="text-gray-600">Refined Date Range:</span>
+                  <span className="font-medium text-right">
+                    {cleaningDraft.start_date || "Any"} to{" "}
+                    {cleaningDraft.end_date || "Any"}
+                  </span>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-gray-600">Cleaning Filters:</p>
+                  <p className="font-medium text-gray-900">
+                    File extensions:{" "}
+                    {cleaningDraft.filters?.file_extensions?.length > 0
+                      ? cleaningDraft.filters.file_extensions.join(", ")
+                      : "No filter"}
+                  </p>
+                  <p className="font-medium text-gray-900">
+                    Authors:{" "}
+                    {cleaningDraft.filters?.authors?.length > 0
+                      ? cleaningDraft.filters.authors.join(", ")
+                      : "No filter"}
+                  </p>
+                  <div>
+                    <p className="font-medium text-gray-900 mb-2">Keyword filters:</p>
+                    {keywordFilters.length > 0 ? (
+                      <div className="space-y-2">
+                        {keywordFilters.map((filter) => (
+                          <div
+                            key={filter.field}
+                            className="rounded-lg bg-white px-3 py-2 text-sm text-gray-700"
+                          >
+                            <span className="font-medium text-gray-900">
+                              {KEYWORD_FIELD_LABELS[filter.field] || filter.field}:
+                            </span>{" "}
+                            {filter.keywords.join(", ")}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm italic text-gray-500">
+                        No keyword filters
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <div>
+                  <p className="text-gray-600 mb-2">
+                    Selected cleaning features ({selectedFeatures.length})
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedFeatures.length > 0 ? (
+                      selectedFeatures.map((feature) => (
+                        <span
+                          key={feature}
+                          className="rounded-full bg-indigo-100 px-3 py-1 text-xs font-medium text-indigo-800"
+                        >
+                          {FEATURE_LABELS[feature] || feature}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="text-sm italic text-gray-500">
+                        All available cleaning features
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {warnings.length > 0 && (
+            <div>
+              <h3 className="font-semibold text-gray-900 mb-3">Warnings</h3>
+              <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-4">
+                <ul className="space-y-2 text-sm text-yellow-900">
+                  {warnings.map((warning, index) => (
+                    <li key={`${warning}-${index}`}>{warning}</li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          )}
+
           {/* Info Note */}
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex gap-3">
             <div className="text-sm text-blue-800">
               <p className="font-medium mb-1">Important:</p>
               <p>
-                Once started, the collection will run in the background. You can
-                safely navigate away and check the progress later.
+                {isAutomatic
+                  ? "Once started, the collection uses the shared progress screen. When collection finishes, cleaning will continue automatically and open the cleaned dataset details."
+                  : "Once started, the collection will run in the background. You can safely navigate away and check the progress later."}
               </p>
             </div>
           </div>
@@ -88,7 +191,7 @@ function CollectPlanModal({ plan, repository, onClose, onStartCollection }) {
             onClick={onStartCollection}
             className="px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
           >
-            Start collection →
+            {isAutomatic ? "Start automatic workflow →" : "Start collection →"}
           </button>
         </div>
       </div>

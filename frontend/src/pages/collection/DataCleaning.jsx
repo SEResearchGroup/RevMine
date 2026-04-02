@@ -51,6 +51,10 @@ const FEATURES_CONFIG = [
   { id: 'deletions', label: 'Total Deletions', description: 'Total lines deleted in the PR/MR', category: 'Code Metrics' },
   { id: 'comments', label: 'Comments Count', description: 'Total number of comments', category: 'Collaboration' },
 ];
+import {
+  COLLECTION_FEATURES_CONFIG as FEATURES_CONFIG,
+  KEYWORD_FIELD_LABELS,
+} from "../../components/collection/collectionFeatureConfig";
 
 function DataCleaning() {
   const { workspaceId, repositoryId, collectionId } = useParams();
@@ -191,13 +195,7 @@ function DataCleaning() {
   };
 
   const getFieldLabel = (field) => {
-    const labels = {
-      title: "Title",
-      description: "Description",
-      comments: "Comments",
-      commit_message: "Commit Message"
-    };
-    return labels[field] || field;
+    return KEYWORD_FIELD_LABELS[field] || field;
   };
 
   // Feature selection helpers

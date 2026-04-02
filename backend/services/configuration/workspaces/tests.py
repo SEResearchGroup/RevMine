@@ -6,7 +6,7 @@ import pytest
 from rest_framework import status
 from unittest.mock import patch, Mock
 from workspaces.models import Workspace, Repository
-from workspaces.services import ConnectionService, GitAPIClient
+from workspaces.services import ConnectionService, GitAPIClient, RepositoryService
 
 
 # =============================================================================
@@ -191,6 +191,102 @@ class TestRepositoryEndpoints:
         response = api_client.delete(f'/api/workspaces/{workspace.id}/repositories/{repository.id}/')
         assert response.status_code == status.HTTP_204_NO_CONTENT
         assert not Repository.objects.filter(id=repo_id).exists()
+
+    @patch('workspaces.services.RepositoryService.fetch_repository_by_id')
+    @patch('workspaces.services.RepositoryService.fetch_repositories')
+    def test_import_repository_by_direct_external_id(
+        self,
+        mock_fetch_repositories,
+        mock_fetch_repository_by_id,
+        api_client,
+        workspace,
+    ):
+        """Test importing a repository by ID even when it is not in the workspace list."""
+        mock_fetch_repositories.return_value = {
+            'success': True,
+            'message': '0 repositories found',
+            'repositories': [],
+        }
+        mock_fetch_repository_by_id.return_value = {
+            'success': True,
+            'message': 'Repository found',
+            'repository': {
+                'id': 987654321,
+                'name': 'public-repo',
+                'full_name': 'octocat/public-repo',
+                'description': 'Public repository',
+                'url': 'https://api.github.com/repos/octocat/public-repo',
+                'html_url': 'https://github.com/octocat/public-repo',
+                'owner': {'login': 'octocat', 'type': 'User'},
+                'default_branch': 'main',
+                'private': False,
+                'fork': False,
+                'archived': False,
+                'created_at': '2024-01-01T00:00:00Z',
+                'updated_at': '2024-02-01T00:00:00Z',
+            },
+        }
+
+        response = api_client.post(
+            f'/api/workspaces/{workspace.id}/repositories/import/',
+            {'repository_ids': ['987654321']},
+            format='json',
+        )
+
+        assert response.status_code == status.HTTP_201_CREATED
+        assert response.data['imported_count'] == 1
+        assert Repository.objects.filter(
+            workspace=workspace,
+            external_id='987654321',
+        ).exists()
+
+
+@pytest.mark.django_db
+class TestRepositoryService:
+    """Unit tests for repository import fallbacks."""
+
+    @patch('workspaces.services.RepositoryService.fetch_repository_by_id')
+    @patch('workspaces.services.RepositoryService.fetch_repositories')
+    def test_import_repositories_falls_back_to_direct_lookup(
+        self,
+        mock_fetch_repositories,
+        mock_fetch_repository_by_id,
+        workspace,
+    ):
+        """Test fallback import when repository is not present in workspace repository list."""
+        mock_fetch_repositories.return_value = {
+            'success': True,
+            'message': '0 repositories found',
+            'repositories': [],
+        }
+        mock_fetch_repository_by_id.return_value = {
+            'success': True,
+            'message': 'Repository found',
+            'repository': {
+                'id': 456789,
+                'name': 'fallback-repo',
+                'full_name': 'octocat/fallback-repo',
+                'description': 'Fallback repository',
+                'url': 'https://api.github.com/repos/octocat/fallback-repo',
+                'html_url': 'https://github.com/octocat/fallback-repo',
+                'owner': {'login': 'octocat', 'type': 'User'},
+                'default_branch': 'main',
+                'private': False,
+                'fork': False,
+                'archived': False,
+                'created_at': '2024-01-01T00:00:00Z',
+                'updated_at': '2024-02-01T00:00:00Z',
+            },
+        }
+
+        imported_repositories, errors = RepositoryService.import_repositories(
+            workspace,
+            ['456789'],
+        )
+
+        assert len(imported_repositories) == 1
+        assert errors == []
+        assert imported_repositories[0].external_id == '456789'
 
 
 # =============================================================================
