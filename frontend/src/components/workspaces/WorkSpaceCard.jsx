@@ -43,7 +43,7 @@ const WorkspaceCard = ({ workspace, onView, onEdit, onDelete }) => {
       className="bg-white rounded-xl border border-gray-200 p-4 sm:p-5 hover:shadow-lg transition-shadow cursor-pointer"
     >
       <div className="flex items-start gap-3 mb-4">
-        <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gray-100 rounded-full flex items-center justify-center flex-shrink-0">
+        <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gray-100 rounded-full flex items-center justify-center shrink-0">
           {workspace.platform === "github" ? (
             <Github className="w-5 h-5 sm:w-6 sm:h-6" />
           ) : (
@@ -63,27 +63,27 @@ const WorkspaceCard = ({ workspace, onView, onEdit, onDelete }) => {
 
       <div className="space-y-2 text-xs sm:text-sm text-gray-600">
         <div className="flex items-center gap-2">
-          <FolderGit2 className="w-4 h-4 flex-shrink-0" />
+          <FolderGit2 className="w-4 h-4 shrink-0" />
           <span>
             {workspace.projects_count ?? 0} Project
             {workspace.projects_count > 1 ? "s" : ""}
           </span>
         </div>
         <div className="flex items-center gap-2">
-          <BarChart3 className="w-4 h-4 flex-shrink-0" />
+          <BarChart3 className="w-4 h-4 shrink-0" />
           <span>
             {workspace.analyses_count ?? 0} analysis
             {workspace.analyses_count > 1 ? "es" : ""}
           </span>
         </div>
         <div className="flex items-center gap-2">
-          <Clock className="w-4 h-4 flex-shrink-0" />
+          <Clock className="w-4 h-4 shrink-0" />
           <span className="truncate">
             Edited {getTimeDiff(workspace.updated_at)}
           </span>
         </div>
         <div className="flex items-center gap-2">
-          <Lock className="w-4 h-4 flex-shrink-0" />
+          <Lock className="w-4 h-4 shrink-0" />
           <span className="capitalize">{workspace.visibility || "Public"}</span>
         </div>
       </div>

@@ -450,7 +450,7 @@ const WorkspaceModal = ({ workspace, onClose }) => {
               {testResult === "success" && (
                 <div className="p-4 bg-green-50 border border-green-200 rounded-lg flex items-start gap-3">
                   <svg
-                    className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0"
+                    className="w-5 h-5 text-green-600 mt-0.5 shrink-0"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -474,7 +474,7 @@ const WorkspaceModal = ({ workspace, onClose }) => {
               {testResult === "error" && (
                 <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
                   <svg
-                    className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0"
+                    className="w-5 h-5 text-red-600 mt-0.5 shrink-0"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -583,7 +583,7 @@ const WorkspaceModal = ({ workspace, onClose }) => {
                             </span>
                           </p>
                         </div>
-                        <div className="ml-4 flex-shrink-0">
+                        <div className="ml-4 shrink-0">
                           <input
                             type="checkbox"
                             checked={selectedRepos.includes(repo.id)}

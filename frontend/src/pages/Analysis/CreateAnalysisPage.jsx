@@ -155,7 +155,7 @@ const CreateAnalysisPage = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
+      <div className="min-h-screen bg-linear-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="w-12 h-12 animate-spin text-indigo-600 mx-auto mb-4" />
           <p className="text-slate-600">Loading metrics...</p>
@@ -165,7 +165,7 @@ const CreateAnalysisPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+    <div className="min-h-screen bg-linear-to-br from-slate-50 via-blue-50 to-indigo-50">
       <div className="max-w-6xl mx-auto px-6 py-8">
         {/* Header */}
         <div className="mb-6">
@@ -179,7 +179,7 @@ const CreateAnalysisPage = () => {
 
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-6">
             <div className="flex items-center gap-4">
-              <div className="w-14 h-14 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-purple-200">
+              <div className="w-14 h-14 bg-linear-to-br from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-purple-200">
                 <BarChart3 className="w-7 h-7 text-white" />
               </div>
               <div>
@@ -224,7 +224,7 @@ const CreateAnalysisPage = () => {
             <button
               onClick={handleCreateAnalysis}
               disabled={selectedMetrics.length === 0 || creating}
-              className="flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-indigo-600 to-blue-600 text-white rounded-xl hover:from-indigo-700 hover:to-blue-700 disabled:from-slate-300 disabled:to-slate-400 disabled:cursor-not-allowed transition-all shadow-lg shadow-indigo-200 font-medium"
+              className="flex items-center justify-center gap-2 px-6 py-3 bg-linear-to-r from-indigo-600 to-blue-600 text-white rounded-xl hover:from-indigo-700 hover:to-blue-700 disabled:from-slate-300 disabled:to-slate-400 disabled:cursor-not-allowed transition-all shadow-lg shadow-indigo-200 font-medium"
             >
               {creating ? (
                 <>
@@ -242,7 +242,7 @@ const CreateAnalysisPage = () => {
 
           {error && (
             <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-red-600">
-              <AlertCircle className="w-5 h-5 flex-shrink-0" />
+              <AlertCircle className="w-5 h-5 shrink-0" />
               <span className="text-sm">{error}</span>
             </div>
           )}
@@ -291,7 +291,7 @@ const CreateAnalysisPage = () => {
                     className="flex items-center justify-between p-5 cursor-pointer hover:bg-slate-50 transition-colors"
                   >
                     <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 bg-gradient-to-br from-indigo-100 to-blue-100 rounded-lg flex items-center justify-center">
+                      <div className="w-10 h-10 bg-linear-to-br from-indigo-100 to-blue-100 rounded-lg flex items-center justify-center">
                         <BarChart3 className="w-5 h-5 text-indigo-600" />
                       </div>
                       <div>

@@ -41,6 +41,8 @@ const FEATURES_CONFIG = [
   { id: 'filetypes', label: 'File Types', description: 'Number of unique file extensions modified', category: 'Code Metrics' },
   { id: 'state', label: 'State', description: 'Current state of PR/MR (open, merged, closed)', category: 'Basic Info' },
   { id: 'rework_size', label: 'Rework Size', description: 'Lines changed in commits after first review comment', category: 'Code Metrics' },
+  { id: 'Author', label: 'Author', description: 'The author who created the PR/MR', category: 'Collaboration' },
+  { id: 'Reviewers', label: 'Reviewers', description: 'List of reviewers assigned to the PR/MR', category: 'Collaboration' },
   { id: '#people', label: 'People Count', description: 'Total unique people involved (authors, reviewers, discussers)', category: 'Collaboration' },
   { id: '#reviewers', label: 'Reviewers Count', description: 'Number of unique reviewers', category: 'Collaboration' },
   { id: '#commiters', label: 'Committers Count', description: 'Number of unique committers', category: 'Collaboration' },
@@ -365,7 +367,7 @@ function DataCleaning() {
         {/* Project Info */}
         <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
           <div className="flex items-start gap-4">
-            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center flex-shrink-0">
+            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center shrink-0">
               {platform === "github" ? (
                 <Github className="w-8 h-8" />
               ) : (

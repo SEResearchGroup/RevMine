@@ -75,7 +75,7 @@ const Register = () => {
 
         {error && (
           <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2 sm:gap-3">
-            <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-red-500 mt-0.5 flex-shrink-0" />
+            <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-red-500 mt-0.5 shrink-0" />
             <p className="text-xs sm:text-sm text-red-700">{error}</p>
           </div>
         )}
@@ -232,7 +232,7 @@ const Register = () => {
               id="updates"
               checked={sendUpdates}
               onChange={(e) => setSendUpdates(e.target.checked)}
-              className="mt-0.5 sm:mt-1 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 flex-shrink-0"
+              className="mt-0.5 sm:mt-1 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 shrink-0"
               disabled={loading}
             />
             <label

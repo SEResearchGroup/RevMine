@@ -10,7 +10,7 @@ import {
   ChevronDown,
   ChevronUp,
 } from "lucide-react";
-import InteractiveChart from "./InteractiveChart";
+import DynamicChart from "./DynamicChart";
 
 const ResultsDisplay = ({ results = [], onExportAll, onExportSingle, exportLoading }) => {
   const [fullscreenChart, setFullscreenChart] = useState(null);
@@ -121,9 +121,11 @@ const ResultsDisplay = ({ results = [], onExportAll, onExportSingle, exportLoadi
                 <div className="p-6">
                   <div className="bg-slate-50 rounded-lg p-6 h-96">
                     {result.chart_data ? (
-                      <InteractiveChart
+                      <DynamicChart
                         chartData={{ data: result.chart_data }}
                         chartType={result.chart_type}
+                        height={384}
+                        showControls={false}
                       />
                     ) : (
                       <div className="flex items-center justify-center h-full text-slate-400">
@@ -219,9 +221,10 @@ const ResultsDisplay = ({ results = [], onExportAll, onExportSingle, exportLoadi
             </div>
 
             <div className="flex-1 bg-white rounded-lg p-6 overflow-auto">
-              <InteractiveChart
+              <DynamicChart
                 chartData={{ data: fullscreenChart.chart_data }}
                 chartType={fullscreenChart.chart_type}
+                showControls={true}
               />
             </div>
 

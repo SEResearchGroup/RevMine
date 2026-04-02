@@ -130,12 +130,12 @@ const DatasetSelectionPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/40">
+    <div className="min-h-screen bg-linear-to-br from-slate-50 via-blue-50/30 to-indigo-50/40">
       <div className="max-w-6xl mx-auto px-6 py-8">
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-200/50">
+            <div className="w-10 h-10 bg-linear-to-br from-indigo-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-200/50">
               <Database className="w-5 h-5 text-white" />
             </div>
             <div>
@@ -232,7 +232,7 @@ const DatasetSelectionPage = () => {
 
           {uploadError && (
             <div className="mx-6 mb-6 p-3 bg-red-50 border border-red-200 rounded-xl flex items-center gap-2 text-red-600 text-sm">
-              <AlertCircle className="w-4 h-4 flex-shrink-0" />
+              <AlertCircle className="w-4 h-4 shrink-0" />
               {uploadError}
               <button onClick={() => setUploadError(null)} className="ml-auto">
                 <X className="w-4 h-4" />
@@ -241,7 +241,7 @@ const DatasetSelectionPage = () => {
           )}
           {uploadSuccess && (
             <div className="mx-6 mb-6 p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center gap-2 text-emerald-700 text-sm">
-              <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+              <CheckCircle2 className="w-4 h-4 shrink-0" />
               {uploadSuccess}
               <button onClick={() => setUploadSuccess(null)} className="ml-auto">
                 <X className="w-4 h-4" />
@@ -300,7 +300,7 @@ const DatasetSelectionPage = () => {
                     }`}
                   >
                     <div
-                      className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                      className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
                         isSelected
                           ? "bg-indigo-100 text-indigo-600"
                           : "bg-slate-100 text-slate-400"
@@ -338,13 +338,13 @@ const DatasetSelectionPage = () => {
                     </div>
 
                     {isSelected && (
-                      <CheckCircle2 className="w-5 h-5 text-indigo-500 flex-shrink-0" />
+                      <CheckCircle2 className="w-5 h-5 text-indigo-500 shrink-0" />
                     )}
 
                     <button
                       onClick={(e) => handleDelete(dataset.id, e)}
                       disabled={deletingId === dataset.id}
-                      className="p-2 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors flex-shrink-0"
+                      className="p-2 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors shrink-0"
                     >
                       {deletingId === dataset.id ? (
                         <Loader2 className="w-4 h-4 animate-spin" />
@@ -364,7 +364,7 @@ const DatasetSelectionPage = () => {
           <button
             onClick={handleContinue}
             disabled={!selectedDataset}
-            className="flex items-center gap-2 px-8 py-3.5 bg-gradient-to-r from-indigo-600 to-blue-600 text-white rounded-xl font-medium shadow-lg shadow-indigo-200/50 hover:from-indigo-700 hover:to-blue-700 disabled:from-slate-300 disabled:to-slate-400 disabled:shadow-none disabled:cursor-not-allowed transition-all"
+            className="flex items-center gap-2 px-8 py-3.5 bg-linear-to-r from-indigo-600 to-blue-600 text-white rounded-xl font-medium shadow-lg shadow-indigo-200/50 hover:from-indigo-700 hover:to-blue-700 disabled:from-slate-300 disabled:to-slate-400 disabled:shadow-none disabled:cursor-not-allowed transition-all"
           >
             Continue to Metrics
             <ArrowRight className="w-4 h-4" />

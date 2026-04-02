@@ -1,11 +1,9 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import {
   ArrowLeft,
-  Download,
   FileText,
   Maximize2,
-  Minimize2,
   RefreshCw,
   BarChart3,
   LineChart,
@@ -17,58 +15,63 @@ import {
   ChevronDown,
   LayoutGrid,
   LayoutList,
-  Clock,
   TrendingUp,
   Calendar,
-  Filter,
   Image,
+  Hash,
+  GitMerge,
+  CheckCircle2,
 } from "lucide-react";
-import {
-  ResponsiveContainer,
-  LineChart as RLineChart,
-  Line,
-  BarChart,
-  Bar,
-  PieChart as RPieChart,
-  Pie,
-  Cell,
-  ScatterChart as RScatterChart,
-  Scatter,
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  Brush,
-} from "recharts";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 import { analyzeService } from "../../services/api";
+import DynamicChart from "../../components/analysis/DynamicChart";
 
 /* ------------------------------------------------------------------ */
-/*  Color palette                                                     */
+/*  Constants                                                         */
 /* ------------------------------------------------------------------ */
-const COLORS = [
-  "#6366f1", "#3b82f6", "#06b6d4", "#10b981", "#f59e0b",
-  "#ef4444", "#8b5cf6", "#ec4899", "#14b8a6", "#f97316",
-  "#84cc16", "#a855f7", "#0ea5e9", "#22c55e", "#eab308",
-];
-
 const TIME_AGG_LABELS = { D: "Daily", W: "Weekly", M: "Monthly", Q: "Quarterly", Y: "Yearly" };
 
 /* ------------------------------------------------------------------ */
-/*  Chart card component                                              */
+/*  Summary Stat Card                                                 */
+/* ------------------------------------------------------------------ */
+const SummaryStatCard = ({ icon: Icon, label, value, color = "indigo" }) => {
+  const colorMap = {
+    indigo: "from-indigo-500 to-blue-600 shadow-indigo-200/50",
+    emerald: "from-emerald-500 to-teal-600 shadow-emerald-200/50",
+    amber: "from-amber-500 to-orange-600 shadow-amber-200/50",
+    rose: "from-rose-500 to-pink-600 shadow-rose-200/50",
+    violet: "from-violet-500 to-purple-600 shadow-violet-200/50",
+    cyan: "from-cyan-500 to-sky-600 shadow-cyan-200/50",
+    blue: "from-blue-500 to-indigo-600 shadow-blue-200/50",
+  };
+  return (
+    <div className="bg-white rounded-xl border border-slate-200/60 p-4 flex items-center gap-3">
+      <div className={`w-10 h-10 rounded-xl bg-linear-to-br ${colorMap[color] || colorMap.indigo} flex items-center justify-center shadow-lg shrink-0`}>
+        <Icon className="w-5 h-5 text-white" />
+      </div>
+      <div className="min-w-0">
+        <p className="text-[10px] uppercase tracking-wider text-slate-400 font-medium">{label}</p>
+        <p className="text-lg font-bold text-slate-800 truncate">{value}</p>
+      </div>
+    </div>
+  );
+};
+
+/* ------------------------------------------------------------------ */
+/*  Chart card component (now uses DynamicChart)                      */
 /* ------------------------------------------------------------------ */
 const DashboardChart = ({
   result,
   index,
+  chartTypeOverrides,
+  onChartTypeChange,
   onTimeChange,
   onFullscreen,
-  onDownloadImage,
+  onExportImage,
   onRetry,
   retrying,
+  chartRefs,
 }) => {
   const [localTimeAgg, setLocalTimeAgg] = useState(
     result.time_aggregation || "M"
@@ -76,19 +79,16 @@ const DashboardChart = ({
   const [isChanging, setIsChanging] = useState(false);
 
   const chartData = result.chart_data;
-  const chartType = chartData?.type || result.chart_type || "bar";
+  const originalType = chartData?.type || result.chart_type || "bar";
+  const activeType = chartTypeOverrides?.[index] || originalType;
   const options = chartData?.options || {};
   const title = options.title || result.metric_code?.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) || "Chart";
 
-  // Check if this is a timeseries chart
+  // Check if timeseries
   const isTimeseries =
-    chartType === "line" ||
-    chartType === "area" ||
+    originalType === "line" ||
+    originalType === "area" ||
     (chartData?.data?.labels || []).some((l) => /\d{4}/.test(l));
-
-  // Convert chart.js data to recharts format
-  const rechartsData = convertToRechartsData(chartData, chartType);
-  const datasetConfigs = chartData?.data?.datasets || [];
 
   const handleTimeAggChange = async (newAgg) => {
     setLocalTimeAgg(newAgg);
@@ -101,13 +101,10 @@ const DashboardChart = ({
   };
 
   const ChartIcon =
-    chartType === "line"
-      ? LineChart
-      : chartType === "pie"
-      ? PieChart
-      : chartType === "scatter"
-      ? ScatterChart
-      : BarChart3;
+    activeType === "line" ? LineChart
+    : activeType === "pie" ? PieChart
+    : activeType === "scatter" ? ScatterChart
+    : BarChart3;
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm hover:shadow-md transition-shadow overflow-hidden flex flex-col">
@@ -117,7 +114,7 @@ const DashboardChart = ({
           <ChartIcon className="w-4 h-4 text-indigo-500" />
           <h3 className="font-semibold text-slate-800 text-sm truncate">{title}</h3>
           <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[10px] uppercase tracking-wider font-medium">
-            {chartType}
+            {activeType}
           </span>
         </div>
         <div className="flex items-center gap-1">
@@ -137,7 +134,7 @@ const DashboardChart = ({
             </div>
           )}
           <button
-            onClick={() => onDownloadImage(index)}
+            onClick={() => onExportImage(index)}
             className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
             title="Download image"
           >
@@ -162,7 +159,7 @@ const DashboardChart = ({
       </div>
 
       {/* Chart body */}
-      <div className="flex-1 p-4 min-h-[280px]">
+      <div className="flex-1 p-4 min-h-[300px]">
         {isChanging ? (
           <div className="h-full flex items-center justify-center">
             <Loader2 className="w-6 h-6 animate-spin text-indigo-400" />
@@ -173,19 +170,25 @@ const DashboardChart = ({
             <p className="text-sm">{result.message || "Chart generation failed"}</p>
           </div>
         ) : (
-          <ResponsiveContainer width="100%" height={260}>
-            {renderRechartsChart(chartType, rechartsData, datasetConfigs, options)}
-          </ResponsiveContainer>
+          <DynamicChart
+            ref={(el) => { if (chartRefs) chartRefs.current[index] = el; }}
+            chartData={chartData}
+            chartType={activeType}
+            height={280}
+            showControls={true}
+            colorIndex={index}
+            onChartTypeChange={(newType) => onChartTypeChange(index, newType)}
+          />
         )}
       </div>
 
       {/* Statistics footer */}
       {result.statistics && Object.keys(result.statistics).length > 0 && (
         <div className="px-5 py-3 border-t border-slate-100 bg-slate-50/50">
-          <div className="flex flex-wrap gap-4">
+          <div className="flex flex-wrap gap-x-6 gap-y-2">
             {Object.entries(result.statistics).slice(0, 4).map(([key, val]) => (
-              <div key={key} className="text-center">
-                <p className="text-[10px] uppercase tracking-wider text-slate-400 font-medium">{key.replace(/_/g, " ")}</p>
+              <div key={key} className="text-center min-w-20">
+                <p className="text-[10px] uppercase tracking-wider text-slate-400 font-medium whitespace-nowrap">{key.replace(/_/g, " ")}</p>
                 <p className="text-sm font-bold text-slate-700">
                   {typeof val === "number" ? val.toLocaleString(undefined, { maximumFractionDigits: 2 }) : String(val)}
                 </p>
@@ -199,181 +202,14 @@ const DashboardChart = ({
 };
 
 /* ------------------------------------------------------------------ */
-/*  Data conversion helpers                                           */
+/*  Fullscreen overlay (ECharts-based)                                */
 /* ------------------------------------------------------------------ */
-function convertToRechartsData(chartData, chartType) {
-  if (!chartData) return [];
-
-  const raw = chartData.data || chartData;
-  const labels = raw.labels || [];
-  const datasets = raw.datasets || [];
-
-  if (chartType === "pie") {
-    const ds = datasets[0] || {};
-    return labels.map((label, i) => ({
-      name: label,
-      value: Array.isArray(ds.data) ? ds.data[i] : 0,
-    }));
-  }
-
-  if (chartType === "scatter") {
-    const ds = datasets[0] || {};
-    if (Array.isArray(ds.data) && ds.data.length > 0 && typeof ds.data[0] === "object") {
-      return ds.data.map((pt) => ({ x: pt.x, y: pt.y }));
-    }
-    return labels.map((l, i) => ({
-      x: Array.isArray(ds.data) ? ds.data[i] : 0,
-      y: datasets[1] ? datasets[1].data?.[i] : 0,
-    }));
-  }
-
-  // line, bar, area, histogram
-  return labels.map((label, i) => {
-    const point = { name: label };
-    datasets.forEach((ds, di) => {
-      const key = ds.label || `series_${di}`;
-      point[key] = Array.isArray(ds.data) ? ds.data[i] : 0;
-    });
-    return point;
-  });
-}
-
-function renderRechartsChart(type, data, datasetConfigs, options) {
-  const xLabel = options.xLabel || "";
-  const yLabel = options.yLabel || "";
-
-  const commonProps = {
-    data,
-    margin: { top: 5, right: 20, left: 10, bottom: 5 },
-  };
-
-  const customTooltip = {
-    contentStyle: {
-      background: "white",
-      border: "1px solid #e2e8f0",
-      borderRadius: "12px",
-      padding: "8px 12px",
-      boxShadow: "0 4px 6px -1px rgba(0,0,0,0.1)",
-    },
-  };
-
-  if (type === "pie") {
-    return (
-      <RPieChart>
-        <Pie data={data} cx="50%" cy="50%" outerRadius={90} innerRadius={45} dataKey="value" nameKey="name" paddingAngle={3} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`} labelLine={{ strokeWidth: 1 }}>
-          {data.map((_, i) => (
-            <Cell key={i} fill={COLORS[i % COLORS.length]} />
-          ))}
-        </Pie>
-        <Tooltip {...customTooltip} />
-        <Legend />
-      </RPieChart>
-    );
-  }
-
-  if (type === "scatter") {
-    return (
-      <RScatterChart {...commonProps}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-        <XAxis dataKey="x" type="number" name={xLabel || "X"} tick={{ fontSize: 11 }} />
-        <YAxis dataKey="y" type="number" name={yLabel || "Y"} tick={{ fontSize: 11 }} />
-        <Tooltip {...customTooltip} />
-        <Scatter data={data} fill={COLORS[0]} fillOpacity={0.7} r={5} />
-      </RScatterChart>
-    );
-  }
-
-  if (type === "area") {
-    const keys = datasetConfigs.map((ds) => ds.label || "value");
-    return (
-      <AreaChart {...commonProps}>
-        <defs>
-          {keys.map((k, i) => (
-            <linearGradient key={k} id={`grad_${i}`} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor={COLORS[i % COLORS.length]} stopOpacity={0.3} />
-              <stop offset="95%" stopColor={COLORS[i % COLORS.length]} stopOpacity={0} />
-            </linearGradient>
-          ))}
-        </defs>
-        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-        <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-        <YAxis tick={{ fontSize: 11 }} />
-        <Tooltip {...customTooltip} />
-        <Legend />
-        {keys.map((k, i) => (
-          <Area
-            key={k}
-            type="monotone"
-            dataKey={k}
-            stroke={COLORS[i % COLORS.length]}
-            fill={`url(#grad_${i})`}
-            strokeWidth={2}
-          />
-        ))}
-        {data.length > 15 && <Brush dataKey="name" height={20} stroke="#6366f1" />}
-      </AreaChart>
-    );
-  }
-
-  if (type === "line") {
-    const keys = datasetConfigs.length > 0 ? datasetConfigs.map((ds) => ds.label || "value") : Object.keys(data[0] || {}).filter((k) => k !== "name");
-    return (
-      <RLineChart {...commonProps}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-        <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-        <YAxis tick={{ fontSize: 11 }} />
-        <Tooltip {...customTooltip} />
-        <Legend />
-        {keys.map((k, i) => (
-          <Line
-            key={k}
-            type="monotone"
-            dataKey={k}
-            stroke={COLORS[i % COLORS.length]}
-            strokeWidth={2}
-            dot={{ r: 3, fill: COLORS[i % COLORS.length] }}
-            activeDot={{ r: 5 }}
-          />
-        ))}
-        {data.length > 15 && <Brush dataKey="name" height={20} stroke="#6366f1" />}
-      </RLineChart>
-    );
-  }
-
-  // bar / histogram
-  const keys = datasetConfigs.length > 0 ? datasetConfigs.map((ds) => ds.label || "value") : Object.keys(data[0] || {}).filter((k) => k !== "name");
-  return (
-    <BarChart {...commonProps}>
-      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-      <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-      <YAxis tick={{ fontSize: 11 }} />
-      <Tooltip {...customTooltip} />
-      <Legend />
-      {keys.map((k, i) => (
-        <Bar
-          key={k}
-          dataKey={k}
-          fill={COLORS[i % COLORS.length]}
-          radius={[4, 4, 0, 0]}
-          maxBarSize={50}
-        />
-      ))}
-      {data.length > 15 && <Brush dataKey="name" height={20} stroke="#6366f1" />}
-    </BarChart>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/*  Fullscreen overlay                                                */
-/* ------------------------------------------------------------------ */
-const FullscreenOverlay = ({ result, onClose }) => {
+const FullscreenOverlay = ({ result, chartTypeOverride, onChartTypeChange, onClose, colorIndex = 0 }) => {
   if (!result) return null;
   const chartData = result.chart_data;
-  const chartType = chartData?.type || result.chart_type || "bar";
+  const activeType = chartTypeOverride || chartData?.type || result.chart_type || "bar";
   const options = chartData?.options || {};
   const title = options.title || result.metric_code?.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) || "Chart";
-  const rechartsData = convertToRechartsData(chartData, chartType);
-  const datasetConfigs = chartData?.data?.datasets || [];
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-6">
@@ -387,18 +223,23 @@ const FullscreenOverlay = ({ result, onClose }) => {
             <X className="w-5 h-5 text-slate-500" />
           </button>
         </div>
-        <div className="p-6" style={{ height: "500px" }}>
-          <ResponsiveContainer width="100%" height="100%">
-            {renderRechartsChart(chartType, rechartsData, datasetConfigs, options)}
-          </ResponsiveContainer>
+        <div className="p-6">
+          <DynamicChart
+            chartData={chartData}
+            chartType={activeType}
+            height={500}
+            showControls={true}
+            colorIndex={colorIndex}
+            onChartTypeChange={onChartTypeChange}
+          />
         </div>
         {result.statistics && Object.keys(result.statistics).length > 0 && (
           <div className="px-6 pb-6">
             <h4 className="text-sm font-semibold text-slate-600 mb-3">Statistics</h4>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {Object.entries(result.statistics).map(([key, val]) => (
                 <div key={key} className="bg-slate-50 rounded-xl p-3 text-center">
-                  <p className="text-[10px] uppercase tracking-wider text-slate-400 font-medium">{key.replace(/_/g, " ")}</p>
+                  <p className="text-[10px] uppercase tracking-wider text-slate-400 font-medium whitespace-nowrap">{key.replace(/_/g, " ")}</p>
                   <p className="text-lg font-bold text-slate-700">
                     {typeof val === "number" ? val.toLocaleString(undefined, { maximumFractionDigits: 2 }) : String(val)}
                   </p>
@@ -421,28 +262,49 @@ const AnalysisDashboardPage = () => {
   const location = useLocation();
 
   const [dataset, setDataset] = useState(location.state?.dataset || null);
-  const [results, setResults] = useState(location.state?.results || []);
+  const [summary, setSummary] = useState(null);
+  const [results, setResults] = useState(
+    (location.state?.results || []).filter((r) => r.metric_code !== "custom_chart")
+  );
   const [loading, setLoading] = useState(!location.state?.results);
   const [layout, setLayout] = useState("grid"); // grid | list
   const [fullscreenIdx, setFullscreenIdx] = useState(null);
   const [retryingIdx, setRetryingIdx] = useState(null);
   const [exporting, setExporting] = useState(false);
+  const [chartTypeOverrides, setChartTypeOverrides] = useState({});
 
-  /* ---- load from history if no state ---- */
-  const loadFromHistory = useCallback(async () => {
+  // Refs for chart instances (used in export)
+  const chartRefs = useRef({});
+
+  /* ---- load data ---- */
+  const loadData = useCallback(async () => {
     if (location.state?.results) return;
     try {
       setLoading(true);
-      const [datasetRes, analysesRes] = await Promise.all([
+      const [datasetRes, analysesRes, summaryRes] = await Promise.all([
         analyzeService.getDatasetById(datasetId),
         analyzeService.getAnalyses(datasetId),
+        analyzeService.getDatasetSummary(datasetId).catch(() => null),
       ]);
       setDataset(datasetRes);
+      setSummary(summaryRes);
 
       // Load results for each completed analysis
       const analyses = analysesRes.results || [];
-      const loaded = [];
+      // Deduplicate analyses by metric_code, keeping only the latest one
+      const latestByMetric = new Map();
       for (const a of analyses) {
+        const key = a.metric_code || a.id;
+        const existing = latestByMetric.get(key);
+        if (!existing || new Date(a.created_at) > new Date(existing.created_at)) {
+          latestByMetric.set(key, a);
+        }
+      }
+      const deduplicated = [...latestByMetric.values()];
+
+      const loaded = [];
+      for (const a of deduplicated) {
+        if (a.metric_code === "custom_chart") continue;
         if (a.status === "completed") {
           try {
             const res = await analyzeService.getAnalysisResult(a.id);
@@ -463,8 +325,13 @@ const AnalysisDashboardPage = () => {
   }, [datasetId, location.state]);
 
   useEffect(() => {
-    loadFromHistory();
-  }, [loadFromHistory]);
+    loadData();
+  }, [loadData]);
+
+  /* ---- chart type change per card ---- */
+  const handleChartTypeChange = useCallback((idx, newType) => {
+    setChartTypeOverrides((prev) => ({ ...prev, [idx]: newType }));
+  }, []);
 
   /* ---- time aggregation change = re-generate chart ---- */
   const handleTimeChange = async (idx, newAgg) => {
@@ -508,15 +375,33 @@ const AnalysisDashboardPage = () => {
     }
   };
 
-  /* ---- download single matplotlib image ---- */
-  const handleDownloadImage = (idx) => {
+  /* ---- export single chart as PNG via ECharts ---- */
+  const handleExportImage = useCallback((idx) => {
+    const chartComponent = chartRefs.current[idx];
+    if (chartComponent?.exportImage) {
+      const url = chartComponent.exportImage();
+      if (url) {
+        const link = document.createElement("a");
+        link.download = `chart_${results[idx]?.metric_code || idx + 1}.png`;
+        link.href = url;
+        link.click();
+        return;
+      }
+    }
+    // Fallback: use backend base64 image if available
     const r = results[idx];
-    if (!r?.image_base64) return;
-    const link = document.createElement("a");
-    link.download = `${r.metric_code || "chart"}_${idx + 1}.png`;
-    link.href = `data:image/png;base64,${r.image_base64}`;
-    link.click();
-  };
+    if (r?.image_base64) {
+      const link = document.createElement("a");
+      link.download = `${r.metric_code || "chart"}_${idx + 1}.png`;
+      link.href = `data:image/png;base64,${r.image_base64}`;
+      link.click();
+    } else if (r?.chart_image) {
+      const link = document.createElement("a");
+      link.download = `${r.metric_code || "chart"}_${idx + 1}.png`;
+      link.href = `data:image/png;base64,${r.chart_image}`;
+      link.click();
+    }
+  }, [results]);
 
   /* ---- export all to PDF ---- */
   const handleExportPDF = async () => {
@@ -528,41 +413,58 @@ const AnalysisDashboardPage = () => {
 
       // Title page
       pdf.setFontSize(24);
-      pdf.setTextColor(99, 102, 241); // indigo
+      pdf.setTextColor(99, 102, 241);
       pdf.text("Analysis Report", pageWidth / 2, 40, { align: "center" });
       pdf.setFontSize(14);
       pdf.setTextColor(100, 116, 139);
-      pdf.text(dataset?.name || dataset?.original_filename || "Dataset", pageWidth / 2, 55, { align: "center" });
+      pdf.text(dataset?.filename || dataset?.name || "Dataset", pageWidth / 2, 55, { align: "center" });
       pdf.setFontSize(10);
       pdf.text(`Generated: ${new Date().toLocaleString()}`, pageWidth / 2, 65, { align: "center" });
       pdf.text(`Total charts: ${results.filter((r) => !r.error).length}`, pageWidth / 2, 72, { align: "center" });
 
-      // Chart pages
+      // Chart pages – use ECharts getDataURL or fallback to backend image
       for (let i = 0; i < results.length; i++) {
         const r = results[i];
-        if (r.error || !r.image_base64) continue;
+        if (r.error) continue;
 
         pdf.addPage();
         const title = r.chart_data?.options?.title || r.metric_code?.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) || `Chart ${i + 1}`;
 
-        // Title
         pdf.setFontSize(16);
         pdf.setTextColor(30, 41, 59);
         pdf.text(title, 14, 18);
-
-        // Chart type badge
         pdf.setFontSize(9);
         pdf.setTextColor(100, 116, 139);
-        pdf.text(`Type: ${r.chart_type || "chart"}`, 14, 25);
+        pdf.text(`Type: ${chartTypeOverrides[i] || r.chart_data?.type || r.chart_type || "chart"}`, 14, 25);
 
-        // Image
-        try {
-          const imgData = `data:image/png;base64,${r.image_base64}`;
-          const maxW = pageWidth - 28;
-          const maxH = pageHeight - 60;
-          pdf.addImage(imgData, "PNG", 14, 30, maxW, maxH * 0.7);
-        } catch {
-          pdf.text("Image could not be embedded", 14, 40);
+        // Try to get image data URL from ECharts instance or backend
+        let imgData = null;
+        
+        // Try ECharts ref first
+        const chartComponent = chartRefs.current[i];
+        if (chartComponent?.exportImage) {
+          imgData = chartComponent.exportImage();
+        }
+        
+        // Fallback to backend base64 image
+        if (!imgData && r.image_base64) {
+          imgData = `data:image/png;base64,${r.image_base64}`;
+        } else if (!imgData && r.chart_image) {
+          imgData = `data:image/png;base64,${r.chart_image}`;
+        }
+
+        if (imgData) {
+          try {
+            const maxW = pageWidth - 28;
+            const maxH = pageHeight - 60;
+            pdf.addImage(imgData, "PNG", 14, 30, maxW, maxH * 0.7);
+          } catch {
+            pdf.text("Image could not be embedded", 14, 40);
+          }
+        } else {
+          pdf.setFontSize(10);
+          pdf.setTextColor(100, 116, 139);
+          pdf.text("Chart image available via individual download", 14, 40);
         }
 
         // Statistics
@@ -591,7 +493,7 @@ const AnalysisDashboardPage = () => {
   /* ---- render ---- */
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/40 flex items-center justify-center">
+      <div className="min-h-screen bg-linear-to-br from-slate-50 via-blue-50/30 to-indigo-50/40 flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="w-10 h-10 animate-spin text-indigo-500 mx-auto mb-3" />
           <p className="text-slate-500">Loading dashboard...</p>
@@ -604,13 +506,13 @@ const AnalysisDashboardPage = () => {
   const failedResults = results.filter((r) => r.error);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/40">
+    <div className="min-h-screen bg-linear-to-br from-slate-50 via-blue-50/30 to-indigo-50/40">
       <div className="max-w-[1400px] mx-auto px-6 py-6">
         {/* Top bar */}
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-6">
           <div className="flex items-center gap-3">
             <button
-              onClick={() => navigate(`/analysis/${datasetId}/metrics`)}
+              onClick={() => navigate(`/analysis/${datasetId}/detail`)}
               className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-white transition-colors"
             >
               <ArrowLeft className="w-5 h-5" />
@@ -620,7 +522,7 @@ const AnalysisDashboardPage = () => {
                 Analysis Dashboard
               </h1>
               <p className="text-sm text-slate-500">
-                {dataset?.name || dataset?.original_filename}
+                {dataset?.filename || dataset?.name || dataset?.original_filename}
                 {" · "}
                 {successResults.length} chart{successResults.length !== 1 ? "s" : ""}
                 {failedResults.length > 0 && (
@@ -670,7 +572,7 @@ const AnalysisDashboardPage = () => {
             {/* Add more metrics */}
             <button
               onClick={() => navigate(`/analysis/${datasetId}/metrics`)}
-              className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-blue-600 text-white rounded-xl text-sm font-medium shadow-sm hover:from-indigo-700 hover:to-blue-700 transition-all"
+              className="flex items-center gap-2 px-4 py-2.5 bg-linear-to-r from-indigo-600 to-blue-600 text-white rounded-xl text-sm font-medium shadow-sm hover:from-indigo-700 hover:to-blue-700 transition-all"
             >
               <TrendingUp className="w-4 h-4" />
               Add Charts
@@ -678,25 +580,43 @@ const AnalysisDashboardPage = () => {
           </div>
         </div>
 
-        {/* Summary cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          {[
-            { label: "Total Charts", value: results.length, icon: BarChart3, color: "indigo" },
-            { label: "Completed", value: successResults.length, icon: TrendingUp, color: "emerald" },
-            { label: "Failed", value: failedResults.length, icon: AlertCircle, color: "red" },
-            { label: "Dataset Rows", value: dataset?.row_count?.toLocaleString() || "—", icon: Calendar, color: "blue" },
-          ].map(({ label, value, icon: Icon, color }) => (
-            <div key={label} className="bg-white rounded-xl border border-slate-200/60 p-4 flex items-center gap-3">
-              <div className={`w-10 h-10 rounded-lg bg-${color}-50 flex items-center justify-center`}>
-                <Icon className={`w-5 h-5 text-${color}-500`} />
-              </div>
-              <div>
-                <p className="text-xs text-slate-400 font-medium">{label}</p>
-                <p className="text-lg font-bold text-slate-800">{value}</p>
-              </div>
-            </div>
-          ))}
+        {/* Summary stats section */}
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 mb-6">
+          <SummaryStatCard icon={BarChart3} label="Total Charts" value={results.length} color="indigo" />
+          <SummaryStatCard icon={CheckCircle2} label="Completed" value={successResults.length} color="emerald" />
+          <SummaryStatCard icon={AlertCircle} label="Failed" value={failedResults.length} color="rose" />
+          <SummaryStatCard
+            icon={Hash}
+            label="Dataset Rows"
+            value={(dataset?.rows_count || dataset?.row_count || 0).toLocaleString()}
+            color="blue"
+          />
+          {summary?.total_mrs != null && (
+            <SummaryStatCard icon={GitMerge} label="Total MRs" value={summary.total_mrs.toLocaleString()} color="violet" />
+          )}
+          {summary?.date_range?.start && (
+            <SummaryStatCard
+              icon={Calendar}
+              label="Date Range"
+              value={`${new Date(summary.date_range.start).toLocaleDateString("en-US", { month: "short", year: "numeric" })} – ${new Date(summary.date_range.end).toLocaleDateString("en-US", { month: "short", year: "numeric" })}`}
+              color="cyan"
+            />
+          )}
         </div>
+
+        {/* State distribution (if available) */}
+        {summary?.state_distribution && Object.keys(summary.state_distribution).length > 0 && (
+          <div className="flex flex-wrap gap-2 mb-6">
+            {Object.entries(summary.state_distribution).map(([state, count]) => (
+              <span
+                key={state}
+                className="px-3 py-1.5 rounded-lg bg-white border border-slate-200/60 text-xs font-medium text-slate-600"
+              >
+                {state}: <span className="font-bold text-slate-800">{count.toLocaleString()}</span>
+              </span>
+            ))}
+          </div>
+        )}
 
         {/* Charts grid */}
         {results.length === 0 ? (
@@ -723,11 +643,14 @@ const AnalysisDashboardPage = () => {
                 key={idx}
                 result={result}
                 index={idx}
+                chartTypeOverrides={chartTypeOverrides}
+                onChartTypeChange={handleChartTypeChange}
                 onTimeChange={handleTimeChange}
                 onFullscreen={(i) => setFullscreenIdx(i)}
-                onDownloadImage={handleDownloadImage}
+                onExportImage={handleExportImage}
                 onRetry={handleRetry}
                 retrying={retryingIdx === idx}
+                chartRefs={chartRefs}
               />
             ))}
           </div>
@@ -738,6 +661,9 @@ const AnalysisDashboardPage = () => {
       {fullscreenIdx !== null && (
         <FullscreenOverlay
           result={results[fullscreenIdx]}
+          chartTypeOverride={chartTypeOverrides[fullscreenIdx]}
+          colorIndex={fullscreenIdx}
+          onChartTypeChange={(newType) => handleChartTypeChange(fullscreenIdx, newType)}
           onClose={() => setFullscreenIdx(null)}
         />
       )}

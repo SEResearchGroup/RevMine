@@ -276,7 +276,7 @@ const ImportRepositoriesModal = ({ workspaceId, onClose }) => {
                             </span>
                           </p>
                         </div>
-                        <div className="ml-4 flex-shrink-0">
+                        <div className="ml-4 shrink-0">
                           <input
                             type="checkbox"
                             checked={isSelected}

@@ -17,7 +17,6 @@ import {
   ChevronDown,
   ChevronRight,
   Play,
-  SlidersHorizontal,
   Layers,
 } from "lucide-react";
 import { analyzeService } from "../../services/api";
@@ -70,13 +69,11 @@ const MetricsSelectionPage = () => {
 
   // Selection
   const [selectedMetrics, setSelectedMetrics] = useState([]);
-  const [customCharts, setCustomCharts] = useState([]);
 
   // UI
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [expandedCats, setExpandedCats] = useState({});
-  const [activeTab, setActiveTab] = useState("predefined"); // predefined | custom
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState(null);
 
@@ -136,26 +133,8 @@ const MetricsSelectionPage = () => {
     else setSelectedMetrics(allAvailable);
   };
 
-  /* ---- custom chart helpers ---- */
-  const addCustomChart = () => {
-    setCustomCharts((prev) => [
-      ...prev,
-      { id: Date.now(), x_axis: "", y_axis: "", chart_type: "bar", aggregation: "sum", time_aggregation: "M" },
-    ]);
-  };
-
-  const updateCustomChart = (id, field, value) => {
-    setCustomCharts((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, [field]: value } : c))
-    );
-  };
-
-  const removeCustomChart = (id) => {
-    setCustomCharts((prev) => prev.filter((c) => c.id !== id));
-  };
-
   /* ---- submit ---- */
-  const totalSelected = selectedMetrics.length + customCharts.filter((c) => c.x_axis && c.y_axis).length;
+  const totalSelected = selectedMetrics.length;
 
   const handleRunAnalysis = async () => {
     if (totalSelected === 0) return;
@@ -179,25 +158,6 @@ const MetricsSelectionPage = () => {
         }
       }
 
-      // Generate custom charts
-      for (const cc of customCharts) {
-        if (!cc.x_axis || !cc.y_axis) continue;
-        try {
-          const res = await analyzeService.generateChart({
-            dataset_id: datasetId,
-            x_axis: cc.x_axis,
-            y_axis: cc.y_axis,
-            chart_type: cc.chart_type,
-            aggregation: cc.aggregation,
-            time_aggregation: cc.time_aggregation,
-          });
-          results.push(res);
-        } catch (err) {
-          console.error("Failed custom chart:", err);
-          results.push({ error: true, message: err.response?.data?.error || err.message });
-        }
-      }
-
       navigate(`/analysis/${datasetId}/dashboard`, { state: { results, dataset } });
     } catch (err) {
       setError("Analysis failed. Try again.");
@@ -218,7 +178,7 @@ const MetricsSelectionPage = () => {
   /* ---- loading / error states ---- */
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/40 flex items-center justify-center">
+      <div className="min-h-screen bg-linear-to-br from-slate-50 via-blue-50/30 to-indigo-50/40 flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="w-10 h-10 animate-spin text-indigo-500 mx-auto mb-3" />
           <p className="text-slate-500">Loading metrics catalogue...</p>
@@ -228,7 +188,7 @@ const MetricsSelectionPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/40">
+    <div className="min-h-screen bg-linear-to-br from-slate-50 via-blue-50/30 to-indigo-50/40">
       <div className="max-w-6xl mx-auto px-6 py-8">
         {/* Header */}
         <div className="mb-6">
@@ -241,7 +201,7 @@ const MetricsSelectionPage = () => {
           </button>
 
           <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-purple-200/50">
+            <div className="w-10 h-10 bg-linear-to-br from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-purple-200/50">
               <BarChart3 className="w-5 h-5 text-white" />
             </div>
             <div>
@@ -325,7 +285,7 @@ const MetricsSelectionPage = () => {
             <button
               onClick={handleRunAnalysis}
               disabled={totalSelected === 0 || creating}
-              className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-indigo-600 to-blue-600 text-white rounded-xl font-medium shadow-lg shadow-indigo-200/50 hover:from-indigo-700 hover:to-blue-700 disabled:from-slate-300 disabled:to-slate-400 disabled:shadow-none disabled:cursor-not-allowed transition-all"
+              className="flex items-center gap-2 px-6 py-3 bg-linear-to-r from-indigo-600 to-blue-600 text-white rounded-xl font-medium shadow-lg shadow-indigo-200/50 hover:from-indigo-700 hover:to-blue-700 disabled:from-slate-300 disabled:to-slate-400 disabled:shadow-none disabled:cursor-not-allowed transition-all"
             >
               {creating ? (
                 <>
@@ -349,35 +309,11 @@ const MetricsSelectionPage = () => {
           )}
         </div>
 
-        {/* Tab switcher */}
-        <div className="flex gap-2 mb-6">
-          {[
-            { key: "predefined", label: "Predefined Metrics", icon: BarChart3 },
-            { key: "custom", label: "Custom Chart", icon: SlidersHorizontal },
-          ].map(({ key, label, icon: Icon }) => (
-            <button
-              key={key}
-              onClick={() => setActiveTab(key)}
-              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                activeTab === key
-                  ? "bg-white text-indigo-600 shadow-sm border border-indigo-100"
-                  : "text-slate-500 hover:text-slate-700 hover:bg-white/60"
-              }`}
-            >
-              <Icon className="w-4 h-4" />
-              {label}
-            </button>
-          ))}
-        </div>
-
-        {/* PREDEFINED TAB */}
-        {activeTab === "predefined" && (
-          <>
-            {/* Search */}
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-4 mb-6">
-              <div className="relative">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                <input
+        {/* Search */}
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-4 mb-6">
+          <div className="relative">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+            <input
                   type="text"
                   placeholder="Search metrics..."
                   value={searchTerm}
@@ -478,7 +414,7 @@ const MetricsSelectionPage = () => {
                                       {metric.name}
                                     </p>
                                     <ChIcon
-                                      className={`w-4 h-4 flex-shrink-0 ${
+                                      className={`w-4 h-4 shrink-0 ${
                                         isAvailable ? "text-slate-400" : "text-slate-300"
                                       }`}
                                     />
@@ -493,7 +429,7 @@ const MetricsSelectionPage = () => {
 
                                   {!isAvailable && missing.length > 0 && (
                                     <div className="mt-2 flex items-start gap-1.5 text-xs text-amber-600 bg-amber-50 rounded-lg px-2.5 py-1.5">
-                                      <Info className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                                      <Info className="w-3.5 h-3.5 mt-0.5 shrink-0" />
                                       <span>
                                         Missing columns:{" "}
                                         <span className="font-medium">
@@ -513,156 +449,6 @@ const MetricsSelectionPage = () => {
                 })
               )}
             </div>
-          </>
-        )}
-
-        {/* CUSTOM TAB */}
-        {activeTab === "custom" && compatibleAxes && (
-          <div className="space-y-4">
-            <div className="bg-white rounded-2xl border border-slate-200/60 p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h3 className="text-lg font-semibold text-slate-800">
-                    Custom Charts
-                  </h3>
-                  <p className="text-sm text-slate-400">
-                    Pick X and Y axes from your dataset columns
-                  </p>
-                </div>
-                <button
-                  onClick={addCustomChart}
-                  className="px-4 py-2 bg-indigo-50 text-indigo-600 rounded-xl text-sm font-medium hover:bg-indigo-100 transition-colors"
-                >
-                  + Add chart
-                </button>
-              </div>
-
-              {customCharts.length === 0 ? (
-                <div className="text-center py-8 text-slate-400 text-sm">
-                  Click "Add chart" to create a custom chart.
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {customCharts.map((cc, idx) => (
-                    <div
-                      key={cc.id}
-                      className="border border-slate-200 rounded-xl p-4 bg-slate-50/50"
-                    >
-                      <div className="flex items-center justify-between mb-3">
-                        <p className="text-sm font-medium text-slate-700">
-                          Custom Chart #{idx + 1}
-                        </p>
-                        <button
-                          onClick={() => removeCustomChart(cc.id)}
-                          className="text-xs text-red-500 hover:text-red-700"
-                        >
-                          Remove
-                        </button>
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
-                        {/* X Axis */}
-                        <div>
-                          <label className="text-xs font-medium text-slate-500 mb-1 block">
-                            X Axis
-                          </label>
-                          <select
-                            value={cc.x_axis}
-                            onChange={(e) => updateCustomChart(cc.id, "x_axis", e.target.value)}
-                            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                          >
-                            <option value="">Select column</option>
-                            {(compatibleAxes.x_axis || []).map((ax) => (
-                              <option key={ax.column} value={ax.column}>
-                                {ax.label} ({ax.dtype})
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-
-                        {/* Y Axis */}
-                        <div>
-                          <label className="text-xs font-medium text-slate-500 mb-1 block">
-                            Y Axis
-                          </label>
-                          <select
-                            value={cc.y_axis}
-                            onChange={(e) => updateCustomChart(cc.id, "y_axis", e.target.value)}
-                            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                          >
-                            <option value="">Select column</option>
-                            {(compatibleAxes.y_axis || []).map((ax) => (
-                              <option key={ax.column} value={ax.column}>
-                                {ax.label}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-
-                        {/* Chart Type */}
-                        <div>
-                          <label className="text-xs font-medium text-slate-500 mb-1 block">
-                            Chart Type
-                          </label>
-                          <select
-                            value={cc.chart_type}
-                            onChange={(e) => updateCustomChart(cc.id, "chart_type", e.target.value)}
-                            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                          >
-                            {(compatibleAxes.supported_chart_types || ["bar", "line", "scatter", "area", "pie"]).map(
-                              (t) => (
-                                <option key={t} value={t}>
-                                  {t.charAt(0).toUpperCase() + t.slice(1)}
-                                </option>
-                              )
-                            )}
-                          </select>
-                        </div>
-
-                        {/* Aggregation */}
-                        <div>
-                          <label className="text-xs font-medium text-slate-500 mb-1 block">
-                            Aggregation
-                          </label>
-                          <select
-                            value={cc.aggregation}
-                            onChange={(e) => updateCustomChart(cc.id, "aggregation", e.target.value)}
-                            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                          >
-                            {["sum", "mean", "median", "count", "min", "max"].map((a) => (
-                              <option key={a} value={a}>
-                                {a.charAt(0).toUpperCase() + a.slice(1)}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-
-                        {/* Time Aggregation */}
-                        <div>
-                          <label className="text-xs font-medium text-slate-500 mb-1 block">
-                            Time Group
-                          </label>
-                          <select
-                            value={cc.time_aggregation}
-                            onChange={(e) => updateCustomChart(cc.id, "time_aggregation", e.target.value)}
-                            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                          >
-                            {(compatibleAxes.time_aggregations || ["D", "W", "M", "Q", "Y"]).map(
-                              (t) => (
-                                <option key={t} value={t}>
-                                  {{ D: "Daily", W: "Weekly", M: "Monthly", Q: "Quarterly", Y: "Yearly" }[t] || t}
-                                </option>
-                              )
-                            )}
-                          </select>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
 
         {/* Bottom continue */}
         <div className="mt-8 flex justify-between">
@@ -676,7 +462,7 @@ const MetricsSelectionPage = () => {
           <button
             onClick={handleRunAnalysis}
             disabled={totalSelected === 0 || creating}
-            className="flex items-center gap-2 px-8 py-3 bg-gradient-to-r from-indigo-600 to-blue-600 text-white rounded-xl font-medium shadow-lg shadow-indigo-200/50 hover:from-indigo-700 hover:to-blue-700 disabled:from-slate-300 disabled:to-slate-400 disabled:shadow-none disabled:cursor-not-allowed transition-all"
+            className="flex items-center gap-2 px-8 py-3 bg-linear-to-r from-indigo-600 to-blue-600 text-white rounded-xl font-medium shadow-lg shadow-indigo-200/50 hover:from-indigo-700 hover:to-blue-700 disabled:from-slate-300 disabled:to-slate-400 disabled:shadow-none disabled:cursor-not-allowed transition-all"
           >
             {creating ? (
               <>

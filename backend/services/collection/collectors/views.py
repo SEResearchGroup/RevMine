@@ -4,6 +4,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework import status
+from django.db import models as db_models
 from django.shortcuts import get_object_or_404
 from django.http import HttpResponse, FileResponse
 from django.views import View
@@ -956,6 +957,66 @@ class UploadExternalCollectionView(UserIdRequiredMixin, APIView):
             'message': 'External collection uploaded successfully.',
             'collection': serializer.data,
         }, status=status.HTTP_201_CREATED)
+
+
+class CleanedCollectionsForAnalysisView(UserIdRequiredMixin, APIView):
+    """Return cleaned data items ready for analysis (completed + has statistics CSV)."""
+
+    def get(self, request):
+        user_id = self.get_user_id(request)
+        if not user_id:
+            return self.user_id_error_response()
+
+        search = request.query_params.get("search", "").strip()
+
+        collections = (
+            Collection.objects.filter(user=user_id, status="completed")
+            .prefetch_related("cleaned_data")
+        )
+
+        if search:
+            collections = collections.filter(
+                db_models.Q(repository_name__icontains=search)
+                | db_models.Q(repository_full_name__icontains=search)
+            )
+
+        results = []
+        for coll in collections:
+            cleaned_items = coll.cleaned_data.filter(
+                status="completed",
+            ).exclude(
+                statistics_csv_filename__isnull=True,
+            ).exclude(
+                statistics_csv_filename="",
+            ).order_by("-completed_at")
+
+            for cd in cleaned_items:
+                results.append(
+                    {
+                        "cleaned_data_id": cd.id,
+                        "collection_id": coll.id,
+                        "repository_name": coll.repository_name,
+                        "repository_full_name": coll.repository_full_name,
+                        "platform": coll.platform,
+                        "workspace_id": coll.workspace_id,
+                        "repository_id": coll.repository_id,
+                        "repository_url": coll.repository_url,
+                        "collection_date": coll.completed_at,
+                        "cleaning_date": cd.completed_at,
+                        "start_date": cd.start_date,
+                        "end_date": cd.end_date,
+                        "stats": cd.stats,
+                        "selected_features": cd.selected_features,
+                        "statistics_csv_filename": cd.statistics_csv_filename,
+                    }
+                )
+
+        results.sort(key=lambda r: r["cleaning_date"] or "", reverse=True)
+
+        return Response(
+            {"count": len(results), "results": results},
+            status=status.HTTP_200_OK,
+        )
 
 
 class UserDatasetsView(UserIdRequiredMixin, APIView):

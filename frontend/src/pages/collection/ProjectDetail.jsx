@@ -605,7 +605,7 @@ function ProjectDetail() {
   const InProgressIndicator = () => (
     <div className="relative w-full h-1 bg-blue-100 rounded-full overflow-hidden">
       <div
-        className="absolute h-full w-1/3 bg-gradient-to-r from-blue-400 via-blue-600 to-blue-400 rounded-full animate-slide-progress"
+        className="absolute h-full w-1/3 bg-linear-to-r from-blue-400 via-blue-600 to-blue-400 rounded-full animate-slide-progress"
       />
     </div>
   );
@@ -641,7 +641,7 @@ function ProjectDetail() {
         {/* Project Details Card */}
         <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
           <div className="flex items-start gap-4">
-            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center flex-shrink-0">
+            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center shrink-0">
               {platform === "github" ? (
                 <Github className="w-8 h-8" />
               ) : (

@@ -40,7 +40,9 @@ class AnalysisService:
             'correlation_matrix': self.analyze_correlation_matrix,
             'mr_complexity': self.analyze_mr_complexity,
             'project_comparison': self.analyze_project_comparison,
-            'custom_chart': self.analyze_custom_chart,
+            'top_commiters': self.analyze_top_commiters,
+            'top_authors': self.analyze_top_authors,
+            'top_reviewers': self.analyze_top_reviewers,
         }
     
     def _parse_dates(self, df):
@@ -588,6 +590,210 @@ class AnalysisService:
             'statistics': statistics
         }
     
+    def analyze_top_commiters(self, df, analysis):
+        """
+        Top 10 committers ranked by number of MRs they contributed to.
+        Parses the comma-separated 'Commiters' column.
+        """
+        config = analysis.config
+        commiters_col = 'Commiters'
+
+        df = self._apply_config(df, config)
+
+        if commiters_col not in df.columns:
+            raise ValueError(f"Column '{commiters_col}' not found in dataset")
+
+        # Parse comma-separated committer names and count MR participation
+        from collections import Counter
+        counter = Counter()
+        for val in df[commiters_col].dropna():
+            names = [n.strip() for n in str(val).split(',') if n.strip()]
+            counter.update(names)
+
+        if not counter:
+            raise ValueError("No committer data found")
+
+        top10 = counter.most_common(10)
+        labels = [name for name, _ in top10]
+        values = [count for _, count in top10]
+
+        chart_data = {
+            'type': 'bar',
+            'data': {
+                'labels': labels,
+                'datasets': [{
+                    'label': 'MRs Contributed To',
+                    'data': values,
+                }]
+            },
+            'options': {
+                'title': 'Top 10 Committers',
+                'xLabel': 'Committer',
+                'yLabel': 'Number of MRs',
+            }
+        }
+
+        fig, ax = plt.subplots(figsize=(12, 6))
+        bars = ax.barh(range(len(labels)), values, color='steelblue')
+        ax.set_yticks(range(len(labels)))
+        ax.set_yticklabels(labels)
+        ax.set_xlabel('Number of MRs')
+        ax.set_title('Top 10 Committers')
+        ax.invert_yaxis()
+        ax.grid(axis='x', alpha=0.3)
+        plt.tight_layout()
+
+        chart_image = self._generate_matplotlib_image(fig)
+
+        statistics = {
+            'total_unique_commiters': len(counter),
+            'top_commiter': labels[0] if labels else '',
+            'top_commiter_mrs': values[0] if values else 0,
+            'total_mrs': len(df),
+        }
+
+        return {
+            'chart_data': chart_data,
+            'chart_image': chart_image,
+            'statistics': statistics
+        }
+
+    def analyze_top_authors(self, df, analysis):
+        """
+        Top 10 authors ranked by number of MRs they authored.
+        Uses the 'Author' column.
+        """
+        config = analysis.config
+        author_col = 'Author'
+
+        df = self._apply_config(df, config)
+
+        if author_col not in df.columns:
+            raise ValueError(f"Column '{author_col}' not found in dataset. "
+                             "This metric requires the Author column. "
+                             "Re-collect your data to include it.")
+
+        author_counts = df[author_col].dropna().astype(str).str.strip()
+        author_counts = author_counts[author_counts != '']
+        author_dist = author_counts.value_counts().head(10)
+
+        if len(author_dist) == 0:
+            raise ValueError("No author data found")
+
+        labels = author_dist.index.tolist()
+        values = author_dist.values.tolist()
+
+        chart_data = {
+            'type': 'bar',
+            'data': {
+                'labels': labels,
+                'datasets': [{
+                    'label': 'MRs Authored',
+                    'data': values,
+                }]
+            },
+            'options': {
+                'title': 'Top 10 Authors',
+                'xLabel': 'Author',
+                'yLabel': 'Number of MRs',
+            }
+        }
+
+        fig, ax = plt.subplots(figsize=(12, 6))
+        ax.barh(range(len(labels)), values, color='steelblue')
+        ax.set_yticks(range(len(labels)))
+        ax.set_yticklabels(labels)
+        ax.set_xlabel('Number of MRs')
+        ax.set_title('Top 10 Authors')
+        ax.invert_yaxis()
+        ax.grid(axis='x', alpha=0.3)
+        plt.tight_layout()
+
+        chart_image = self._generate_matplotlib_image(fig)
+
+        total_authors = df[author_col].dropna().nunique()
+        statistics = {
+            'total_unique_authors': int(total_authors),
+            'top_author': labels[0] if labels else '',
+            'top_author_mrs': values[0] if values else 0,
+            'total_mrs': len(df),
+        }
+
+        return {
+            'chart_data': chart_data,
+            'chart_image': chart_image,
+            'statistics': statistics
+        }
+
+    def analyze_top_reviewers(self, df, analysis):
+        """
+        Top 10 reviewers ranked by number of MRs they reviewed.
+        Parses the comma-separated 'Reviewers' column.
+        """
+        config = analysis.config
+        reviewers_col = 'Reviewers'
+
+        df = self._apply_config(df, config)
+
+        if reviewers_col not in df.columns:
+            raise ValueError(f"Column '{reviewers_col}' not found in dataset. "
+                             "This metric requires the Reviewers column. "
+                             "Re-collect your data to include it.")
+
+        from collections import Counter
+        counter = Counter()
+        for val in df[reviewers_col].dropna():
+            names = [n.strip() for n in str(val).split(',') if n.strip()]
+            counter.update(names)
+
+        if not counter:
+            raise ValueError("No reviewer data found")
+
+        top10 = counter.most_common(10)
+        labels = [name for name, _ in top10]
+        values = [count for _, count in top10]
+
+        chart_data = {
+            'type': 'bar',
+            'data': {
+                'labels': labels,
+                'datasets': [{
+                    'label': 'MRs Reviewed',
+                    'data': values,
+                }]
+            },
+            'options': {
+                'title': 'Top 10 Reviewers',
+                'xLabel': 'Reviewer',
+                'yLabel': 'Number of MRs',
+            }
+        }
+
+        fig, ax = plt.subplots(figsize=(12, 6))
+        ax.barh(range(len(labels)), values, color='steelblue')
+        ax.set_yticks(range(len(labels)))
+        ax.set_yticklabels(labels)
+        ax.set_xlabel('Number of MRs')
+        ax.set_title('Top 10 Reviewers')
+        ax.invert_yaxis()
+        ax.grid(axis='x', alpha=0.3)
+        plt.tight_layout()
+
+        chart_image = self._generate_matplotlib_image(fig)
+
+        statistics = {
+            'total_unique_reviewers': len(counter),
+            'top_reviewer': labels[0] if labels else '',
+            'top_reviewer_mrs': values[0] if values else 0,
+            'total_mrs': len(df),
+        }
+
+        return {
+            'chart_data': chart_data,
+            'chart_image': chart_image,
+            'statistics': statistics
+        }
+
     def analyze_custom_chart(self, df, analysis):
         """
         Generic function for custom X/Y axis charts
@@ -636,9 +842,10 @@ class AnalysisService:
             # Calculate correlation
             correlation = df[[x_axis, y_axis]].corr().iloc[0, 1]
             statistics = {
-                'correlation': float(correlation),
-                'x_stats': df[x_axis].describe().to_dict(),
-                'y_stats': df[y_axis].describe().to_dict(),
+                'correlation': float(correlation) if pd.notna(correlation) else 0,
+                'x_mean': round(float(df[x_axis].mean()), 2) if pd.notna(df[x_axis].mean()) else 0,
+                'y_mean': round(float(df[y_axis].mean()), 2) if pd.notna(df[y_axis].mean()) else 0,
+                'data_points': len(df),
             }
             
         else:
@@ -1111,8 +1318,11 @@ class AnalysisService:
         chart_image = self._generate_matplotlib_image(fig)
         
         statistics = {
-            'averages': means,
             'total_mrs': len(df_copy),
+            'avg_people': round(means.get('people', 0), 2),
+            'avg_reviewers': round(means.get('reviewers', 0), 2),
+            'avg_commiters': round(means.get('commiters', 0), 2),
+            'avg_discussionners': round(means.get('discussionners', 0), 2),
         }
         
         return {
@@ -1408,10 +1618,12 @@ class AnalysisService:
         
         chart_image = self._generate_matplotlib_image(fig)
         
-        statistics = {
-            'total_mrs': int(state_dist.sum()),
-            'states': {str(k): int(v) for k, v in state_dist.items()},
-        }
+        # Flatten state counts into top-level statistics
+        flat_stats = {'total_mrs': int(state_dist.sum())}
+        for state_name, count in state_dist.items():
+            flat_stats[f'{state_name}_count'] = int(count)
+        
+        statistics = flat_stats
         
         return {
             'chart_data': chart_data,
@@ -1596,7 +1808,8 @@ class AnalysisService:
         corr_pairs.sort(key=lambda x: abs(x['correlation']), reverse=True)
         
         statistics = {
-            'strongest_correlations': corr_pairs[:5],
+            'top_correlation': corr_pairs[0]['pair'] if corr_pairs else 'N/A',
+            'top_correlation_value': round(corr_pairs[0]['correlation'], 3) if corr_pairs else 0,
             'columns_analyzed': len(available_cols),
             'rows_analyzed': len(df_copy),
         }
@@ -1684,11 +1897,12 @@ class AnalysisService:
         
         chart_image = self._generate_matplotlib_image(fig)
         
-        statistics = {
-            'total_mrs': len(df_copy),
-            'complexity_breakdown': {str(k): int(v) for k, v in complexity_dist.items()},
-            'factors_used': complexity_factors,
-        }
+        # Flatten complexity breakdown into top-level stats
+        flat_stats = {'total_mrs': len(df_copy)}
+        for level, count in complexity_dist.items():
+            flat_stats[f'{level.lower()}_complexity'] = int(count)
+        
+        statistics = flat_stats
         
         return {
             'chart_data': chart_data,

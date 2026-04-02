@@ -322,6 +322,12 @@ export const collectionService = {
     return response.data;
   },
 
+  getCleanedForAnalysis: async (search = "") => {
+    const params = search ? `?search=${encodeURIComponent(search)}` : "";
+    const response = await collectionApi.get(`/cleaned-for-analysis/${params}`);
+    return response.data;
+  },
+
   uploadExternalCollection: (file, platform, name, onUploadProgress) => {
     const formData = new FormData();
     formData.append('file', file);
@@ -449,6 +455,20 @@ export const analyzeService = {
 
   retryAnalysis: async (analysisId) => {
     const response = await analyzeApi.post(`/analyses/${analysisId}/retry/`);
+    return response.data;
+  },
+
+  // ========== HISTORY (panel page) ==========
+  getAnalysisHistory: async (workspaceId = null) => {
+    let url = '/analyses/history/';
+    if (workspaceId) url += `?workspace_id=${workspaceId}`;
+    const response = await analyzeApi.get(url);
+    return response.data;
+  },
+
+  // ========== DATASET SUMMARY ==========
+  getDatasetSummary: async (datasetId) => {
+    const response = await analyzeApi.get(`/datasets/${datasetId}/summary/`);
     return response.data;
   },
 };

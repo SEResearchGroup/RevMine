@@ -758,3 +758,141 @@ class AnalysisRetryView(APIView):
                 "message": "Analysis retry failed.",
                 "error": str(e)
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+# ---------------------------------------------------------------------------
+# Analysis history  (grouped by dataset for the panel page)
+# ---------------------------------------------------------------------------
+
+class AnalysisHistoryView(APIView):
+    """
+    GET /analyses/history/
+    Returns analysis history grouped by dataset, for the history panel page.
+    Each dataset entry includes: dataset info, count of analyses, dates, statuses.
+    """
+
+    def get(self, request):
+        workspace_id = request.query_params.get('workspace_id')
+        
+        datasets_qs = Dataset.objects.prefetch_related('analyses').all()
+        
+        if workspace_id:
+            datasets_qs = datasets_qs.filter(workspace_id=workspace_id)
+        
+        # Only datasets that have at least one analysis
+        datasets_with_analyses = []
+        for dataset in datasets_qs:
+            analyses = dataset.analyses.all()
+            if not analyses.exists():
+                continue
+            
+            completed = analyses.filter(status='completed').count()
+            failed = analyses.filter(status='failed').count()
+            total = analyses.count()
+            
+            # Get date range from analyses
+            first_analysis = analyses.order_by('created_at').first()
+            last_analysis = analyses.order_by('-created_at').first()
+            
+            # Get unique metric codes used
+            metric_codes = list(analyses.values_list('metric_code', flat=True).distinct())
+            
+            datasets_with_analyses.append({
+                'dataset': DatasetSerializer(dataset).data,
+                'analysis_summary': {
+                    'total_analyses': total,
+                    'completed': completed,
+                    'failed': failed,
+                    'pending': total - completed - failed,
+                    'metric_codes': metric_codes,
+                    'first_analysis_date': first_analysis.created_at.isoformat() if first_analysis else None,
+                    'last_analysis_date': last_analysis.created_at.isoformat() if last_analysis else None,
+                }
+            })
+        
+        # Sort by last analysis date descending
+        datasets_with_analyses.sort(
+            key=lambda x: x['analysis_summary']['last_analysis_date'] or '',
+            reverse=True
+        )
+        
+        return Response({
+            'count': len(datasets_with_analyses),
+            'results': datasets_with_analyses
+        })
+
+
+class DatasetSummaryView(APIView):
+    """
+    GET /datasets/<pk>/summary/
+    Returns a comprehensive summary of the dataset for dashboard display:
+    total rows, date range, column stats, key metrics computed from the raw data.
+    """
+
+    def get(self, request, pk):
+        dataset = get_object_or_404(Dataset, pk=pk)
+        
+        service = DatasetService()
+        try:
+            df = service.load_dataframe(dataset)
+        except Exception as e:
+            return Response(
+                {"error": f"Failed to load dataset: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+        
+        summary = {
+            'dataset_id': str(pk),
+            'filename': dataset.filename,
+            'total_rows': dataset.rows_count,
+            'total_columns': dataset.columns_count,
+            'uploaded_at': dataset.uploaded_at.isoformat() if dataset.uploaded_at else None,
+        }
+        
+        # Date range from Creation_Date if available
+        if 'Creation_Date' in df.columns:
+            import pandas as pd
+            dates = pd.to_datetime(df['Creation_Date'], errors='coerce').dropna()
+            if len(dates) > 0:
+                summary['date_range'] = {
+                    'start': dates.min().isoformat(),
+                    'end': dates.max().isoformat(),
+                }
+        
+        # MR/PR counts
+        summary['total_mrs'] = len(df)
+        
+        # State distribution if available
+        if 'state' in df.columns:
+            state_counts = df['state'].value_counts().to_dict()
+            summary['state_distribution'] = {str(k): int(v) for k, v in state_counts.items()}
+        
+        # Key numeric column averages
+        import pandas as pd
+        numeric_summaries = {}
+        key_cols = [
+            '#Commits', '#Discussions', '#UniqueCommiters', 'modified_files',
+            'comments', '#people', '#reviewers', 'Lead_Time',
+            'additions', 'deletions', 'churn_addition', 'churn_deletions',
+            'initial_mr_size', 'rework_size', 'hist_entropy',
+        ]
+        for col in key_cols:
+            if col in df.columns:
+                vals = pd.to_numeric(df[col], errors='coerce').dropna()
+                if len(vals) > 0:
+                    numeric_summaries[col] = {
+                        'mean': round(float(vals.mean()), 2),
+                        'median': round(float(vals.median()), 2),
+                        'min': float(vals.min()),
+                        'max': float(vals.max()),
+                        'sum': float(vals.sum()),
+                    }
+        
+        summary['numeric_summaries'] = numeric_summaries
+        
+        # Platform info
+        summary['platform'] = dataset.platform
+        summary['workspace_id'] = dataset.workspace_id
+        summary['repository_id'] = dataset.repository_id
+        
+        return Response(summary)

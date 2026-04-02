@@ -21,7 +21,7 @@ import {
   List,
 } from "lucide-react";
 import { analyzeService } from "../../services/api";
-import InteractiveChart from "../../components/analysis/InteractiveChart";
+import DynamicChart from "../../components/analysis/DynamicChart";
 
 const AnalysisResultsPage = () => {
   const { datasetId } = useParams();
@@ -236,7 +236,7 @@ const AnalysisResultsPage = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
+      <div className="min-h-screen bg-linear-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="w-12 h-12 animate-spin text-indigo-600 mx-auto mb-4" />
           <p className="text-slate-600">Loading results...</p>
@@ -246,7 +246,7 @@ const AnalysisResultsPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+    <div className="min-h-screen bg-linear-to-br from-slate-50 via-blue-50 to-indigo-50">
       <div className="max-w-7xl mx-auto px-6 py-8">
         {/* Header */}
         <div className="mb-6">
@@ -261,7 +261,7 @@ const AnalysisResultsPage = () => {
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-6">
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
               <div className="flex items-center gap-4">
-                <div className="w-14 h-14 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center shadow-lg shadow-green-200">
+                <div className="w-14 h-14 bg-linear-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center shadow-lg shadow-green-200">
                   <BarChart3 className="w-7 h-7 text-white" />
                 </div>
                 <div>
@@ -284,7 +284,7 @@ const AnalysisResultsPage = () => {
                 </button>
                 <button
                   onClick={() => navigate(`/analysis/datasets/${datasetId}/analyze`)}
-                  className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-blue-600 text-white rounded-xl hover:from-indigo-700 hover:to-blue-700 transition-all shadow-lg shadow-indigo-200 font-medium"
+                  className="flex items-center gap-2 px-5 py-2.5 bg-linear-to-r from-indigo-600 to-blue-600 text-white rounded-xl hover:from-indigo-700 hover:to-blue-700 transition-all shadow-lg shadow-indigo-200 font-medium"
                 >
                   <BarChart3 className="w-4 h-4" />
                   New analysis
@@ -372,9 +372,11 @@ const AnalysisResultsPage = () => {
                 <div className="p-5">
                   {analysis.status === "completed" && analysis.result?.chart_data ? (
                     <div className="h-64 bg-slate-50 rounded-xl overflow-hidden">
-                      <InteractiveChart
+                      <DynamicChart
                         chartData={analysis.result.chart_data}
                         chartType={analysis.result.chart_data?.type || analysis.chart_type}
+                        height={256}
+                        showControls={false}
                       />
                     </div>
                   ) : analysis.status === "processing" || analysis.status === "pending" ? (
@@ -449,9 +451,11 @@ const AnalysisResultsPage = () => {
                   <div className="lg:w-1/3">
                     {analysis.status === "completed" && analysis.result?.chart_data ? (
                       <div className="h-48 bg-slate-50 rounded-xl overflow-hidden">
-                        <InteractiveChart
+                        <DynamicChart
                           chartData={analysis.result.chart_data}
                           chartType={analysis.result.chart_data?.type || analysis.chart_type}
+                          height={192}
+                          showControls={false}
                         />
                       </div>
                     ) : (
@@ -590,9 +594,11 @@ const AnalysisResultsPage = () => {
               <div className="p-8 bg-slate-50">
                 <div className="h-[60vh]">
                   {fullscreenChart.result?.chart_data ? (
-                    <InteractiveChart
+                    <DynamicChart
                       chartData={fullscreenChart.result.chart_data}
                       chartType={fullscreenChart.result.chart_data?.type || fullscreenChart.chart_type}
+                      height="60vh"
+                      showControls={true}
                     />
                   ) : (
                     <div className="flex items-center justify-center h-full text-slate-500">

@@ -256,7 +256,7 @@ const DatasetSelectionSection = ({ onSelectDataset, onFileSelect }) => {
                 className="bg-white rounded-lg border border-slate-200 p-5 hover:shadow-md hover:border-blue-300 transition-all cursor-pointer group"
               >
                 <div className="flex items-start justify-between mb-3">
-                  <FileText className="w-8 h-8 text-blue-600 flex-shrink-0" />
+                  <FileText className="w-8 h-8 text-blue-600 shrink-0" />
                   {dataset.status === "completed" && (
                     <CheckCircle2 className="w-5 h-5 text-green-500" />
                   )}

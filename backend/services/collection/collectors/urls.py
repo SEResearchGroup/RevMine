@@ -22,6 +22,7 @@ from .views import (
     DownloadCollectionJSONView,
     DeleteCollectionView,
     UploadExternalCollectionView,
+    CleanedCollectionsForAnalysisView,
 )
 
 urlpatterns = [
@@ -119,4 +120,7 @@ urlpatterns = [
 
     # get all user datasets
     path("datasets/", UserDatasetsView.as_view(), name="user-datasets"),
+
+    # cleaned collections ready for analysis
+    path("cleaned-for-analysis/", CleanedCollectionsForAnalysisView.as_view(), name="cleaned-for-analysis"),
 ]

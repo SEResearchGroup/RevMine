@@ -77,7 +77,7 @@ const Sidebar = () => {
       id: "analysis",
       icon: BarChart3,
       label: "Analysis",
-      subItems: ["New Analysis", "Dashboard"],
+      subItems: ["History", "New Analysis"],
     },
     {
       id: "settings",
@@ -100,7 +100,9 @@ const Sidebar = () => {
     } else if (subItem === "Workspaces") {
       navigate("/workspaces");
     } else if (subItem === "New Analysis") {
-      navigate("/analysis");
+      navigate("/analysis/new");
+    } else if (subItem === "History") {
+      navigate("/analysis/history");
     } else if (subItem === "Dashboard") {
       navigate("/analysis");
     } else if (subItem === "Profile") {

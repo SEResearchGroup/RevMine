@@ -139,7 +139,7 @@ function CollectionProgress() {
         {/* Project Details Card */}
         <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
           <div className="flex items-start gap-4">
-            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center flex-shrink-0">
+            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center shrink-0">
               {workspace?.platform === "github" ? (
                 <Github className="w-8 h-8" />
               ) : (

@@ -26,6 +26,10 @@ import Profile from "../pages/profile/Profile";
 import DatasetSelectionPage from "../pages/Analysis/DatasetSelectionPage";
 import MetricsSelectionPage from "../pages/Analysis/MetricsSelectionPage";
 import AnalysisDashboardPage from "../pages/Analysis/AnalysisDashboardPage";
+import AnalysisHistoryPage from "../pages/Analysis/AnalysisHistoryPage";
+import ProjectAnalysisDetailPage from "../pages/Analysis/ProjectAnalysisDetailPage";
+import ProjectSelectionPage from "../pages/Analysis/ProjectSelectionPage";
+import NewAnalysisPage from "../pages/Analysis/NewAnalysisPage";
 
 const AppRoutes = () => {
   return (
@@ -81,6 +85,11 @@ const AppRoutes = () => {
         
         {/* Analysis Routes */}
         <Route path="/analysis" element={<DatasetSelectionPage />} />
+        <Route path="/analysis/new" element={<NewAnalysisPage />} />
+        <Route path="/analysis/history" element={<AnalysisHistoryPage />} />
+        <Route path="/analysis/new/csv" element={<DatasetSelectionPage />} />
+        <Route path="/analysis/new/project" element={<ProjectSelectionPage />} />
+        <Route path="/analysis/:datasetId/detail" element={<ProjectAnalysisDetailPage />} />
         <Route path="/analysis/:datasetId/metrics" element={<MetricsSelectionPage />} />
         <Route path="/analysis/:datasetId/dashboard" element={<AnalysisDashboardPage />} />
 

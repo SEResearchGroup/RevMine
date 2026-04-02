@@ -8,6 +8,7 @@ from .views import (
     DatasetAvailableMetricsView,
     DatasetCompatibleAxesView,
     DatasetPreviewView,
+    DatasetSummaryView,
 
     # Metrics
     MetricListView,
@@ -21,6 +22,7 @@ from .views import (
     AnalysisDetailView,
     AnalysisResultView,
     AnalysisRetryView,
+    AnalysisHistoryView,
 
     # Generate (core endpoint)
     GenerateChartView,
@@ -38,6 +40,7 @@ urlpatterns = [
     path('datasets/<uuid:pk>/available_metrics/',           DatasetAvailableMetricsView.as_view(),   name='dataset-available-metrics'),
     # Returns compatible (x_axis, y_axis) pairs given the dataset columns
     path('datasets/<uuid:pk>/compatible_axes/',             DatasetCompatibleAxesView.as_view(),     name='dataset-compatible-axes'),
+    path('datasets/<uuid:pk>/summary/',                     DatasetSummaryView.as_view(),            name='dataset-summary'),
 
     # ──────────────────────────────────────────
     # Metrics  (read-only catalogue)
@@ -63,4 +66,6 @@ urlpatterns = [
     path('analyses/<uuid:pk>/result/',                      AnalysisResultView.as_view(),            name='analysis-result'),
     # Re-runs the analysis (e.g. after a dataset update)
     path('analyses/<uuid:pk>/retry/',                       AnalysisRetryView.as_view(),             name='analysis-retry'),
+    # History – grouped by dataset for the panel page
+    path('analyses/history/',                               AnalysisHistoryView.as_view(),           name='analysis-history'),
 ]

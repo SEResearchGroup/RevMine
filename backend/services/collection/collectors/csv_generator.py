@@ -559,7 +559,7 @@ class MetricsCalculator:
     - Churn: Total lines added and deleted across commits
     - Entropy: Shannon entropy measuring distribution of changes across files
     - Mean Time Between Commits: Average time interval between consecutive commits
-    - Author Contributions: Count of major (>=50% commits) vs minor (<50%) contributors
+    - Author Contributions: Count of major (>=5% commits) vs minor (<5%) contributors
     - Delta Time: Days since Unix epoch (for time-series analysis)
     - Rework Size: Estimated lines changed after code review feedback
     """
@@ -1324,6 +1324,8 @@ class StatisticsCSVGenerator:
         "filetypes",
         "state",
         "rework_size",
+        "Author",
+        "Reviewers",
         "#people",
         "#reviewers",
         "#commiters",
@@ -1387,6 +1389,8 @@ class StatisticsCSVGenerator:
             "filetypes",
             "state",
             "rework_size",
+            "Author",
+            "Reviewers",
             "#people",
             "#reviewers",
             "#commiters",
@@ -1597,6 +1601,8 @@ class StatisticsCSVGenerator:
             'filetypes': filetypes,
             'state': state,
             'rework_size': rework_size,
+            'Author': self.extractor.get_author(details),
+            'Reviewers': ', '.join(sorted(reviewers)) if reviewers else '',
             '#people': people_count,
             '#reviewers': len(reviewers),
             '#commiters': len(committers),

@@ -14,8 +14,7 @@ import {
   Search,
   Tag,
 } from "lucide-react";
-import { collectionService } from "../../services/api";
-import { DomPlatform } from "chart.js";
+import { collectionService, analyzeService } from "../../services/api";
 
 function CleaningDetail() {
   const { workspaceId, repositoryId, collectionId, cleanedDataId } = useParams();
@@ -24,6 +23,7 @@ function CleaningDetail() {
   const [cleanedData, setCleanedData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [analyzing, setAnalyzing] = useState(false);
 
   useEffect(() => {
     fetchCleanedDataDetails();
@@ -262,7 +262,7 @@ function CleaningDetail() {
                 <div className="space-y-2">
                   {cleanedData.filters.keyword_filters.map((filter, idx) => (
                     <div key={idx} className="flex items-start gap-2">
-                      <Tag className="w-4 h-4 text-purple-500 mt-0.5 flex-shrink-0" />
+                      <Tag className="w-4 h-4 text-purple-500 mt-0.5 shrink-0" />
                       <div>
                         <span className="font-medium text-purple-700 capitalize">
                           {filter.field.replace('_', ' ')}:
@@ -355,7 +355,7 @@ function CleaningDetail() {
               </div>
             </div>
             <div className="flex flex-col justify-center items-center border border-gray-200 rounded-lg p-4 hover:border-green-300 transition-colors mt-6">
-                <div className="flex items-center items-center gap-3 mb-3">
+                <div className="flex items-center gap-3 mb-3">
                   <FileSpreadsheet className="w-6 h-6 text-green-600" />
                   <div className="text-center">
                     <h3 className="font-medium text-gray-900">Analyze the results</h3>
@@ -365,24 +365,36 @@ function CleaningDetail() {
                   </div>
                 </div>
                 <button
-                  onClick={() => {
-                    navigate(`/workspaces/${workspaceId}/repositories/${repositoryId}/revmine/analyze`, {
-                      state: {
-                        dataset: {
-                          id: cleanedData.id,
-                          collection_id: cleanedData.collection_id,
-                          workspace_id: workspaceId,
-                          repository_id: repositoryId,
-                          dataset_filename: cleanedData.statistics_csv_filename || 'Dataset',
-                          platform: cleanedData.platform,
-                        }
-                      }
-                    });
+                  disabled={analyzing}
+                  onClick={async () => {
+                    try {
+                      setAnalyzing(true);
+                      const csvResponse = await collectionService.downloadCleanedDataCSV(
+                        cleanedData.id,
+                        "statistics"
+                      );
+                      const filename = `${cleanedData.statistics_csv_filename || "statistics"}.csv`;
+                      const csvFile = new File([csvResponse.data], filename, { type: "text/csv" });
+                      const dataset = await analyzeService.uploadDataset(csvFile, {
+                        workspace_id: workspaceId,
+                        repository_id: repositoryId,
+                        platform: cleanedData.platform,
+                      });
+                      navigate(`/analysis/${dataset.id}/metrics`);
+                    } catch (err) {
+                      console.error("Failed to start analysis:", err);
+                      alert("Failed to start analysis. Please try again.");
+                    } finally {
+                      setAnalyzing(false);
+                    }
                   }}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
-                  <span>📊</span>
-                  Analyze in Revmine
+                  {analyzing ? (
+                    <><span className="animate-spin">⏳</span> Preparing analysis...</>
+                  ) : (
+                    <><span>📊</span> Analyze in Revmine</>
+                  )}
                 </button>
 
               </div>

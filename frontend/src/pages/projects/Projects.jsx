@@ -113,7 +113,7 @@ function Projects() {
         {/* Section workspace info */}
         <div className="bg-white rounded-xl border border-gray-200 p-4 sm:p-6 mb-4 sm:mb-6">
           <div className="flex flex-col sm:flex-row items-start gap-4">
-            <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gray-100 rounded-full flex items-center justify-center flex-shrink-0">
+            <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gray-100 rounded-full flex items-center justify-center shrink-0">
               {workspace.platform === "github" ? (
                 <Github className="w-6 h-6 sm:w-8 sm:h-8" />
               ) : (
@@ -221,7 +221,7 @@ function Projects() {
                 className="bg-white rounded-xl border border-gray-200 p-4 sm:p-5 hover:shadow-lg transition-shadow cursor-pointer"
               >
                 <div className="flex items-start gap-3 mb-4">
-                  <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gray-100 rounded-full flex items-center justify-center flex-shrink-0">
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gray-100 rounded-full flex items-center justify-center shrink-0">
                     <FolderGit2 className="w-5 h-5 sm:w-6 sm:h-6 text-gray-600" />
                   </div>
                   <div className="flex-1 min-w-0">
@@ -259,7 +259,7 @@ function Projects() {
                   </div>
 
                   <div className="flex items-center gap-2">
-                    <Clock className="w-4 h-4 flex-shrink-0" />
+                    <Clock className="w-4 h-4 shrink-0" />
                     <span className="truncate">
                       Updated {getTimeDiff(repo.updated_at)}
                     </span>

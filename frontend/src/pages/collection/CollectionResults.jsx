@@ -90,7 +90,7 @@ function CollectionResults() {
         {/* Project Details Card */}
         <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
           <div className="flex items-start gap-4">
-            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center flex-shrink-0">
+            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center shrink-0">
               {platform === "github" ? (
                 <Github className="w-8 h-8" />
               ) : (
@@ -117,7 +117,7 @@ function CollectionResults() {
         {status.collection_plan.status === "paused" && (
           <div className="mb-6 bg-yellow-50 border border-yellow-200 rounded-xl p-6">
             <div className="flex items-start gap-4">
-              <AlertTriangle className="w-6 h-6 text-yellow-600 flex-shrink-0" />
+              <AlertTriangle className="w-6 h-6 text-yellow-600 shrink-0" />
               <div className="flex-1">
                 <h3 className="text-lg font-semibold text-yellow-900 mb-2">
                   Collection was interrupted
@@ -146,7 +146,7 @@ function CollectionResults() {
 
           <div className="bg-green-50 border border-green-200 rounded-xl p-6">
             <div className="flex items-start gap-4">
-              <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
+              <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center shrink-0">
                 <CheckCircle className="w-6 h-6 text-green-600" />
               </div>
               <div className="flex-1">
@@ -201,7 +201,7 @@ function CollectionResults() {
           <h3 className="text-xl font-semibold mb-4">Data Cleaning & Structuring</h3>
           <div className="bg-white border border-gray-200 rounded-xl p-6">
             <div className="flex items-start gap-4">
-              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center shrink-0">
                 <Filter className="w-6 h-6 text-blue-600" />
               </div>
               <div className="flex-1">
