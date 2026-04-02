@@ -8,6 +8,7 @@ from .routing.handlers import (
     WorkspaceRequestHandler,
 )
 from .services.service_clients import (
+    AnalyzeServiceClient,
     ConfigurationServiceClient,
     CollectionServiceClient,
     LLMServiceClient,
@@ -49,6 +50,7 @@ class ServiceProxyMiddleware:
         # Initialization of service clients
         self.config_client = ConfigurationServiceClient(self.configuration_service_url)
         self.collection_client = CollectionServiceClient(self.collection_service_url)
+        self.analyze_client = AnalyzeServiceClient(self.analyze_service_url)
         self.llm_client = LLMServiceClient(self.llm_service_url)
 
         # Initialization of handlers
@@ -62,7 +64,10 @@ class ServiceProxyMiddleware:
         )
 
         self.analysis_handler = AnalysisRequestHandler(
-            self.analyze_service_url, self.collection_service_url
+            self.analyze_service_url,
+            self.collection_service_url,
+            self.analyze_client,
+            self.llm_client,
         )
         self.llm_handler = LLMRequestHandler(self.llm_service_url)
 

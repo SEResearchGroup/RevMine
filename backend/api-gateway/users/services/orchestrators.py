@@ -12,6 +12,13 @@ from .collection_automation import (
     normalize_collection_automation_payload,
     sanitize_user_prompt,
 )
+from .analysis_automation import (
+    DEFAULT_ANALYSIS_LLM_MODEL,
+    AnalysisAutomationValidationError,
+    build_llm_analysis_prompt,
+    normalize_analysis_automation_payload,
+    sanitize_analysis_prompt,
+)
 from .service_clients import (
     ServiceClientError,
     build_collection_payload,
@@ -210,9 +217,11 @@ class CollectionOrchestrator:
 class AnalysisOrchestrator:
     """Orchestrates complex analysis operations"""
 
-    def __init__(self, analyze_service_url, collection_service_url):
+    def __init__(self, analyze_service_url, collection_service_url, analyze_client, llm_client):
         self.analyze_service_url = analyze_service_url
         self.collection_service_url = collection_service_url
+        self.analyze_client = analyze_client
+        self.llm_client = llm_client
 
     def create_analysis(self, request, user_id):
         """
@@ -237,6 +246,96 @@ class AnalysisOrchestrator:
 
         proxy = BaseProxyHandler(self.analyze_service_url, "/api/analysis")
         return proxy.proxy_request(request, user_id)
+
+    def preview_automatic_analysis(self, request, user_id):
+        """Generate, validate, and normalize an automatic analysis draft."""
+        body_data, error_response = parse_json_body(request)
+        if error_response:
+            return error_response
+
+        dataset_id = body_data.get("dataset_id")
+        model = body_data.get("model") or DEFAULT_ANALYSIS_LLM_MODEL
+
+        try:
+            prompt = sanitize_analysis_prompt(body_data.get("prompt"))
+        except AnalysisAutomationValidationError as exc:
+            return JsonResponse({"error": str(exc)}, status=400)
+
+        if not dataset_id:
+            return JsonResponse({"error": "dataset_id is required"}, status=400)
+
+        logger.info(
+            "Generating automatic analysis draft for dataset=%s model=%s prompt_length=%s",
+            dataset_id,
+            model,
+            len(prompt),
+        )
+
+        try:
+            available_metrics_payload = self.analyze_client.get_available_metrics(
+                dataset_id,
+                user_id,
+            )
+            dataset_columns = available_metrics_payload.get("dataset_columns") or []
+            available_metrics = available_metrics_payload.get("metrics") or []
+
+            if not available_metrics:
+                return JsonResponse(
+                    {
+                        "error": "No analysis metrics are available for this dataset.",
+                        "detail": "Select metrics manually or upload a richer dataset.",
+                    },
+                    status=422,
+                )
+
+            llm_prompt = build_llm_analysis_prompt(
+                str(dataset_id),
+                dataset_columns,
+                available_metrics,
+                prompt,
+            )
+            llm_response, llm_status = self.llm_client.generate_analysis_draft(
+                prompt=llm_prompt,
+                model=model,
+            )
+
+            if llm_status >= 400:
+                detail = llm_response.get("detail") if isinstance(llm_response, dict) else None
+                return JsonResponse(
+                    {
+                        "error": "Failed to generate automatic analysis draft",
+                        "detail": detail or llm_response,
+                    },
+                    status=llm_status,
+                )
+
+            normalized = normalize_analysis_automation_payload(
+                llm_payload=llm_response,
+                available_metrics=available_metrics,
+                dataset_columns=dataset_columns,
+            )
+            return JsonResponse(
+                {
+                    "success": True,
+                    "prompt": prompt,
+                    "dataset_id": str(dataset_id),
+                    **normalized,
+                },
+                status=200,
+            )
+
+        except AnalysisAutomationValidationError as exc:
+            logger.warning(
+                "Automatic analysis draft validation failed for dataset=%s: %s",
+                dataset_id,
+                exc,
+            )
+            return JsonResponse({"error": str(exc)}, status=422)
+        except ServiceClientError as e:
+            error_body = {"error": e.message}
+            if e.detail:
+                error_body["detail"] = e.detail
+            return JsonResponse(error_body, status=e.status_code)
 
     def _create_analysis_with_fetched_csv(self, request, user_id, cleaned_data_id):
         """Creates an analysis by first fetching the CSV"""

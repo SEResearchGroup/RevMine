@@ -132,14 +132,24 @@ class AnalysisService:
             if col in df_copy.columns:
                 if isinstance(filter_value, dict):
                     # Range filter
+                    series = df_copy[col]
                     if 'min' in filter_value:
-                        df_copy = df_copy[df_copy[col] >= filter_value['min']]
+                        min_value = filter_value['min']
+                        if pd.api.types.is_datetime64_any_dtype(series):
+                            min_value = pd.to_datetime(min_value, errors='coerce')
+                        df_copy = df_copy[df_copy[col] >= min_value]
                     if 'max' in filter_value:
-                        df_copy = df_copy[df_copy[col] <= filter_value['max']]
+                        max_value = filter_value['max']
+                        if pd.api.types.is_datetime64_any_dtype(series):
+                            max_value = pd.to_datetime(max_value, errors='coerce')
+                        df_copy = df_copy[df_copy[col] <= max_value]
+                elif isinstance(filter_value, list):
+                    # Multi-select filter
+                    df_copy = df_copy[df_copy[col].isin(filter_value)]
                 else:
                     # Exact match filter
                     df_copy = df_copy[df_copy[col] == filter_value]
-        
+
         return df_copy
     
     def _generate_matplotlib_image(self, fig):

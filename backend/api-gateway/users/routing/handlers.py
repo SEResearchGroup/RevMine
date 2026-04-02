@@ -71,9 +71,14 @@ class CollectionRequestHandler:
 class AnalysisRequestHandler:
     """Handler for analysis requests"""
 
-    def __init__(self, service_url, collection_service_url):
+    def __init__(self, service_url, collection_service_url, analyze_client, llm_client):
         self.proxy = BaseProxyHandler(service_url, "/api/analysis")
-        self.orchestrator = AnalysisOrchestrator(service_url, collection_service_url)
+        self.orchestrator = AnalysisOrchestrator(
+            service_url,
+            collection_service_url,
+            analyze_client,
+            llm_client,
+        )
 
     def handle(self, request):
         """Route to orchestrator or simple proxy based on endpoint"""
@@ -89,6 +94,12 @@ class AnalysisRequestHandler:
             or request.path == "/api/analysis/create"
         ) and request.method == "POST":
             return self.orchestrator.create_analysis(request, user_id)
+
+        if request.path in {
+            "/api/analysis/automation/preview",
+            "/api/analysis/automation/preview/",
+        } and request.method == "POST":
+            return self.orchestrator.preview_automatic_analysis(request, user_id)
 
         # Other endpoints: simple proxy
         return self.proxy.proxy_request(request, user_id)

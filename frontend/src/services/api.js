@@ -431,6 +431,13 @@ export const analyzeService = {
     return response.data;
   },
 
+  previewAnalysisPrompt: async (payload) => {
+    const response = await analyzeApi.post('/automation/preview/', payload, {
+      timeout: 60000,
+    });
+    return response.data;
+  },
+
   // ========== ANALYSES ==========
   getAnalyses: async (datasetId = null) => {
     let url = '/analyses/';

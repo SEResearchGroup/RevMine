@@ -189,6 +189,45 @@ class CollectionServiceClient:
             )
 
 
+class AnalyzeServiceClient:
+    """Client for communicating with the Analyze Service."""
+
+    def __init__(self, base_url: str):
+        self.base_url = base_url.rstrip("/")
+
+    def get_available_metrics(self, dataset_id: str, user_id: int) -> dict:
+        """Fetch dataset-aware available metrics for analysis."""
+        url = f"{self.base_url}/datasets/{dataset_id}/available_metrics/"
+        logger.info("Fetching available analysis metrics from: %s", url)
+
+        try:
+            response = requests.get(
+                url,
+                headers={"X-User-ID": str(user_id)},
+                timeout=30,
+            )
+            try:
+                response_data = response.json()
+            except ValueError:
+                response_data = {"detail": response.text or "Empty response"}
+
+            if response.status_code != 200:
+                raise ServiceClientError(
+                    message="Failed to fetch available analysis metrics",
+                    status_code=response.status_code,
+                    detail=str(response_data),
+                )
+
+            return response_data
+        except requests.RequestException as e:
+            logger.error("Analyze service error: %s", e)
+            raise ServiceClientError(
+                message="Analyze service unavailable",
+                status_code=503,
+                detail=str(e),
+            )
+
+
 class LLMServiceClient:
     """Client for communicating with the LLM service."""
 
@@ -225,6 +264,20 @@ class LLMServiceClient:
                 status_code=503,
                 detail=str(e),
             )
+
+    def generate_analysis_draft(
+        self,
+        *,
+        prompt: str,
+        model: str,
+        endpoint: str = "openrouter",
+    ) -> tuple[dict, int]:
+        """Generate a structured analysis draft from a natural-language prompt."""
+        return self.generate_collection_draft(
+            prompt=prompt,
+            model=model,
+            endpoint=endpoint,
+        )
 
 
 def build_collection_payload(
