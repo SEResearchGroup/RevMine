@@ -395,9 +395,7 @@ const ProjectAnalysisDetailPage = () => {
                       key={a.id}
                       analysis={a}
                       onClick={() =>
-                        navigate(`/analysis/${datasetId}/dashboard`, {
-                          state: { highlightAnalysis: a.id },
-                        })
+                        navigate(`/analysis/${datasetId}/chart/${a.id}`)
                       }
                     />
                   ))}

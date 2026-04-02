@@ -30,6 +30,7 @@ import AnalysisHistoryPage from "../pages/Analysis/AnalysisHistoryPage";
 import ProjectAnalysisDetailPage from "../pages/Analysis/ProjectAnalysisDetailPage";
 import ProjectSelectionPage from "../pages/Analysis/ProjectSelectionPage";
 import NewAnalysisPage from "../pages/Analysis/NewAnalysisPage";
+import SingleChartPage from "../pages/Analysis/SingleChartPage";
 
 const AppRoutes = () => {
   return (
@@ -91,6 +92,7 @@ const AppRoutes = () => {
         <Route path="/analysis/new/project" element={<ProjectSelectionPage />} />
         <Route path="/analysis/:datasetId/detail" element={<ProjectAnalysisDetailPage />} />
         <Route path="/analysis/:datasetId/metrics" element={<MetricsSelectionPage />} />
+        <Route path="/analysis/:datasetId/chart/:analysisId" element={<SingleChartPage />} />
         <Route path="/analysis/:datasetId/dashboard" element={<AnalysisDashboardPage />} />
 
         <Route path="/profile" element={<Profile />} />

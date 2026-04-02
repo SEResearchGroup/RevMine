@@ -1807,9 +1807,13 @@ class AnalysisService:
         
         corr_pairs.sort(key=lambda x: abs(x['correlation']), reverse=True)
         
+        # Filter out trivially correlated pairs (|r| >= 0.99)
+        meaningful_pairs = [p for p in corr_pairs if abs(p['correlation']) < 0.99]
+        top_pair = meaningful_pairs[0] if meaningful_pairs else (corr_pairs[0] if corr_pairs else None)
+        
         statistics = {
-            'top_correlation': corr_pairs[0]['pair'] if corr_pairs else 'N/A',
-            'top_correlation_value': round(corr_pairs[0]['correlation'], 3) if corr_pairs else 0,
+            'top_correlation': top_pair['pair'] if top_pair else 'N/A',
+            'top_correlation_value': round(top_pair['correlation'], 3) if top_pair else 0,
             'columns_analyzed': len(available_cols),
             'rows_analyzed': len(df_copy),
         }
