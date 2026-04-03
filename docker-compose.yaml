@@ -417,6 +417,27 @@ services:
     restart: unless-stopped
     logging: *default-logging
 
+  frontend:
+    build:
+      context: ./frontend
+    container_name: frontend
+    hostname: frontend
+    ports:
+      - "5173:5173"
+    environment:
+      VITE_API_URL: http://localhost:8000/api
+      CHOKIDAR_USEPOLLING: "true"
+    depends_on:
+      api-gateway:
+        condition: service_started
+    volumes:
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
+    networks:
+      - app-network
+    restart: unless-stopped
+    logging: *default-logging
+
 volumes:
   kafka_data:
   gateway_postgres_data:
@@ -428,6 +449,7 @@ volumes:
   redis_data:
   minio_data:
   ollama_data:
+  frontend_node_modules:
 
 networks:
   app-network:
