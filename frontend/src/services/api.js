@@ -58,7 +58,8 @@ const createApiInstance = (baseURL) => {
         const isAuthEndpoint =
           originalRequest?.url?.includes("/login") ||
           originalRequest?.url?.includes("/register") ||
-          originalRequest?.url?.includes("/token/refresh");
+          originalRequest?.url?.includes("/token/refresh") ||
+          originalRequest?.url?.includes("/refresh");
 
         if (isAuthEndpoint) {
           return Promise.reject(error);
@@ -89,7 +90,7 @@ const createApiInstance = (baseURL) => {
         }
 
         try {
-          const response = await axios.post(`${baseURL}/token/refresh/`, {
+          const response = await axios.post("http://localhost:8000/api/auth/refresh", {
             refresh: refreshToken
           });
 

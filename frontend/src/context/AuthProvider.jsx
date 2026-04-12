@@ -35,7 +35,7 @@ export const AuthProvider = ({ children }) => {
         setIsAuthenticated(true);
       } else if (refreshToken && !isTokenExpired(refreshToken)) {
         try {
-          const response = await authApi.post("/token/refresh/", {
+          const response = await authApi.post("/refresh", {
             refresh: refreshToken
           });
           const { access } = response.data;
@@ -72,7 +72,7 @@ export const AuthProvider = ({ children }) => {
 
       if (token && isTokenExpiringSoon(token) && refreshToken) {
         try {
-          const response = await authApi.post("/token/refresh/", {
+          const response = await authApi.post("/refresh", {
             refresh: refreshToken
           });
           const { access } = response.data;
@@ -81,7 +81,7 @@ export const AuthProvider = ({ children }) => {
           const payload = JSON.parse(atob(access.split(".")[1]));
           setUser(payload.user || payload);
         } catch (error) {
-          console.error("Erreur lors du refresh proactif:", error);
+          console.error("Proactive token refresh failed:", error);
           logout();
         }
       }
