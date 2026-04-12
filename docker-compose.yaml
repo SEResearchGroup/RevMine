@@ -205,6 +205,26 @@ services:
     networks:
       - app-network
 
+  notification-db:
+    image: postgres:15
+    container_name: notification-db
+    environment:
+      POSTGRES_DB: notification_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5436:5432"
+    volumes:
+      - notification_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    logging: *default-logging
+    networks:
+      - app-network
+
   ollama-service:
     image: ollama/ollama:latest
     container_name: ollama-service
@@ -236,6 +256,7 @@ services:
       CONFIGURATION_SERVICE_URL: http://configuration-service:8001/api/workspaces
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       LLM_SERVICE_URL: http://llm-service:8004
+      NOTIFICATION_SERVICE_URL: http://notification-service:8005
     depends_on:
       gateway-db:
         condition: service_healthy
@@ -417,9 +438,31 @@ services:
     restart: unless-stopped
     logging: *default-logging
 
+  notification-service:
+    build:
+      context: ./backend/services/notification
+    container_name: notification-service
+    hostname: notification-service
+    ports:
+      - "8005:8005"
+    environment:
+      PORT: "8005"
+      DATABASE_URL: "postgres://postgres:postgres@notification-db:5432/notification_db?sslmode=disable"
+      KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
+      KAFKA_GROUP_ID: "notification-service"
+    depends_on:
+      notification-db:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - app-network
+    restart: unless-stopped
+    logging: *default-logging
+
   frontend:
     build:
-      context: ./frontend
+      context: ./fronten, ther
     container_name: frontend
     hostname: frontend
     ports:
@@ -444,6 +487,7 @@ volumes:
   configuration_postgres_data:
   collection_postgres_data:
   analyze_postgres_data:
+  notification_postgres_data:
   loki_data:
   grafana_data:
   redis_data:

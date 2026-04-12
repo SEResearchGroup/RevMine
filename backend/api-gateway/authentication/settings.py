@@ -109,6 +109,10 @@ COLLECTION_SERVICE_URL = os.getenv(
     "http://collection-service:8002/api/collections",  # Running locally for development
 )
 
+NOTIFICATION_SERVICE_URL = os.getenv(
+    "NOTIFICATION_SERVICE_URL", "http://notification-service:8005"
+)
+
 
 TEMPLATES = [
     {

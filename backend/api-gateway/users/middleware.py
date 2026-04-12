@@ -5,6 +5,7 @@ from .routing.handlers import (
     CollectionRequestHandler,
     AnalysisRequestHandler,
     LLMRequestHandler,
+    NotificationRequestHandler,
     WorkspaceRequestHandler,
 )
 from .services.service_clients import (
@@ -47,6 +48,10 @@ class ServiceProxyMiddleware:
             settings, "LLM_SERVICE_URL", "http://llm-service:8004"
         )
 
+        self.notification_service_url = getattr(
+            settings, "NOTIFICATION_SERVICE_URL", "http://notification-service:8005"
+        )
+
         # Initialization of service clients
         self.config_client = ConfigurationServiceClient(self.configuration_service_url)
         self.collection_client = CollectionServiceClient(self.collection_service_url)
@@ -70,12 +75,14 @@ class ServiceProxyMiddleware:
             self.llm_client,
         )
         self.llm_handler = LLMRequestHandler(self.llm_service_url)
+        self.notification_handler = NotificationRequestHandler(self.notification_service_url)
 
         logger.info("ServiceProxyMiddleware initialized")
         logger.info(f"   Configuration Service: {self.configuration_service_url}")
         logger.info(f"   Collection Service: {self.collection_service_url}")
         logger.info(f"   Analysis Service: {self.analyze_service_url}")
         logger.info(f"   LLM Service: {self.llm_service_url}")
+        logger.info(f"   Notification Service: {self.notification_service_url}")
 
     def __call__(self, request):
         """Route les requêtes vers le handler approprié"""
@@ -95,6 +102,10 @@ class ServiceProxyMiddleware:
         # LLM endpoints
         if request.path.startswith("/api/llm"):
             return self.llm_handler.handle(request)
+
+        # Notification endpoints
+        if request.path.startswith("/api/notifications"):
+            return self.notification_handler.handle(request)
 
         # Other non-proxied requests
         return self.get_response(request)

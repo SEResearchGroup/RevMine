@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Search, Plus, Mail, Bell, User, Settings, LogOut } from "lucide-react";
+import { Search, Plus, Mail, User, Settings, LogOut } from "lucide-react";
 import { authService } from "../../services/api";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../hooks/useAuth";
+import NotificationDropdown from "../ui/NotificationDropdown";
 
 const NavbarAuth = () => {
   const [userInformation, setUserInformation] = useState({});
@@ -68,9 +69,7 @@ const NavbarAuth = () => {
         <button className="hidden lg:block p-2 hover:bg-gray-100 rounded-lg transition">
           <Mail className="w-5 h-5 text-blue-500" />
         </button>
-        <button className="p-2 hover:bg-gray-100 rounded-lg transition">
-          <Bell className="w-5 h-5 text-blue-500" />
-        </button>
+        <NotificationDropdown />
 
         {/* User dropdown */}
         <div className="relative" ref={dropdownRef}>

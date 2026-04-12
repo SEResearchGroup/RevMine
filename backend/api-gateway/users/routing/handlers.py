@@ -103,3 +103,14 @@ class AnalysisRequestHandler:
 
         # Other endpoints: simple proxy
         return self.proxy.proxy_request(request, user_id)
+
+
+class NotificationRequestHandler:
+    """Handler for notification requests (proxy to Go notification service)"""
+
+    def __init__(self, service_url):
+        self.proxy = BaseProxyHandler(service_url, "")
+
+    def handle(self, request):
+        """Proxy to notification service"""
+        return self.proxy.proxy_request(request)

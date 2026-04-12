@@ -11,3 +11,6 @@ class Topics:
     # Analysis service
     ANALYSIS_REQUESTED  = "analysis.events.requested"
     ANALYSIS_COMPLETED  = "analysis.events.completed"
+
+    # Notification service
+    NOTIFICATION_EVENTS = "notification.events"

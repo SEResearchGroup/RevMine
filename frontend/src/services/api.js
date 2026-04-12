@@ -130,6 +130,9 @@ export const collectionApi = createApiInstance(
 export const analysisApi = createApiInstance(
   "http://localhost:8000/api/analysis"
 );
+export const notificationApi = createApiInstance(
+  "http://localhost:8000/api/notifications"
+);
 
 export const authService = {
   register: (email, password, sendUpdates, firstName, lastName, position) => {
@@ -489,9 +492,28 @@ export const analyzeService = {
   },
 };
 
+export const notificationService = {
+  getAll: (limit = 20, offset = 0) => {
+    return notificationApi.get(`/?limit=${limit}&offset=${offset}`);
+  },
+  getUnreadCount: () => {
+    return notificationApi.get("/unread-count");
+  },
+  markAsRead: (id) => {
+    return notificationApi.patch(`/${id}/read`);
+  },
+  markAllAsRead: () => {
+    return notificationApi.patch("/read-all");
+  },
+  delete: (id) => {
+    return notificationApi.delete(`/${id}`);
+  },
+};
+
 export default {
   auth: authService,
   workspace: workspaceService,
   collection: collectionService,
   analyze: analyzeService,
+  notification: notificationService,
 };
