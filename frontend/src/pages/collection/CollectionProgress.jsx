@@ -32,6 +32,31 @@ const getApiErrorMessage = (error, fallbackMessage) =>
 const getCollectionStatusValue = (status) =>
   status?.collection_plan?.status || status?.status;
 
+/**
+ * Round a number up to the nearest "nice" ceiling for approximate display.
+ * e.g., 8942 → 8950, 342 → 350, 12 → 15, 1234 → 1250
+ */
+const roundUpApproximate = (n) => {
+  if (n <= 10) return n + 5;
+  if (n <= 100) return Math.ceil(n / 10) * 10;
+  if (n <= 1000) return Math.ceil(n / 50) * 50;
+  return Math.ceil(n / 50) * 50;
+};
+
+/**
+ * Format the total items for display, accounting for approximate totals.
+ */
+const formatTotalItems = (status) => {
+  if (!status?.total_items) return "...";
+  const isApproximate =
+    status.is_total_approximate ||
+    status.collection_plan?.is_total_approximate;
+  if (isApproximate) {
+    return `≤ ${roundUpApproximate(status.total_items)}`;
+  }
+  return status.total_items;
+};
+
 function CollectionProgress() {
   const { workspaceId, repositoryId, planId } = useParams();
   const navigate = useNavigate();
@@ -408,7 +433,7 @@ function CollectionProgress() {
                       : "-"}
                   </span>
                   <span>
-                    {status.collected_items} / {status.total_items || "..."} items
+                    {status.collected_items} / {formatTotalItems(status)} items
                   </span>
                 </div>
               </div>
@@ -547,7 +572,7 @@ function CollectionProgress() {
                 <div className="flex justify-between text-sm text-gray-600">
                   <span>Current progress</span>
                   <span className="font-medium text-gray-900">
-                    {status.collected_items} / {status.total_items} {itemLabel}
+                    {status.collected_items} / {formatTotalItems(status)} {itemLabel}
                   </span>
                 </div>
               </div>
@@ -657,7 +682,7 @@ function CollectionProgress() {
                 </div>
                 <div className="flex justify-between text-xs text-gray-500">
                   <span>
-                    {status.collected_items} / {status.total_items} {itemLabel} collected
+                    {status.collected_items} / {formatTotalItems(status)} {itemLabel} collected
                   </span>
                   {(status.last_collected_item ||
                     status.collection_plan?.last_collected_item_id) && (

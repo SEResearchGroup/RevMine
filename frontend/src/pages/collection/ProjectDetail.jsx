@@ -69,7 +69,13 @@ function ProjectDetail() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [selectedStatus, setSelectedStatus] = useState(["open", "closed", "merged"]);
+  const [saveBatchSize, setSaveBatchSize] = useState(1);
+  const [editingBatchSize, setEditingBatchSize] = useState(false);
+  const [batchSizeDraft, setBatchSizeDraft] = useState(1);
   const [collectionMode, setCollectionMode] = useState("manual");
+
+  // Global date range of MRs/PRs in the repository
+  const [dateRange, setDateRange] = useState({ first_date: null, last_date: null });
 
   // Automatic mode
   const [automationPrompt, setAutomationPrompt] = useState("");
@@ -305,6 +311,11 @@ function ProjectDetail() {
         repositoryId
       );
       setBranches(res.data.branches || []);
+
+      // Store global date range of MRs/PRs
+      if (res.data.date_range) {
+        setDateRange(res.data.date_range);
+      }
 
       // Only set default branch if not already set (from active collection)
       if (!selectedBranch) {
@@ -551,6 +562,7 @@ function ProjectDetail() {
         end_date: endDate || null,
         status: selectedStatus,
         branch_name: selectedBranch,
+        save_batch_size: saveBatchSize,
       });
 
       // Get validation summary
@@ -815,6 +827,15 @@ function ProjectDetail() {
                   <Clock className="w-4 h-4" />
                   <span>Updated {getTimeDiff(repository.updated_at)}</span>
                 </div>
+                {dateRange.first_date && dateRange.last_date && (
+                  <div className="flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-blue-500" />
+                    <span>
+                      {platform === "github" ? "PRs" : "MRs"}:{" "}
+                      {new Date(dateRange.first_date).toLocaleDateString()} → {new Date(dateRange.last_date).toLocaleDateString()}
+                    </span>
+                  </div>
+                )}
               </div>
 
               {repository.web_url && (
@@ -1162,6 +1183,18 @@ function ProjectDetail() {
               <div>
                 <h3 className="text-lg font-medium mb-4">Apply Filters</h3>
 
+                {dateRange.first_date && dateRange.last_date && (
+                  <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p className="text-sm text-blue-800">
+                      <strong>Available {platform === "github" ? "PR" : "MR"} date range:</strong>{" "}
+                      {new Date(dateRange.first_date).toLocaleDateString()} → {new Date(dateRange.last_date).toLocaleDateString()}
+                    </p>
+                    <p className="text-xs text-blue-600 mt-1">
+                      Use the date filters below to narrow down the collection period
+                    </p>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1171,6 +1204,8 @@ function ProjectDetail() {
                       type="date"
                       value={startDate}
                       onChange={(e) => setStartDate(e.target.value)}
+                      min={dateRange.first_date ? new Date(dateRange.first_date).toISOString().split('T')[0] : undefined}
+                      max={endDate || (dateRange.last_date ? new Date(dateRange.last_date).toISOString().split('T')[0] : undefined)}
                       className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
@@ -1183,6 +1218,8 @@ function ProjectDetail() {
                       type="date"
                       value={endDate}
                       onChange={(e) => setEndDate(e.target.value)}
+                      min={startDate || (dateRange.first_date ? new Date(dateRange.first_date).toISOString().split('T')[0] : undefined)}
+                      max={dateRange.last_date ? new Date(dateRange.last_date).toISOString().split('T')[0] : undefined}
                       className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
@@ -1205,6 +1242,82 @@ function ProjectDetail() {
                       </label>
                     ))}
                   </div>
+                </div>
+
+                {/* Save Batch Size */}
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Save Batch Size
+                  </label>
+                  <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p className="text-sm text-blue-800">
+                      <strong>Number of {platform === "github" ? "PRs" : "MRs"} collected before each save to storage.</strong>
+                    </p>
+                    <p className="text-xs text-blue-600 mt-1">
+                      Higher values speed up large collections but risk losing more progress on interruption.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm text-gray-600 bg-gray-100 px-2.5 py-1 rounded font-mono">{saveBatchSize}</span>
+                    <span className="text-xs text-gray-400">{saveBatchSize === 1 ? "(default)" : "items per save"}</span>
+                    {!editingBatchSize ? (
+                      <button
+                        type="button"
+                        onClick={() => { setBatchSizeDraft(saveBatchSize); setEditingBatchSize(true); }}
+                        className="px-3 py-1 text-xs font-medium text-blue-600 border border-blue-600 rounded-lg hover:bg-blue-50 transition-colors"
+                      >
+                        Modify
+                      </button>
+                    ) : null}
+                  </div>
+
+                  {editingBatchSize && (
+                    <div className="mt-2 max-w-sm p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                      <div className="flex flex-wrap gap-1.5 mb-2">
+                        {[1, 20, 40, 60, 80, 100].map((v) => (
+                          <button
+                            key={v}
+                            type="button"
+                            onClick={() => setBatchSizeDraft(v)}
+                            className={`px-2.5 py-1 text-xs rounded border transition-colors ${
+                              batchSizeDraft === v
+                                ? "bg-blue-600 text-white border-blue-600"
+                                : "bg-white text-gray-600 border-gray-300 hover:border-blue-400"
+                            }`}
+                          >
+                            {v}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          min="1"
+                          max="100"
+                          value={batchSizeDraft}
+                          onChange={(e) => {
+                            const v = Number(e.target.value);
+                            if (v >= 1 && v <= 100) setBatchSizeDraft(v);
+                          }}
+                          className="w-16 px-2 py-1 border border-gray-300 rounded text-center text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => { setSaveBatchSize(batchSizeDraft); setEditingBatchSize(false); }}
+                          className="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
+                        >
+                          Validate
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditingBatchSize(false)}
+                          className="px-2 py-1 text-xs text-gray-500 hover:text-gray-700"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 

@@ -143,8 +143,12 @@ def execute_collection_task(plan_id, resume=False):
             )
         collector.required_endpoints = required_endpoints
         
-        # Progress callback with incremental saving
+        # Progress callback with batched saving
+        batch_size = collection.save_batch_size or 1
+        items_since_last_save = 0
+
         def save_progress(current, total, message="", item_data=None, all_data=None):
+            nonlocal items_since_last_save
             try:
                 # Check if collection was paused or cancelled
                 if cancellation_registry.is_cancelled(plan_id):
@@ -156,7 +160,7 @@ def execute_collection_task(plan_id, resume=False):
                 collection.collected_items = current
                 collection.total_items = total
                 
-                # Save accumulated data incrementally (all_data is managed by the collector)
+                # Save accumulated data in batches (all_data is managed by the collector)
                 if item_data and all_data is not None:
                     # Update last collected item
                     item_number = item_data.get("pull_request_number") or item_data.get(
@@ -164,14 +168,19 @@ def execute_collection_task(plan_id, resume=False):
                     )
                     collection.last_collected_item_id = str(item_number)
 
-                    # Save to MinIO after each item
                     if not collection.raw_data_filename:
                         collection.raw_data_filename = minio_client.generate_filename(
                             collection.repository_name, collection.id, "json"
                         )
                         raw_data_filename = collection.raw_data_filename
-                    
-                    minio_client.save_json(all_data, collection.raw_data_filename)
+
+                    items_since_last_save += 1
+
+                    # Save to MinIO only when batch is full
+                    if items_since_last_save >= batch_size:
+                        minio_client.save_json(all_data, collection.raw_data_filename)
+                        items_since_last_save = 0
+                        logger.info(f"Batch saved to MinIO at {current}/{total}")
                 
                 collection.save(update_fields=['collected_items', 'total_items', 'last_collected_item_id', 'raw_data_filename'])
                 logger.info(f"Progress: {current}/{total} - {message}")
@@ -196,6 +205,10 @@ def execute_collection_task(plan_id, resume=False):
             resume_from=collection.last_collected_item_id if resume else None,
             existing_data=existing_data if resume else None,
         )
+
+        # Update is_total_approximate from collector
+        if hasattr(collector, 'is_total_approximate'):
+            collection.is_total_approximate = collector.is_total_approximate
 
         # Calculate statistics
         stats = calculate_statistics(all_data, collection.platform)

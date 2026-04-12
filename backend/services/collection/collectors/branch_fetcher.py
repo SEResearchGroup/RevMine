@@ -134,3 +134,95 @@ class BranchFetcher:
             logger.error(f"Failed to get GitLab project ID: {e}")
 
         return None
+
+    def fetch_date_range(self) -> dict:
+        """
+        Fetch the global date range of MRs/PRs (oldest and newest created_at).
+        Returns: {"first_date": "2020-01-15T...", "last_date": "2024-12-01T..."}
+        """
+        try:
+            if self.platform == "github":
+                return self._fetch_github_date_range()
+            else:
+                return self._fetch_gitlab_date_range()
+        except Exception as e:
+            logger.error(f"Error fetching date range: {e}")
+            return {"first_date": None, "last_date": None}
+
+    def _fetch_github_date_range(self) -> dict:
+        """Fetch date range from GitHub (oldest and newest PR)."""
+        result = {"first_date": None, "last_date": None}
+
+        # Newest PR (most recently created)
+        try:
+            response = requests.get(
+                f"{self.base_url}/repos/{self.repo_full_name}/pulls",
+                headers=self.headers,
+                params={"state": "all", "sort": "created", "direction": "desc", "per_page": 1},
+                timeout=30,
+            )
+            if response.status_code == 200:
+                data = response.json()
+                if data:
+                    result["last_date"] = data[0].get("created_at")
+        except Exception as e:
+            logger.warning(f"Error fetching newest GitHub PR: {e}")
+
+        # Oldest PR (earliest created)
+        try:
+            response = requests.get(
+                f"{self.base_url}/repos/{self.repo_full_name}/pulls",
+                headers=self.headers,
+                params={"state": "all", "sort": "created", "direction": "asc", "per_page": 1},
+                timeout=30,
+            )
+            if response.status_code == 200:
+                data = response.json()
+                if data:
+                    result["first_date"] = data[0].get("created_at")
+        except Exception as e:
+            logger.warning(f"Error fetching oldest GitHub PR: {e}")
+
+        return result
+
+    def _fetch_gitlab_date_range(self) -> dict:
+        """Fetch date range from GitLab (oldest and newest MR)."""
+        result = {"first_date": None, "last_date": None}
+
+        project_id = self._get_gitlab_project_id()
+        if not project_id:
+            return result
+
+        # Newest MR
+        try:
+            response = requests.get(
+                f"{self.base_url}/projects/{project_id}/merge_requests",
+                headers=self.headers,
+                params={"state": "all", "order_by": "created_at", "sort": "desc", "per_page": 1},
+                timeout=30,
+                verify=False,
+            )
+            if response.status_code == 200:
+                data = response.json()
+                if data:
+                    result["last_date"] = data[0].get("created_at")
+        except Exception as e:
+            logger.warning(f"Error fetching newest GitLab MR: {e}")
+
+        # Oldest MR
+        try:
+            response = requests.get(
+                f"{self.base_url}/projects/{project_id}/merge_requests",
+                headers=self.headers,
+                params={"state": "all", "order_by": "created_at", "sort": "asc", "per_page": 1},
+                timeout=30,
+                verify=False,
+            )
+            if response.status_code == 200:
+                data = response.json()
+                if data:
+                    result["first_date"] = data[0].get("created_at")
+        except Exception as e:
+            logger.warning(f"Error fetching oldest GitLab MR: {e}")
+
+        return result

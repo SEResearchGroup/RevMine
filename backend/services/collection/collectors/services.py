@@ -175,6 +175,18 @@ class BranchService:
             repo_full_name=collection.repository_full_name,
         )
 
+    @staticmethod
+    def fetch_date_range(platform: str, token: str, repo_full_name: str) -> Dict[str, Any]:
+        """Fetch the global date range of MRs/PRs for a repository."""
+        try:
+            branch_fetcher = BranchFetcher(
+                platform=platform, token=token, repo_full_name=repo_full_name
+            )
+            return branch_fetcher.fetch_date_range()
+        except Exception as e:
+            logger.error(f"Error fetching date range: {e}")
+            return {"first_date": None, "last_date": None}
+
 
 # =============================================================================
 # Collection Lifecycle Services
@@ -337,6 +349,10 @@ class CollectionService:
         if branch_name is not None:
             collection.branch_name = branch_name
 
+        save_batch_size = filters.get("save_batch_size")
+        if save_batch_size is not None:
+            collection.save_batch_size = max(1, min(100, int(save_batch_size)))
+
         collection.save()
 
         logger.info(
@@ -412,6 +428,7 @@ class CollectionService:
             "progress_percentage": collection.progress_percentage,
             "collected_items": collection.collected_items,
             "total_items": collection.total_items,
+            "is_total_approximate": collection.is_total_approximate,
             "stats": collection.stats,
             "can_resume": collection.can_resume,
             "last_collected_item": collection.last_collected_item_id,

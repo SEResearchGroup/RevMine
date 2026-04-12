@@ -166,11 +166,17 @@ class GetBranchesForRepositoryView(UserIdRequiredMixin, APIView):
                 platform=platform, token=token, repo_full_name=repo_full_name
             )
 
+            # Also fetch date range of MRs/PRs
+            date_range = BranchService.fetch_date_range(
+                platform=platform, token=token, repo_full_name=repo_full_name
+            )
+
             return Response(
                 {
                     "success": True,
                     "branches": branches,
                     "default_branch": default_branch,
+                    "date_range": date_range,
                 }
             )
 

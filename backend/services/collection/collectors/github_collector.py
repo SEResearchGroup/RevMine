@@ -3,6 +3,7 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 from datetime import datetime
 import logging
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +60,8 @@ class GitHubCollector:
         else:
             all_data = {"pull_requests": []}
 
+        self.is_total_approximate = False
+
         try:
             # Fetch project creation date
             try:
@@ -82,9 +85,20 @@ class GitHubCollector:
                     for pr in existing_data.get("pull_requests", [])
                 }
 
-            # First pass: Collect all PRs to get accurate count
-            logger.info("Collecting PRs...")
-            all_prs = []
+            # Get total PR count upfront (GraphQL with Link header fallback)
+            total_prs = self._get_total_pr_count(filters)
+            has_date_filter = filters and (filters.get("start_date") or filters.get("end_date"))
+            logger.info(f"Total PR count: {total_prs}")
+
+            # Immediately report total so the frontend can display it during pagination
+            if progress_callback and total_prs > 0:
+                progress_callback(
+                    len(collected_prs), total_prs, "Starting collection..."
+                )
+
+            # Process PRs page by page — no full pre-scan needed
+            collected_count = len(collected_prs)
+            failed_prs = []
             page = 1
 
             while True:
@@ -92,55 +106,58 @@ class GitHubCollector:
                 prs = self._get_pull_requests_page(page, filters)
 
                 if not prs:
+                    logger.info(f"No more PRs found on page {page}")
                     break
 
-                all_prs.extend(prs)
+                logger.info(f"Found {len(prs)} PRs on page {page}")
+
+                for pr in prs:
+                    # Skip already collected PRs (resume support)
+                    if pr['number'] in collected_prs:
+                        continue
+
+                    # Apply date filter (GitHub API doesn't support date filtering on pulls endpoint)
+                    if has_date_filter:
+                        pr_created = pr.get('created_at', '')
+                        if pr_created:
+                            pr_date = datetime.fromisoformat(pr_created.replace('Z', '+00:00')).date()
+                            if filters.get("start_date") and pr_date < filters["start_date"]:
+                                continue
+                            if filters.get("end_date") and pr_date > filters["end_date"]:
+                                continue
+
+                    try:
+                        pr_data = self._process_pull_request(pr['number'])
+                    except Exception as e:
+                        logger.warning(f"Skipping PR #{pr['number']} due to error: {e}")
+                        failed_prs.append(pr['number'])
+                        continue
+
+                    if pr_data:
+                        all_data["pull_requests"].append(pr_data)
+                        collected_count += 1
+
+                        # Update progress with item data for incremental saving
+                        if progress_callback:
+                            progress_callback(
+                                collected_count,
+                                total_prs,
+                                f"Collected PR #{pr['number']}",
+                                pr_data,
+                                all_data
+                            )
+
                 page += 1
-
-                if page > 10:
-                    break
-
-            # Filter out already collected PRs
-            if collected_prs:
-                all_prs = [pr for pr in all_prs if pr['number'] not in collected_prs]
-            
-            total_prs = len(all_prs) + len(collected_prs)
-            logger.info(
-                f"Total PRs to process: {len(all_prs)} (already collected: {len(collected_prs)})"
-            )
-
-            if progress_callback:
-                progress_callback(
-                    len(collected_prs), total_prs, "Starting collection..."
-                )
-
-            # Process each PR
-            collected_count = len(collected_prs)
-            failed_prs = []
-            
-            for pr in all_prs:
-                try:
-                    pr_data = self._process_pull_request(pr['number'])
-                except Exception as e:
-                    logger.warning(f"Skipping PR #{pr['number']} due to error: {e}")
-                    failed_prs.append(pr['number'])
-                    continue
-                if pr_data:
-                    all_data["pull_requests"].append(pr_data)
-                    collected_count += 1
-
-                    # Update progress with item data for incremental saving
-                    if progress_callback:
-                        progress_callback(
-                            collected_count,
-                            total_prs,
-                            f"Collected PR #{pr['number']}",
-                            pr_data,
-                            all_data
-                        )
             
             if failed_prs:
                 logger.warning(f"Failed to collect {len(failed_prs)} PRs: {failed_prs}")
+
+            # Update total_prs to actual count now that we've seen all pages
+            total_prs = collected_count
+            if progress_callback:
+                progress_callback(
+                    collected_count, total_prs, "Finalizing..."
+                )
             
             # Deduplicate PRs by pull_request_number as a safety net
             seen = {}
@@ -156,14 +173,143 @@ class GitHubCollector:
             logger.error(f"Error collecting data: {e}")
             raise
 
+    def _get_total_pr_count(self, filters=None):
+        """
+        Get total PR count using GitHub GraphQL API for exact results.
+        Falls back to Link header method if GraphQL fails.
+        """
+        try:
+            return self._get_total_pr_count_graphql(filters)
+        except Exception as e:
+            logger.warning(f"GraphQL total count failed, falling back to Link header: {e}")
+            return self._get_total_pr_count_link_header(filters)
+
+    def _get_total_pr_count_graphql(self, filters=None):
+        """Get exact PR count using GitHub GraphQL API."""
+        graphql_url = "https://api.github.com/graphql"
+        graphql_headers = {
+            "Authorization": f"Bearer {self.token}",
+            "Content-Type": "application/json",
+        }
+        has_date_filter = filters and (filters.get("start_date") or filters.get("end_date"))
+
+        if has_date_filter:
+            # Use search query for date-filtered counts
+            query_parts = [f"repo:{self.repo_full_name}", "is:pr"]
+
+            if self.branch_name:
+                query_parts.append(f"base:{self.branch_name}")
+
+            start = filters.get("start_date") if filters else None
+            end = filters.get("end_date") if filters else None
+            if start and end:
+                s = start.isoformat() if hasattr(start, 'isoformat') else start
+                e = end.isoformat() if hasattr(end, 'isoformat') else end
+                query_parts.append(f"created:{s}..{e}")
+            elif start:
+                s = start.isoformat() if hasattr(start, 'isoformat') else start
+                query_parts.append(f"created:>={s}")
+            elif end:
+                e = end.isoformat() if hasattr(end, 'isoformat') else end
+                query_parts.append(f"created:<={e}")
+
+            graphql_query = """
+            query($searchQuery: String!) {
+                search(query: $searchQuery, type: ISSUE) {
+                    issueCount
+                }
+            }
+            """
+            variables = {"searchQuery": " ".join(query_parts)}
+
+            response = self.session.post(
+                graphql_url,
+                json={"query": graphql_query, "variables": variables},
+                headers=graphql_headers,
+                timeout=30,
+            )
+            if response.status_code != 200:
+                raise Exception(f"GitHub GraphQL HTTP {response.status_code}")
+
+            data = response.json()
+            if "errors" in data:
+                raise Exception(f"GraphQL errors: {data['errors']}")
+
+            return data["data"]["search"]["issueCount"]
+        else:
+            # No date filter - use repository.pullRequests.totalCount (exact)
+            owner, name = self.repo_full_name.split("/", 1)
+            graphql_query = """
+            query($owner: String!, $name: String!, $baseRefName: String) {
+                repository(owner: $owner, name: $name) {
+                    pullRequests(baseRefName: $baseRefName) {
+                        totalCount
+                    }
+                }
+            }
+            """
+            variables = {"owner": owner, "name": name}
+            if self.branch_name:
+                variables["baseRefName"] = self.branch_name
+
+            response = self.session.post(
+                graphql_url,
+                json={"query": graphql_query, "variables": variables},
+                headers=graphql_headers,
+                timeout=30,
+            )
+            if response.status_code != 200:
+                raise Exception(f"GitHub GraphQL HTTP {response.status_code}")
+
+            data = response.json()
+            if "errors" in data:
+                raise Exception(f"GraphQL errors: {data['errors']}")
+
+            return data["data"]["repository"]["pullRequests"]["totalCount"]
+
+    def _get_total_pr_count_link_header(self, filters=None):
+        """Fallback: get total PR count using Link header pagination trick."""
+        try:
+            params = {
+                'state': 'all',
+                'per_page': 1,
+                'page': 1,
+            }
+            if self.branch_name:
+                params['base'] = self.branch_name
+
+            response = self.session.get(
+                f"{self.base_url}/repos/{self.repo_full_name}/pulls",
+                params=params,
+                timeout=30,
+            )
+            if response.status_code == 200:
+                link_header = response.headers.get('Link', '')
+                if link_header:
+                    match = re.search(r'page=(\d+)>;\s*rel="last"', link_header)
+                    if match:
+                        return int(match.group(1))
+                data = response.json()
+                return len(data)
+            return 0
+        except Exception as e:
+            logger.warning(f"Could not get total PR count via Link header: {e}")
+            return 0
+
     def _get_pull_requests_page(self, page, filters=None):
         """Get one page of pull requests"""
         try:
             params = {
                 'state': 'all',
-                'per_page': 30,
-                'page': page
+                'per_page': 100,
+                'page': page,
+                'sort': 'created',
+                'direction': 'desc',
             }
+
+            # Apply branch filter
+            if self.branch_name:
+                params['base'] = self.branch_name
             
             response = self.session.get(
                 f"{self.base_url}/repos/{self.repo_full_name}/pulls",

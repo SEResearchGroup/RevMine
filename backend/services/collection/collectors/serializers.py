@@ -33,6 +33,9 @@ class MetricsFilterSerializer(serializers.Serializer):
     branch_name = serializers.CharField(
         required=False, allow_null=True, allow_blank=True
     )
+    save_batch_size = serializers.IntegerField(
+        required=False, default=1, min_value=1, max_value=100
+    )
 
     def validate(self, data):
         """Validate that end_date is after start_date"""
@@ -74,6 +77,8 @@ class CollectionSerializer(serializers.ModelSerializer):
             'filters',
             'total_items',
             'collected_items',
+            'save_batch_size',
+            'is_total_approximate',
             'progress_percentage',
             'is_active',
             'can_resume',

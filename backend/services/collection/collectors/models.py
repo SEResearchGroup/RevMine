@@ -58,6 +58,14 @@ class Collection(models.Model):
 
     total_items = models.IntegerField(default=0)
     collected_items = models.IntegerField(default=0)
+    save_batch_size = models.PositiveSmallIntegerField(
+        default=1,
+        help_text="Number of items to collect before saving to MinIO (1-100)",
+    )
+    is_total_approximate = models.BooleanField(
+        default=False,
+        help_text="Whether the total_items count is approximate (e.g. GitHub with date filters)",
+    )
 
     # Track last collected item for resume capability
     last_collected_item_id = models.CharField(

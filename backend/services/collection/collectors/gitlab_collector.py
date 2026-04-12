@@ -62,6 +62,8 @@ class GitLabCollector:
         else:
             all_data = {"merge_requests": []}
 
+        self.is_total_approximate = False
+
         try:
             # Get project ID if not already set
             if not self.project_id:
@@ -195,16 +197,110 @@ class GitLabCollector:
 
     def _get_total_mr_count(self, filters=None):
         """
-        Get total MR count using the iid trick: fetch per_page=1 to get the
-        latest MR, then read its 'iid' field which equals the total MR number.
-        Falls back to x-total header if available, or 0 if both fail.
+        Get total MR count using GitLab GraphQL API for exact results.
+        Falls back to REST API x-total header for older GitLab versions (<15.0) or errors.
         """
+        try:
+            return self._get_total_mr_count_graphql(filters)
+        except Exception as e:
+            logger.warning(f"GraphQL total count failed (possibly pre-15.0 GitLab), falling back to REST API: {e}")
+            return self._get_total_mr_count_rest(filters)
+
+    def _get_total_mr_count_graphql(self, filters=None):
+        """Get exact MR count using GitLab GraphQL API (requires GitLab 15.0+)."""
+        graphql_url = self.base_url.replace('/api/v4', '/api/graphql')
+
+        graphql_query = """
+        query($fullPath: ID!, $targetBranches: [String!], $createdAfter: Time, $createdBefore: Time, $state: MergeRequestState) {
+            project(fullPath: $fullPath) {
+                mergeRequests(targetBranches: $targetBranches, createdAfter: $createdAfter, createdBefore: $createdBefore, state: $state) {
+                    count
+                }
+            }
+        }
+        """
+
+        variables = {"fullPath": self.repo_full_name}
+
+        if self.branch_name:
+            variables["targetBranches"] = [self.branch_name]
+
+        if filters:
+            if filters.get("start_date"):
+                start = filters["start_date"]
+                variables["createdAfter"] = start.isoformat() if hasattr(start, 'isoformat') else start
+            if filters.get("end_date"):
+                end = filters["end_date"]
+                variables["createdBefore"] = end.isoformat() if hasattr(end, 'isoformat') else end
+
+            if filters.get("status"):
+                status_list = filters["status"]
+                gitlab_states = []
+                for s in status_list:
+                    if s == "open":
+                        gitlab_states.append("opened")
+                    elif s in ["closed", "merged"]:
+                        gitlab_states.append(s)
+                if len(gitlab_states) == 1:
+                    variables["state"] = gitlab_states[0]
+
+        response = self.session.post(
+            graphql_url,
+            json={"query": graphql_query, "variables": variables},
+            timeout=30,
+        )
+
+        if response.status_code != 200:
+            raise Exception(f"GitLab GraphQL HTTP {response.status_code}")
+
+        data = response.json()
+        if "errors" in data:
+            raise Exception(f"GraphQL errors: {data['errors']}")
+
+        project = data.get("data", {}).get("project")
+        if not project:
+            raise Exception("Project not found via GraphQL")
+
+        return project["mergeRequests"]["count"]
+
+    def _get_total_mr_count_rest(self, filters=None):
+        """Fallback: get total MR count using REST API x-total header."""
         try:
             params = {
                 "page": 1,
                 "per_page": 1,
                 "state": "all",
             }
+
+            if self.branch_name:
+                params["target_branch"] = self.branch_name
+
+            if filters:
+                if filters.get("start_date"):
+                    params["created_after"] = (
+                        filters["start_date"].isoformat()
+                        if hasattr(filters["start_date"], "isoformat")
+                        else filters["start_date"]
+                    )
+                if filters.get("end_date"):
+                    params["created_before"] = (
+                        filters["end_date"].isoformat()
+                        if hasattr(filters["end_date"], "isoformat")
+                        else filters["end_date"]
+                    )
+
+                if filters.get("status"):
+                    status_list = filters["status"]
+                    gitlab_states = []
+                    for s in status_list:
+                        if s == "open":
+                            gitlab_states.append("opened")
+                        elif s in ["closed", "merged"]:
+                            gitlab_states.append(s)
+                    if len(gitlab_states) >= 3 or set(gitlab_states) == {"opened", "closed", "merged"}:
+                        params["state"] = "all"
+                    elif len(gitlab_states) == 1:
+                        params["state"] = gitlab_states[0]
 
             response = self.session.get(
                 f"{self.base_url}/projects/{self.project_id}/merge_requests",
@@ -213,12 +309,10 @@ class GitLabCollector:
             )
 
             if response.status_code == 200:
-                # Try x-total header first (most accurate with filters)
                 x_total = response.headers.get('x-total')
                 if x_total:
                     return int(x_total)
 
-                # Fallback: use iid of the latest MR (works for unfiltered "all" queries)
                 data = response.json()
                 if data and len(data) > 0:
                     latest_iid = data[0].get('iid', 0)
@@ -226,7 +320,7 @@ class GitLabCollector:
 
             return 0
         except Exception as e:
-            logger.warning(f"Could not get total MR count: {e}")
+            logger.warning(f"Could not get total MR count via REST: {e}")
             return 0
 
     def _get_merge_requests_page(self, page, filters=None):
