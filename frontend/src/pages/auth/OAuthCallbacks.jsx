@@ -50,7 +50,7 @@ export const GitHubCallback = () => {
         }
 
         const data = await response.json();
-        login(data.access);
+        login(data.access, data.refresh);
         navigate("/workspaces");
       } catch (err) {
         console.error("GitHub callback error:", err);
@@ -135,7 +135,7 @@ export const GitLabCallback = () => {
         }
 
         const data = await response.json();
-        login(data.access);
+        login(data.access, data.refresh);
         navigate("/workspaces");
       } catch (err) {
         console.error("GitLab callback error:", err);
@@ -220,7 +220,7 @@ export const GoogleCallback = () => {
         }
 
         const data = await response.json();
-        login(data.access);
+        login(data.access, data.refresh);
         navigate("/workspaces");
       } catch (err) {
         console.error("Google callback error:", err);

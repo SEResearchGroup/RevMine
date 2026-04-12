@@ -10,6 +10,7 @@ import {
   User,
 } from "lucide-react";
 import { authService } from "../../services/api";
+import axios from "axios";
 
 const Register = () => {
   const [firstName, setFirstName] = useState("");
@@ -62,8 +63,21 @@ const Register = () => {
     }
   };
 
-  const handleSocialRegister = (provider) => {
-    console.log("Register with:", provider);
+  const handleSocialRegister = async (provider) => {
+    try {
+      let response;
+      if (provider === "GitHub") {
+        response = await axios.get('http://localhost:8000/api/auth/oauth/github');
+      } else if (provider === "GitLab") {
+        response = await axios.get('http://localhost:8000/api/auth/oauth/gitlab');
+      } else {
+        response = await axios.get('http://localhost:8000/api/auth/oauth/google');
+      }
+      window.location.href = response.data.url;
+    } catch (err) {
+      console.error(`Error initiating ${provider} registration:`, err);
+      setError(`Failed to connect to ${provider}`);
+    }
   };
 
   return (

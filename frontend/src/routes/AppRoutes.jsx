@@ -31,6 +31,10 @@ import ProjectAnalysisDetailPage from "../pages/Analysis/ProjectAnalysisDetailPa
 import ProjectSelectionPage from "../pages/Analysis/ProjectSelectionPage";
 import NewAnalysisPage from "../pages/Analysis/NewAnalysisPage";
 import SingleChartPage from "../pages/Analysis/SingleChartPage";
+import DatasetsPage from "../pages/Analysis/DatasetsPage";
+import DatasetDetailPage from "../pages/Analysis/DatasetDetailPage";
+import CreateAnalysisPage from "../pages/Analysis/CreateAnalysisPage";
+import AnalysisResultsPage from "../pages/Analysis/AnalysisResultsPage";
 
 const AppRoutes = () => {
   return (
@@ -94,6 +98,10 @@ const AppRoutes = () => {
         <Route path="/analysis/:datasetId/metrics" element={<MetricsSelectionPage />} />
         <Route path="/analysis/:datasetId/chart/:analysisId" element={<SingleChartPage />} />
         <Route path="/analysis/:datasetId/dashboard" element={<AnalysisDashboardPage />} />
+        <Route path="/analysis/datasets" element={<DatasetsPage />} />
+        <Route path="/analysis/datasets/:datasetId" element={<DatasetDetailPage />} />
+        <Route path="/analysis/datasets/:datasetId/analyze" element={<CreateAnalysisPage />} />
+        <Route path="/analysis/datasets/:datasetId/results" element={<AnalysisResultsPage />} />
 
         <Route path="/profile" element={<Profile />} />
       </Route>
