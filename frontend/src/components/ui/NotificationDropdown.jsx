@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Bell,
   Check,
@@ -10,6 +11,7 @@ import {
   CheckCircle2,
   Loader2,
   Play,
+  ExternalLink,
 } from "lucide-react";
 import { useNotifications } from "../../hooks/useNotifications";
 
@@ -41,6 +43,7 @@ const formatTime = (timestamp) => {
 const NotificationDropdown = () => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
+  const navigate = useNavigate();
   const {
     notifications,
     unreadCount,
@@ -105,6 +108,15 @@ const NotificationDropdown = () => {
               notifications.map((notif) => {
                 const iconConfig = ICON_MAP[notif.type] || DEFAULT_ICON;
                 const Icon = iconConfig.icon;
+                const hasLink = !!notif.link_url;
+
+                const handleClick = () => {
+                  if (!notif.read) markAsRead(notif.id);
+                  if (hasLink) {
+                    setIsOpen(false);
+                    navigate(`/${notif.link_url}`);
+                  }
+                };
 
                 return (
                   <div
@@ -112,7 +124,7 @@ const NotificationDropdown = () => {
                     className={`flex items-start gap-3 px-4 py-3 border-b border-gray-50 hover:bg-gray-50 transition cursor-pointer ${
                       !notif.read ? "bg-blue-50/40" : ""
                     }`}
-                    onClick={() => !notif.read && markAsRead(notif.id)}
+                    onClick={handleClick}
                   >
                     <div
                       className={`shrink-0 w-9 h-9 rounded-full ${iconConfig.bg} flex items-center justify-center mt-0.5`}
@@ -121,8 +133,9 @@ const NotificationDropdown = () => {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between">
-                        <p className={`text-sm ${!notif.read ? "font-semibold text-gray-900" : "text-gray-700"}`}>
+                        <p className={`text-sm ${!notif.read ? "font-semibold text-gray-900" : "text-gray-700"} flex items-center gap-1`}>
                           {notif.title}
+                          {hasLink && <ExternalLink className="w-3 h-3 text-gray-400 shrink-0" />}
                         </p>
                         <div className="flex items-center gap-1 ml-2 shrink-0">
                           {!notif.read && (

@@ -9,17 +9,17 @@ import (
 
 func InsertNotification(db *sql.DB, n *model.Notification) error {
 	query := `
-		INSERT INTO notifications (user_id, type, title, message, data, read)
-		VALUES ($1, $2, $3, $4, $5, $6)
+		INSERT INTO notifications (user_id, type, title, message, data, link_url, read)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
 		RETURNING id, created_at
 	`
-	return db.QueryRow(query, n.UserID, n.Type, n.Title, n.Message, n.Data, n.Read).
+	return db.QueryRow(query, n.UserID, n.Type, n.Title, n.Message, n.Data, n.LinkURL, n.Read).
 		Scan(&n.ID, &n.CreatedAt)
 }
 
 func GetNotificationsByUser(db *sql.DB, userID int, limit, offset int) ([]model.Notification, error) {
 	query := `
-		SELECT id, user_id, type, title, message, data, read, created_at
+		SELECT id, user_id, type, title, message, data, link_url, read, created_at
 		FROM notifications
 		WHERE user_id = $1
 		ORDER BY created_at DESC
@@ -35,11 +35,15 @@ func GetNotificationsByUser(db *sql.DB, userID int, limit, offset int) ([]model.
 	for rows.Next() {
 		var n model.Notification
 		var data sql.NullString
-		if err := rows.Scan(&n.ID, &n.UserID, &n.Type, &n.Title, &n.Message, &data, &n.Read, &n.CreatedAt); err != nil {
+		var linkURL sql.NullString
+		if err := rows.Scan(&n.ID, &n.UserID, &n.Type, &n.Title, &n.Message, &data, &linkURL, &n.Read, &n.CreatedAt); err != nil {
 			return nil, err
 		}
 		if data.Valid {
 			n.Data = data.String
+		}
+		if linkURL.Valid {
+			n.LinkURL = linkURL.String
 		}
 		notifications = append(notifications, n)
 	}

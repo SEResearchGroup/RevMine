@@ -462,7 +462,7 @@ services:
 
   frontend:
     build:
-      context: ./fronten, ther
+      context: ./frontend
     container_name: frontend
     hostname: frontend
     ports:

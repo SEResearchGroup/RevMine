@@ -129,6 +129,7 @@ type kafkaEvent struct {
 	Type    string `json:"type"`
 	Title   string `json:"title"`
 	Message string `json:"message"`
+	LinkURL string `json:"link_url"` // Optional navigation path for generic events
 }
 
 func (h *consumerGroupHandler) transformEvent(topic string, value []byte) *model.Notification {
@@ -160,16 +161,25 @@ func (h *consumerGroupHandler) transformEvent(topic string, value []byte) *model
 		n.Type = "collection_started"
 		n.Title = "Collection Started"
 		n.Message = fmt.Sprintf("Data collection #%d has started.", event.CollectionID)
+		if event.WorkspaceID != 0 && event.RepositoryID != 0 {
+			n.LinkURL = fmt.Sprintf("workspaces/%d/repositories/%d/collect", event.WorkspaceID, event.RepositoryID)
+		}
 
 	case "collection.events.completed":
 		n.Type = "collection_completed"
 		n.Title = "Collection Completed"
 		n.Message = fmt.Sprintf("Data collection #%d completed successfully.", event.CollectionID)
+		if event.WorkspaceID != 0 && event.RepositoryID != 0 {
+			n.LinkURL = fmt.Sprintf("workspaces/%d/repositories/%d/collect", event.WorkspaceID, event.RepositoryID)
+		}
 
 	case "collection.events.failed":
 		n.Type = "collection_failed"
 		n.Title = "Collection Failed"
 		n.Message = fmt.Sprintf("Data collection #%d failed: %s", event.CollectionID, event.Error)
+		if event.WorkspaceID != 0 && event.RepositoryID != 0 {
+			n.LinkURL = fmt.Sprintf("workspaces/%d/repositories/%d/collect", event.WorkspaceID, event.RepositoryID)
+		}
 		extraData["error"] = event.Error
 
 	case "analysis.events.requested":
@@ -191,6 +201,7 @@ func (h *consumerGroupHandler) transformEvent(topic string, value []byte) *model
 		n.Type = event.Type
 		n.Title = event.Title
 		n.Message = event.Message
+		n.LinkURL = event.LinkURL // Pass through optional link
 
 	default:
 		log.Printf("[Kafka] Unknown topic: %s", topic)

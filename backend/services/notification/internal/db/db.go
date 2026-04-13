@@ -47,6 +47,12 @@ func Migrate(db *sql.DB) error {
 		return err
 	}
 
+	// Add link_url column if it doesn't exist (safe migration for existing databases)
+	_, err = db.Exec(`ALTER TABLE notifications ADD COLUMN IF NOT EXISTS link_url TEXT NOT NULL DEFAULT ''`)
+	if err != nil {
+		return err
+	}
+
 	log.Println("Database migration completed")
 	return nil
 }
