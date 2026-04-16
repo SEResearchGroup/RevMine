@@ -146,7 +146,7 @@ const Sidebar = () => {
               navigate("/");
             }}
           >
-            <img src={logo} alt="RevMine Logo" />
+            <img src={logo} alt="RevMine Logo" className="w-40" />
           </div>
         )}
         <button
