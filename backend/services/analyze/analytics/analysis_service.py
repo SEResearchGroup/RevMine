@@ -396,78 +396,178 @@ class AnalysisService:
     
     def analyze_lead_time_distribution(self, df, analysis):
         """
-        Analyze lead time distribution - only for merged MRs
+        Analyze lead time distribution with adaptive binning and time-based filtering.
+
+        Config params:
+          x_axis       – column name for lead time (default: 'Lead_Time')
+          time_filter  – 'all' | 'daily' | 'weekly' | 'monthly'
+                         Filters rows by Creation_Date before computing the histogram.
         """
         config = analysis.config
         lead_time_col = config.get('x_axis') or 'Lead_Time'
-        
+        time_filter = config.get('time_filter', 'all')
+        date_col = 'Creation_Date'
+
         df = self._apply_config(df, config)
-        
-        # Filter out 'open' values and convert to numeric
         df_filtered = df.copy()
-        
-        # Handle the case where Lead_Time contains 'open' strings for open MRs
+
+        # ------------------------------------------------------------------
+        # 1. Time-based filtering on Creation_Date
+        #    Use the dataset's own max date as the reference point so that
+        #    historical datasets produce meaningful results.
+        # ------------------------------------------------------------------
+        if time_filter != 'all' and date_col in df_filtered.columns:
+            if not pd.api.types.is_datetime64_any_dtype(df_filtered[date_col]):
+                df_filtered[date_col] = pd.to_datetime(df_filtered[date_col], errors='coerce')
+            if df_filtered[date_col].dt.tz is not None:
+                df_filtered[date_col] = df_filtered[date_col].dt.tz_localize(None)
+            max_date = df_filtered[date_col].dropna().max()
+            if pd.notna(max_date):
+                days_map = {'daily': 1, 'weekly': 7, 'monthly': 30}
+                days = days_map.get(time_filter)
+                if days:
+                    cutoff = max_date - pd.Timedelta(days=days)
+                    df_filtered = df_filtered[df_filtered[date_col] >= cutoff]
+
+        # ------------------------------------------------------------------
+        # 2. Clean the lead-time column
+        # ------------------------------------------------------------------
+        if lead_time_col not in df_filtered.columns:
+            raise ValueError(f"Column '{lead_time_col}' not found in dataset")
+
         df_filtered = df_filtered[df_filtered[lead_time_col] != 'open']
         df_filtered[lead_time_col] = pd.to_numeric(df_filtered[lead_time_col], errors='coerce')
         df_filtered = df_filtered.dropna(subset=[lead_time_col])
-        
-        # Filter out negative values and unreasonably large values
         df_filtered = df_filtered[df_filtered[lead_time_col] >= 0]
-        df_filtered = df_filtered[df_filtered[lead_time_col] < 10000]  # Filter out values > 10000 hours
-        
+        df_filtered = df_filtered[df_filtered[lead_time_col] < 10000]
+
         if len(df_filtered) == 0:
-            raise ValueError("No valid lead time data found (all MRs might still be open)")
-        
+            chart_data = {
+                'type': 'bar',
+                'data': {
+                    'labels': ['No data'],
+                    'datasets': [{'label': 'Number of MRs', 'data': [0]}],
+                },
+                'options': {
+                    'title': 'Lead Time Distribution',
+                    'xLabel': 'Lead Time (hours)',
+                    'yLabel': 'Number of MRs',
+                    'isHistogram': True,
+                    'histogram': {
+                        'raw_values':     [],
+                        'data_min':       0,
+                        'data_max':       0,
+                        'time_filter':    time_filter,
+                        'filtered_count': 0,
+                    },
+                },
+            }
+            fig, ax = plt.subplots(figsize=(12, 6))
+            ax.set_xlabel('Lead Time (hours)')
+            ax.set_ylabel('Number of MRs')
+            ax.set_title('Lead Time Distribution – no data for selected period')
+            ax.grid(axis='y', alpha=0.3)
+            plt.tight_layout()
+            chart_image = self._generate_matplotlib_image(fig)
+            return {
+                'chart_data': chart_data,
+                'chart_image': chart_image,
+                'statistics': {'count': 0, 'mean': 0, 'std': 0, 'min': 0,
+                               'p25': 0, 'median': 0, 'p75': 0, 'max': 0},
+            }
+
         values = df_filtered[lead_time_col].values
-        
-        # Calculate histogram data
-        hist_values, bin_edges = np.histogram(values, bins=30)
-        bin_labels = [f"{bin_edges[i]:.0f}-{bin_edges[i+1]:.0f}" for i in range(len(bin_edges)-1)]
-        
+        n = len(values)
+        data_min = float(values.min())
+        data_max = float(values.max())
+        data_range = data_max - data_min
+
+        # ------------------------------------------------------------------
+        # 3. Adaptive initial bin count – Freedman-Diaconis rule
+        # ------------------------------------------------------------------
+        q75, q25 = np.percentile(values, [75, 25])
+        iqr = q75 - q25
+
+        if iqr > 0 and data_range > 0:
+            raw_width = 2.0 * iqr * (n ** (-1.0 / 3.0))
+            # Round to a "nice" power-of-10 multiple
+            magnitude = 10 ** np.floor(np.log10(raw_width))
+            bin_width = np.ceil(raw_width / magnitude) * magnitude
+            num_bins = max(10, min(80, int(np.ceil(data_range / bin_width))))
+        else:
+            # Sturges' rule fallback
+            num_bins = max(10, min(50, int(np.ceil(np.log2(n) + 1))))
+
+        # ------------------------------------------------------------------
+        # 4. Compute display bins
+        # ------------------------------------------------------------------
+        hist_coarse, edges_coarse = np.histogram(values, bins=num_bins, range=(data_min, data_max))
+
+        def _fmt_range(lo, hi):
+            span = hi - lo
+            decimals = 2 if span < 1 else (1 if span < 10 else 0)
+            return f"{lo:.{decimals}f}–{hi:.{decimals}f}"
+
+        coarse_labels = [_fmt_range(edges_coarse[i], edges_coarse[i + 1]) for i in range(num_bins)]
+
         chart_data = {
             'type': 'bar',
             'data': {
-                'labels': bin_labels,
+                'labels': coarse_labels,
                 'datasets': [{
-                    'label': 'Frequency',
-                    'data': hist_values.tolist(),
-                }]
+                    'label': 'Number of MRs',
+                    'data': hist_coarse.tolist(),
+                }],
             },
             'options': {
-                'title': 'Lead Time Distribution (merged MRs only)',
+                'title': 'Lead Time Distribution',
                 'xLabel': 'Lead Time (hours)',
                 'yLabel': 'Number of MRs',
-            }
+                'isHistogram': True,
+                'histogram': {
+                    'raw_values':       values.tolist(),
+                    'data_min':         data_min,
+                    'data_max':         data_max,
+                    'time_filter':      time_filter,
+                    'filtered_count':   int(n),
+                },
+            },
         }
-        
-        # Generate matplotlib image
+
+        # ------------------------------------------------------------------
+        # 5. Matplotlib fallback image
+        # ------------------------------------------------------------------
         fig, ax = plt.subplots(figsize=(12, 6))
-        ax.hist(values, bins=30, edgecolor='white', color='steelblue')
+        ax.bar(range(num_bins), hist_coarse, width=1, edgecolor='white', color='steelblue')
+        tick_step = max(1, num_bins // 10)
+        ax.set_xticks(range(0, num_bins, tick_step))
+        ax.set_xticklabels(coarse_labels[::tick_step], rotation=45, ha='right')
         ax.set_xlabel('Lead Time (hours)')
         ax.set_ylabel('Number of MRs')
-        ax.set_title('Lead Time Distribution (merged MRs only)')
+        ax.set_title('Lead Time Distribution')
         ax.grid(axis='y', alpha=0.3)
         plt.tight_layout()
-        
         chart_image = self._generate_matplotlib_image(fig)
-        
-        # Calculate statistics
+
+        # ------------------------------------------------------------------
+        # 6. Statistics
+        # ------------------------------------------------------------------
         stats = df_filtered[lead_time_col].describe()
         statistics = {
-            'count': int(stats['count']),
-            'mean': float(stats['mean']),
-            'std': float(stats['std']),
-            'min': float(stats['min']),
-            'p25': float(stats['25%']),
+            'count':  int(stats['count']),
+            'mean':   float(stats['mean']),
+            'std':    float(stats['std']),
+            'min':    float(stats['min']),
+            'p25':    float(stats['25%']),
             'median': float(stats['50%']),
-            'p75': float(stats['75%']),
-            'max': float(stats['max']),
+            'p75':    float(stats['75%']),
+            'max':    float(stats['max']),
         }
-        
+
         return {
             'chart_data': chart_data,
             'chart_image': chart_image,
-            'statistics': statistics
+            'statistics': statistics,
         }
     
     def analyze_commits_distribution(self, df, analysis):
@@ -1643,91 +1743,190 @@ class AnalysisService:
     
     def analyze_rework(self, df, analysis):
         """
-        Analyze rework size distribution
+        Analyze rework size distribution with adaptive binning and time-based filtering.
+
+        Config params:
+          x_axis       – column name for rework (default: 'rework_size')
+          time_filter  – 'all' | 'daily' | 'weekly' | 'monthly'
+                         Filters rows by Creation_Date before computing the histogram.
         """
         config = analysis.config
         rework_col = config.get('x_axis') or 'rework_size'
-        
+        time_filter = config.get('time_filter', 'all')
+        date_col = 'Creation_Date'
+
         df = self._apply_config(df, config)
-        
-        if rework_col not in df.columns:
+        df_filtered = df.copy()
+
+        # ------------------------------------------------------------------
+        # 1. Time-based filtering on Creation_Date
+        #    Use the dataset's own max date as the reference point so that
+        #    historical datasets produce meaningful results.
+        # ------------------------------------------------------------------
+        if time_filter != 'all' and date_col in df_filtered.columns:
+            if not pd.api.types.is_datetime64_any_dtype(df_filtered[date_col]):
+                df_filtered[date_col] = pd.to_datetime(df_filtered[date_col], errors='coerce')
+            if df_filtered[date_col].dt.tz is not None:
+                df_filtered[date_col] = df_filtered[date_col].dt.tz_localize(None)
+            max_date = df_filtered[date_col].dropna().max()
+            if pd.notna(max_date):
+                days_map = {'daily': 1, 'weekly': 7, 'monthly': 30}
+                days = days_map.get(time_filter)
+                if days:
+                    cutoff = max_date - pd.Timedelta(days=days)
+                    df_filtered = df_filtered[df_filtered[date_col] >= cutoff]
+
+        # ------------------------------------------------------------------
+        # 2. Clean the rework column
+        # ------------------------------------------------------------------
+        if rework_col not in df_filtered.columns:
             raise ValueError(f"Column '{rework_col}' not found in dataset")
-        
-        df_copy = df.copy()
-        df_copy[rework_col] = pd.to_numeric(df_copy[rework_col], errors='coerce').fillna(0)
-        
+
+        df_filtered[rework_col] = pd.to_numeric(df_filtered[rework_col], errors='coerce').fillna(0)
+
+        # Keep stats on full set before filtering zeros
+        all_stats = df_filtered[rework_col].describe()
+        mrs_with_rework = int((df_filtered[rework_col] > 0).sum())
+        mrs_without_rework = int((df_filtered[rework_col] == 0).sum())
+
         # Filter out zeros for better visualization
-        df_nonzero = df_copy[df_copy[rework_col] > 0]
-        
-        if len(df_nonzero) == 0:
-            # All zeros case
+        df_filtered = df_filtered[df_filtered[rework_col] > 0]
+
+        if len(df_filtered) == 0:
+            # All zeros – still return isHistogram so filter buttons stay visible
             chart_data = {
                 'type': 'bar',
                 'data': {
                     'labels': ['0'],
-                    'datasets': [{
-                        'label': 'Number of MRs',
-                        'data': [len(df_copy)],
-                    }]
+                    'datasets': [{'label': 'Number of MRs', 'data': [mrs_without_rework]}],
                 },
                 'options': {
                     'title': 'Rework Size Distribution',
                     'xLabel': 'Rework Size',
                     'yLabel': 'Number of MRs',
-                }
-            }
-        else:
-            # Filter outliers
-            q99 = df_nonzero[rework_col].quantile(0.99)
-            df_filtered = df_nonzero[df_nonzero[rework_col] <= q99]
-            
-            values = df_filtered[rework_col].values
-            hist_values, bin_edges = np.histogram(values, bins=20)
-            bin_labels = [f"{int(bin_edges[i])}-{int(bin_edges[i+1])}" for i in range(len(bin_edges)-1)]
-            
-            chart_data = {
-                'type': 'bar',
-                'data': {
-                    'labels': bin_labels,
-                    'datasets': [{
-                        'label': 'Number of MRs',
-                        'data': hist_values.tolist(),
-                    }]
+                    'isHistogram': True,
+                    'histogram': {
+                        'raw_values':     [],
+                        'data_min':       0,
+                        'data_max':       0,
+                        'time_filter':    time_filter,
+                        'filtered_count': 0,
+                    },
                 },
-                'options': {
-                    'title': 'Rework Size Distribution (non-zero only)',
-                    'xLabel': 'Rework Size',
-                    'yLabel': 'Number of MRs',
-                }
             }
-        
-        fig, ax = plt.subplots(figsize=(12, 6))
-        if len(df_nonzero) > 0:
-            ax.hist(df_filtered[rework_col].values, bins=20, edgecolor='white', color='steelblue')
+            fig, ax = plt.subplots(figsize=(12, 6))
+            ax.bar([0], [mrs_without_rework], color='steelblue')
+            ax.set_xlabel('Rework Size')
+            ax.set_ylabel('Number of MRs')
+            ax.set_title('Rework Size Distribution')
+            ax.grid(axis='y', alpha=0.3)
+            plt.tight_layout()
+            chart_image = self._generate_matplotlib_image(fig)
+
+            return {
+                'chart_data': chart_data,
+                'chart_image': chart_image,
+                'statistics': {
+                    'count': int(all_stats['count']),
+                    'mean': float(all_stats['mean']),
+                    'median': float(all_stats['50%']),
+                    'max': float(all_stats['max']),
+                    'mrs_with_rework': mrs_with_rework,
+                    'mrs_without_rework': mrs_without_rework,
+                },
+            }
+
+        # Filter outliers (> 99th percentile)
+        q99 = df_filtered[rework_col].quantile(0.99)
+        df_filtered = df_filtered[df_filtered[rework_col] <= q99]
+
+        values = df_filtered[rework_col].values
+        n = len(values)
+        data_min = float(values.min())
+        data_max = float(values.max())
+        data_range = data_max - data_min
+
+        # ------------------------------------------------------------------
+        # 3. Adaptive bin count – Freedman-Diaconis rule
+        # ------------------------------------------------------------------
+        q75, q25 = np.percentile(values, [75, 25])
+        iqr = q75 - q25
+
+        if iqr > 0 and data_range > 0:
+            raw_width = 2.0 * iqr * (n ** (-1.0 / 3.0))
+            magnitude = 10 ** np.floor(np.log10(raw_width))
+            bin_width = np.ceil(raw_width / magnitude) * magnitude
+            num_bins = max(10, min(80, int(np.ceil(data_range / bin_width))))
         else:
-            ax.bar([0], [len(df_copy)], color='steelblue')
+            num_bins = max(10, min(50, int(np.ceil(np.log2(n) + 1))))
+
+        # ------------------------------------------------------------------
+        # 4. Compute display bins
+        # ------------------------------------------------------------------
+        hist_values, edges = np.histogram(values, bins=num_bins, range=(data_min, data_max))
+
+        def _fmt_range(lo, hi):
+            span = hi - lo
+            decimals = 2 if span < 1 else (1 if span < 10 else 0)
+            return f"{lo:.{decimals}f}–{hi:.{decimals}f}"
+
+        bin_labels = [_fmt_range(edges[i], edges[i + 1]) for i in range(num_bins)]
+
+        chart_data = {
+            'type': 'bar',
+            'data': {
+                'labels': bin_labels,
+                'datasets': [{
+                    'label': 'Number of MRs',
+                    'data': hist_values.tolist(),
+                }],
+            },
+            'options': {
+                'title': 'Rework Size Distribution (non-zero only)',
+                'xLabel': 'Rework Size',
+                'yLabel': 'Number of MRs',
+                'isHistogram': True,
+                'histogram': {
+                    'raw_values':     values.tolist(),
+                    'data_min':       data_min,
+                    'data_max':       data_max,
+                    'time_filter':    time_filter,
+                    'filtered_count': int(n),
+                },
+            },
+        }
+
+        # ------------------------------------------------------------------
+        # 5. Matplotlib fallback image
+        # ------------------------------------------------------------------
+        fig, ax = plt.subplots(figsize=(12, 6))
+        ax.bar(range(num_bins), hist_values, width=1, edgecolor='white', color='steelblue')
+        tick_step = max(1, num_bins // 10)
+        ax.set_xticks(range(0, num_bins, tick_step))
+        ax.set_xticklabels(bin_labels[::tick_step], rotation=45, ha='right')
         ax.set_xlabel('Rework Size')
         ax.set_ylabel('Number of MRs')
         ax.set_title('Rework Size Distribution')
         ax.grid(axis='y', alpha=0.3)
         plt.tight_layout()
-        
         chart_image = self._generate_matplotlib_image(fig)
-        
-        stats = df_copy[rework_col].describe()
+
+        # ------------------------------------------------------------------
+        # 6. Statistics
+        # ------------------------------------------------------------------
         statistics = {
-            'count': int(stats['count']),
-            'mean': float(stats['mean']),
-            'median': float(stats['50%']),
-            'max': float(stats['max']),
-            'mrs_with_rework': int((df_copy[rework_col] > 0).sum()),
-            'mrs_without_rework': int((df_copy[rework_col] == 0).sum()),
+            'count': int(all_stats['count']),
+            'mean': float(all_stats['mean']),
+            'median': float(all_stats['50%']),
+            'max': float(all_stats['max']),
+            'mrs_with_rework': mrs_with_rework,
+            'mrs_without_rework': mrs_without_rework,
         }
-        
+
         return {
             'chart_data': chart_data,
             'chart_image': chart_image,
-            'statistics': statistics
+            'statistics': statistics,
         }
     
     def analyze_correlation_matrix(self, df, analysis):

@@ -377,6 +377,8 @@ class GenerateChartView(APIView):
         aggregation = request.data.get("aggregation", "sum")
         time_aggregation = request.data.get("time_aggregation", "M")
         filters = request.data.get("filters", {})
+        # Extra config dict passed from the frontend (e.g. time_filter for histograms)
+        extra_config = request.data.get("config", {}) or {}
 
         # Validate dataset_id
         if not dataset_id:
@@ -446,6 +448,10 @@ class GenerateChartView(APIView):
             "aggregation": aggregation,
             "filters": filters,
         }
+        # Merge any extra config keys (e.g. time_filter for histogram metrics)
+        for key, value in extra_config.items():
+            if key not in config:
+                config[key] = value
         if x_axis is not None:
             config["x_axis"] = x_axis
         if y_axis is not None:

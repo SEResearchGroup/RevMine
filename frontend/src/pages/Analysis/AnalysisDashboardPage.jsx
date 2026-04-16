@@ -67,6 +67,7 @@ const DashboardChart = ({
   chartTypeOverrides,
   onChartTypeChange,
   onTimeChange,
+  onTimeFilter,
   onFullscreen,
   onExportImage,
   onRetry,
@@ -76,6 +77,9 @@ const DashboardChart = ({
   const [localTimeAgg, setLocalTimeAgg] = useState(
     result.time_aggregation || "M"
   );
+  const [localTimeFilter, setLocalTimeFilter] = useState(
+    result.chart_data?.options?.histogram?.time_filter || "all"
+  );
   const [isChanging, setIsChanging] = useState(false);
 
   const chartData = result.chart_data;
@@ -84,11 +88,15 @@ const DashboardChart = ({
   const options = chartData?.options || {};
   const title = options.title || result.metric_code?.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) || "Chart";
 
+  // Check if histogram (lead time distribution)
+  const isHistogram = options.isHistogram === true;
+
   // Check if timeseries
   const isTimeseries =
-    originalType === "line" ||
-    originalType === "area" ||
-    (chartData?.data?.labels || []).some((l) => /\d{4}/.test(l));
+    !isHistogram &&
+    (originalType === "line" ||
+      originalType === "area" ||
+      (chartData?.data?.labels || []).some((l) => /\d{4}/.test(l)));
 
   const handleTimeAggChange = async (newAgg) => {
     setLocalTimeAgg(newAgg);
@@ -100,11 +108,23 @@ const DashboardChart = ({
     }
   };
 
+  const handleTimeFilterChange = async (newFilter) => {
+    setLocalTimeFilter(newFilter);
+    setIsChanging(true);
+    try {
+      await onTimeFilter(index, newFilter);
+    } finally {
+      setIsChanging(false);
+    }
+  };
+
   const ChartIcon =
     activeType === "line" ? LineChart
     : activeType === "pie" ? PieChart
     : activeType === "scatter" ? ScatterChart
     : BarChart3;
+
+  const TIME_FILTER_LABELS = { all: "All", daily: "24h", weekly: "7d", monthly: "30d" };
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm hover:shadow-md transition-shadow overflow-hidden flex flex-col">
@@ -114,10 +134,29 @@ const DashboardChart = ({
           <ChartIcon className="w-4 h-4 text-indigo-500" />
           <h3 className="font-semibold text-slate-800 text-sm truncate">{title}</h3>
           <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[10px] uppercase tracking-wider font-medium">
-            {activeType}
+            {isHistogram ? "histogram" : activeType}
           </span>
         </div>
         <div className="flex items-center gap-1">
+          {/* Histogram time filter – All / 24h / 7d / 30d */}
+          {isHistogram && (
+            <div className="flex items-center bg-slate-100 rounded-lg p-0.5 mr-2">
+              {Object.entries(TIME_FILTER_LABELS).map(([k, v]) => (
+                <button
+                  key={k}
+                  onClick={() => handleTimeFilterChange(k)}
+                  disabled={isChanging}
+                  className={`px-2 py-1 text-[10px] font-medium rounded-md transition-colors disabled:opacity-50 ${
+                    localTimeFilter === k
+                      ? "bg-white text-indigo-600 shadow-sm"
+                      : "text-slate-500 hover:text-slate-700"
+                  }`}
+                >
+                  {v}
+                </button>
+              ))}
+            </div>
+          )}
           {isTimeseries && (
             <div className="relative mr-2">
               <select
@@ -355,6 +394,27 @@ const AnalysisDashboardPage = () => {
       setResults((prev) => prev.map((item, i) => (i === idx ? newRes : item)));
     } catch (err) {
       console.error("Time agg change failed:", err);
+    }
+  };
+
+  /* ---- time filter change for histogram charts (filters by Creation_Date) ---- */
+  const handleTimeFilter = async (idx, newFilter) => {
+    const r = results[idx];
+    if (!r || r.error) return;
+    try {
+      const payload = {
+        dataset_id: datasetId,
+        metric_code: r.metric_code,
+        chart_type: r.chart_type,
+        config: {
+          ...(r.config || {}),
+          time_filter: newFilter,
+        },
+      };
+      const newRes = await analyzeService.generateChart(payload);
+      setResults((prev) => prev.map((item, i) => (i === idx ? newRes : item)));
+    } catch (err) {
+      console.error("Time filter change failed:", err);
     }
   };
 
@@ -646,6 +706,7 @@ const AnalysisDashboardPage = () => {
                 chartTypeOverrides={chartTypeOverrides}
                 onChartTypeChange={handleChartTypeChange}
                 onTimeChange={handleTimeChange}
+                onTimeFilter={handleTimeFilter}
                 onFullscreen={(i) => setFullscreenIdx(i)}
                 onExportImage={handleExportImage}
                 onRetry={handleRetry}

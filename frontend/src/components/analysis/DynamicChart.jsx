@@ -63,6 +63,107 @@ const COLORS = [
 /* ------------------------------------------------------------------ */
 /*  Helper: build ECharts option from backend chart_data               */
 /* ------------------------------------------------------------------ */
+
+/**
+ * Client-side histogram binning with "nice" rounded boundaries.
+ * Given an array of numeric values, produces labels + counts with rounded
+ * bin edges (e.g. 0–100, 100–200 instead of 3.7–89.2).
+ */
+function computeNiceBins(values, targetBins = 25) {
+  if (!values || values.length === 0) return { labels: [], counts: [] };
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min;
+  if (range === 0) return { labels: [`${min}`], counts: [values.length] };
+
+  // Pick a "nice" bin width aligned to 1-2-5 multiples of a power of 10
+  const rawWidth = range / targetBins;
+  const mag = Math.pow(10, Math.floor(Math.log10(rawWidth)));
+  const residual = rawWidth / mag;
+  let niceWidth;
+  if (residual <= 1)      niceWidth = mag;
+  else if (residual <= 2) niceWidth = 2 * mag;
+  else if (residual <= 5) niceWidth = 5 * mag;
+  else                    niceWidth = 10 * mag;
+
+  const niceMin = Math.floor(min / niceWidth) * niceWidth;
+  const niceMax = Math.ceil(max / niceWidth) * niceWidth;
+  const numBins = Math.round((niceMax - niceMin) / niceWidth) || 1;
+
+  const counts = new Array(numBins).fill(0);
+  const labels = [];
+  const span = niceWidth;
+  const decimals = span < 1 ? 2 : span < 10 ? 1 : 0;
+
+  for (let i = 0; i < numBins; i++) {
+    const lo = niceMin + i * niceWidth;
+    const hi = lo + niceWidth;
+    labels.push(`${lo.toFixed(decimals)}\u2013${hi.toFixed(decimals)}`);
+  }
+  for (const v of values) {
+    let idx = Math.floor((v - niceMin) / niceWidth);
+    if (idx < 0) idx = 0;
+    if (idx >= numBins) idx = numBins - 1;
+    counts[idx]++;
+  }
+  return { labels, counts };
+}
+
+/**
+ * Build a standalone histogram ECharts option from a labels+counts pair.
+ */
+function buildHistogramOption(labels, counts, opts, colorOffset = 0) {
+  const color = COLORS[colorOffset % COLORS.length];
+  return {
+    tooltip: {
+      trigger: "axis",
+      backgroundColor: "rgba(255,255,255,0.96)",
+      borderColor: "#e2e8f0",
+      borderWidth: 1,
+      textStyle: { color: "#334155", fontSize: 12 },
+      confine: true,
+      formatter: (params) => {
+        const p = params[0];
+        return `<b>${labels[p.dataIndex]}</b><br/>Count: <b>${p.value}</b>`;
+      },
+    },
+    grid: { left: 60, right: 30, top: 30, bottom: 80, containLabel: false },
+    xAxis: {
+      type: "category",
+      data: labels,
+      name: opts.xLabel || "Lead Time (hours)",
+      nameLocation: "middle",
+      nameGap: 52,
+      axisLabel: { rotate: 45, fontSize: 10, color: "#64748b" },
+      axisTick: { alignWithLabel: true },
+    },
+    yAxis: {
+      type: "value",
+      name: opts.yLabel || "Frequency",
+      nameLocation: "middle",
+      nameGap: 50,
+      splitLine: { lineStyle: { type: "dashed", color: "#f1f5f9" } },
+      axisLabel: { fontSize: 11, color: "#64748b" },
+    },
+    dataZoom: [
+      { type: "slider", bottom: 10, height: 20, textStyle: { fontSize: 10 } },
+      { type: "inside" },
+    ],
+    series: [{
+      type: "bar",
+      data: counts,
+      barCategoryGap: "0%",
+      itemStyle: {
+        color,
+        borderColor: "#fff",
+        borderWidth: 1,
+        borderRadius: [2, 2, 0, 0],
+      },
+      emphasis: { itemStyle: { color: COLORS[(colorOffset + 1) % COLORS.length] } },
+    }],
+  };
+}
+
 function buildOption(chartData, overrideType, swapAxes, colorOffset = 0) {
   if (!chartData) return {};
 
@@ -71,6 +172,13 @@ function buildOption(chartData, overrideType, swapAxes, colorOffset = 0) {
   const type = overrideType || chartData.type || "bar";
   const labels = raw.labels || [];
   const datasets = raw.datasets || [];
+
+  // ---- HISTOGRAM (adaptive-bin) ----
+  if (opts.isHistogram) {
+    const ds = datasets[0] || {};
+    const counts = Array.isArray(ds.data) ? ds.data : [];
+    return buildHistogramOption(labels, counts, opts, colorOffset);
+  }
 
   // Tooltip
   const tooltip = {
@@ -353,6 +461,7 @@ const DynamicChart = forwardRef(({
       if (!instance) return null;
       return instance.getDataURL({ type: "png", pixelRatio: 2, backgroundColor: "#fff" });
     },
+    resetZoom: handleResetZoom,
   }));
 
   // NOTE: chart type and axis swap are managed externally by the Dashboard.
@@ -360,21 +469,123 @@ const DynamicChart = forwardRef(({
   const activeType = initialChartType || chartData?.type || "bar";
   const [swapAxes, setSwapAxes] = useState(false);
 
+  // ---- Histogram metadata (for zoom-driven bin recomputation) --------
+  const isHistogram = chartData?.options?.isHistogram === true;
+  const histMetaRef = useRef(null);
+  histMetaRef.current = isHistogram ? (chartData?.options?.histogram ?? null) : null;
+  const colorIndexRef = useRef(colorIndex);
+  colorIndexRef.current = colorIndex;
+  const optsRef = useRef(chartData?.options ?? {});
+  optsRef.current = chartData?.options ?? {};
+
+  // Track current visible value range for progressive zoom
+  const viewRangeRef = useRef(null);   // [min, max] currently displayed
+  const isRecalcRef = useRef(false);   // flag to prevent infinite loop
+
+  // ---- Zoom event handler for histograms (recomputes bins) -----------
+  const onEvents = useMemo(() => {
+    if (!isHistogram) return {};
+    return {
+      datazoom: (params) => {
+        // Skip programmatic updates from our own setOption calls
+        if (isRecalcRef.current) return;
+
+        const meta = histMetaRef.current;
+        if (!meta?.raw_values?.length) return;
+        const instance = chartRef.current?.getEchartsInstance();
+        if (!instance) return;
+
+        const start = params.start ?? 0;
+        const end   = params.end   ?? 100;
+        const windowPct = end - start;
+
+        // Only recompute when the user has meaningfully zoomed in
+        if (windowPct > 50) return;
+
+        // Map zoom percentages → value range from current view
+        const [curMin, curMax] = viewRangeRef.current ?? [meta.data_min, meta.data_max];
+        const viewMin = curMin + (curMax - curMin) * (start / 100);
+        const viewMax = curMin + (curMax - curMin) * (end / 100);
+
+        // Filter raw values to the visible range
+        const visible = meta.raw_values.filter(v => v >= viewMin && v <= viewMax);
+        if (visible.length < 2) return;
+
+        const { labels, counts } = computeNiceBins(visible, 25);
+        if (!labels.length) return;
+
+        // Store the new view range
+        viewRangeRef.current = [viewMin, viewMax];
+
+        // Update chart with recomputed bins and reset zoom to 0–100
+        isRecalcRef.current = true;
+        instance.setOption(
+          {
+            xAxis:  [{ data: labels }],
+            series: [{ data: counts }],
+            dataZoom: [
+              { type: "slider", start: 0, end: 100 },
+              { type: "inside", start: 0, end: 100 },
+            ],
+          },
+          { notMerge: false, lazyUpdate: true }
+        );
+        setTimeout(() => { isRecalcRef.current = false; }, 150);
+      },
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isHistogram]);
+
+  // ---- Reset zoom / zoom-out handler (callable from parent) ----------
+  const handleResetZoom = useCallback(() => {
+    const meta = histMetaRef.current;
+    if (!meta?.raw_values?.length) return;
+    const instance = chartRef.current?.getEchartsInstance();
+    if (!instance) return;
+
+    // Recompute bins for the full data range
+    const { labels, counts } = computeNiceBins(meta.raw_values, 25);
+    viewRangeRef.current = [meta.data_min, meta.data_max];
+
+    isRecalcRef.current = true;
+    instance.setOption(
+      {
+        xAxis:  [{ data: labels }],
+        series: [{ data: counts }],
+        dataZoom: [
+          { type: "slider", start: 0, end: 100 },
+          { type: "inside", start: 0, end: 100 },
+        ],
+      },
+      { notMerge: false, lazyUpdate: true }
+    );
+    setTimeout(() => { isRecalcRef.current = false; }, 150);
+  }, []);
+
+  // Reset view range when chartData changes (e.g. time filter applied)
+  useEffect(() => {
+    const meta = chartData?.options?.histogram;
+    if (meta) {
+      viewRangeRef.current = [meta.data_min, meta.data_max];
+    }
+  }, [chartData]);
+
   // Determine which chart type toggles to show based on the chart's nature
   const supportedTypes = useMemo(() => {
     if (!chartData) return [];
+    if (isHistogram) return []; // histogram has no type switch
     const type = chartData.type || "bar";
     if (type === "pie") return ["pie", "bar"];
     if (type === "heatmap") return ["heatmap"];
     if (type === "scatter") return ["scatter"];
     // For bar/line/area types, allow switching between them
     return ["bar", "line", "area"];
-  }, [chartData]);
+  }, [chartData, isHistogram]);
 
-  // Can swap axes for bar/line/area (not pie, heatmap, scatter)
+  // Can swap axes for bar/line/area (not pie, heatmap, scatter, histogram)
   const canSwapAxes = useMemo(() => {
-    return ["bar", "line", "area"].includes(activeType);
-  }, [activeType]);
+    return !isHistogram && ["bar", "line", "area"].includes(activeType);
+  }, [activeType, isHistogram]);
 
   // Build ECharts option
   const option = useMemo(
@@ -448,6 +659,17 @@ const DynamicChart = forwardRef(({
               ⇆ Swap Axes
             </button>
           )}
+
+          {/* Reset Zoom button (histogram only) */}
+          {isHistogram && (
+            <button
+              onClick={handleResetZoom}
+              className="px-2.5 py-1 text-xs font-medium rounded-lg border bg-white border-slate-200 text-slate-500 hover:border-indigo-200 hover:text-indigo-600 transition-colors"
+              title="Reset zoom to full range"
+            >
+              ↺ Reset Zoom
+            </button>
+          )}
         </div>
       )}
 
@@ -458,6 +680,7 @@ const DynamicChart = forwardRef(({
         style={{ height, width: "100%" }}
         notMerge={true}
         opts={{ renderer: "canvas" }}
+        onEvents={onEvents}
       />
     </div>
   );
