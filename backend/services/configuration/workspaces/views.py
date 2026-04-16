@@ -3,6 +3,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.shortcuts import get_object_or_404
 from django.db.models import Q
+from django.core.paginator import Paginator
 
 from .models import Workspace, Repository
 from .serializers import (
@@ -34,16 +35,51 @@ class WorkspaceListCreateView(APIView):
 
     @workspace_list_schema
     def get(self, request):
-        """List all workspaces of the user."""
+        """List all workspaces of the user with optional pagination and filtering."""
         if not request.user_id:
             return Response(
                 {"error": "Authentication required"},
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 
-        workspaces = Workspace.objects.filter(user=request.user_id)
-        serializer = WorkspaceListSerializer(workspaces, many=True)
-        return Response(serializer.data)
+        queryset = Workspace.objects.filter(user=request.user_id)
+
+        # Filter by platform
+        platform = request.query_params.get("platform")
+        if platform:
+            queryset = queryset.filter(platform=platform)
+
+        # Filter by date range
+        date_from = request.query_params.get("date_from")
+        if date_from:
+            queryset = queryset.filter(created_at__date__gte=date_from)
+
+        date_to = request.query_params.get("date_to")
+        if date_to:
+            queryset = queryset.filter(created_at__date__lte=date_to)
+
+        # Search by name
+        search = request.query_params.get("search")
+        if search:
+            queryset = queryset.filter(name__icontains=search)
+
+        total = queryset.count()
+
+        # Pagination
+        page_size = int(request.query_params.get("page_size", 20))
+        page = int(request.query_params.get("page", 1))
+        paginator = Paginator(queryset, page_size)
+        page_obj = paginator.get_page(page)
+
+        serializer = WorkspaceListSerializer(page_obj.object_list, many=True)
+        return Response({
+            "results": serializer.data,
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+            "num_pages": paginator.num_pages,
+            "has_next": page_obj.has_next(),
+        })
 
     @workspace_create_schema
     def post(self, request):
@@ -359,3 +395,50 @@ class RepositoryDetailView(APIView):
         )
         repository.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class AllRepositoriesView(APIView):
+    """List all repositories across all workspaces for the authenticated user."""
+
+    def get(self, request):
+        if not request.user_id:
+            return Response(
+                {"error": "Authentication required"},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        queryset = Repository.objects.filter(workspace__user=request.user_id).select_related("workspace")
+
+        # Filter by platform (via workspace)
+        platform = request.query_params.get("platform")
+        if platform:
+            queryset = queryset.filter(workspace__platform=platform)
+
+        # Filter by workspace
+        workspace_id = request.query_params.get("workspace_id")
+        if workspace_id:
+            queryset = queryset.filter(workspace_id=workspace_id)
+
+        # Search by name
+        search = request.query_params.get("search")
+        if search:
+            queryset = queryset.filter(
+                Q(name__icontains=search) | Q(full_name__icontains=search)
+            )
+
+        total = queryset.count()
+
+        page_size = int(request.query_params.get("page_size", 20))
+        page = int(request.query_params.get("page", 1))
+        paginator = Paginator(queryset, page_size)
+        page_obj = paginator.get_page(page)
+
+        serializer = RepositorySerializer(page_obj.object_list, many=True)
+        return Response({
+            "results": serializer.data,
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+            "num_pages": paginator.num_pages,
+            "has_next": page_obj.has_next(),
+        })

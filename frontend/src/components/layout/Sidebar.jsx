@@ -53,7 +53,7 @@ const Sidebar = () => {
       id: "home",
       icon: Home,
       label: "Home",
-      subItems: ["Getting started guide"],
+      path: "/",
     },
     {
       id: "dataSources",
@@ -65,7 +65,7 @@ const Sidebar = () => {
       id: "collection",
       icon: Grid3x3,
       label: "Collection",
-      subItems: ["Manual Collect", "Intelligent collect", "Plan validation"],
+      subItems: ["Manual Collect", "Intelligent collect"],
     },
     {
       id: "dataManagement",
@@ -89,24 +89,45 @@ const Sidebar = () => {
       id: "help",
       icon: HelpCircle,
       label: "Help",
-      subItems: ["FAQs", "Contact Support"],
+      subItems: ["Get started",  "FAQs"],
     },
   ];
 
   const handleSubItemClick = (e, subItem) => {
     e.preventDefault();
-    if (subItem === "Data Cleaning") {
-      navigate("/data-cleaning");
-    } else if (subItem === "Workspaces") {
-      navigate("/workspaces");
-    } else if (subItem === "New Analysis") {
-      navigate("/analysis/new");
-    } else if (subItem === "History") {
-      navigate("/analysis/history");
-    } else if (subItem === "Dashboard") {
-      navigate("/analysis");
-    } else if (subItem === "Profile") {
-      navigate("/profile");
+    switch (subItem) {
+      case "Workspaces":
+        navigate("/workspaces");
+        break;
+      case "Projects":
+        navigate("/projects");
+        break;
+      case "Data Cleaning":
+        navigate("/data-cleaning");
+        break;
+      case "New Analysis":
+        navigate("/analysis/new");
+        break;
+      case "History":
+        navigate("/analysis/history");
+        break;
+      case "Export collect results":
+        navigate("/data-cleaning");
+        break;
+      case "Security & Permissions":
+        navigate("/settings");
+        break;
+      case "Profile":
+        navigate("/profile");
+        break;
+      case "Get started":
+        navigate("/help/get-started");
+        break;
+      case "FAQs":
+        navigate("/help/faqs");
+        break;
+      default:
+        break;
     }
   };
 
@@ -130,7 +151,7 @@ const Sidebar = () => {
         )}
         <button
           onClick={() => setIsOpen(!isOpen)}
-          className="p-1 hover:bg-gray-100 rounded transition"
+          className="p-1 hover:bg-gray-100 rounded transition cursor-pointer"
         >
           <Menu className="w-5 h-5 text-gray-600" />
         </button>
@@ -141,14 +162,15 @@ const Sidebar = () => {
         {menuItems.map((item) => {
           const Icon = item.icon;
           const isExpanded = expandedSections[item.id];
-
+          const hasSubItems = item.subItems && item.subItems.length > 0;
           return (
             <div key={item.id} className="mb-1">
               <button
-                onClick={() => toggleSection(item.id)}
-                className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-gray-50 transition group"
+                onClick={() => item.path ? navigate(item.path) : toggleSection(item.id)}
+                className={`w-full flex items-center justify-between px-4 py-2.5 hover:bg-gray-50 transition group cursor-pointer`}
                 title={!isOpen ? item.label : ""}
               >
+
                 <div className="flex items-center gap-3">
                   <Icon className="w-5 h-5 text-gray-600" />
                   {isOpen && (
@@ -157,7 +179,7 @@ const Sidebar = () => {
                     </span>
                   )}
                 </div>
-                {isOpen && (
+                {isOpen && hasSubItems && (
                   <div>
                     {isExpanded ? (
                       <ChevronDown className="w-4 h-4 text-gray-400" />

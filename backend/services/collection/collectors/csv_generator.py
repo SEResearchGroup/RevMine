@@ -1296,6 +1296,7 @@ def get_platform_adapter(platform: str) -> PlatformAdapter:
     return adapter_class()
 
 
+
 class StatisticsCSVGenerator:
     """
     Generate project statistics CSV with metrics per PR/MR.
@@ -1304,7 +1305,6 @@ class StatisticsCSVGenerator:
     MetricsCalculator for pure metric calculations.
     """
 
-    # All available features with their internal column names
     ALL_FEATURES = [
         "Creation_Date",
         "Lead_Time",
@@ -1312,6 +1312,7 @@ class StatisticsCSVGenerator:
         "#Commits",
         "Mean_Time_between_commits",
         "Commiters",
+        "Commiter_Names",
         "#UniqueCommiters",
         "nb_minor_author",
         "nb_major_author",
@@ -1338,495 +1339,264 @@ class StatisticsCSVGenerator:
     def __init__(self, platform: str):
         self.platform = platform
         self.extractor = get_data_extractor(platform)
-        self.adapter = get_platform_adapter(platform)  # Keep for compatibility
+        self.adapter = get_platform_adapter(platform)
         self.item_key = self.extractor.get_item_key()
         self.item_id_column = "PR_ID" if platform == "github" else "MR_ID"
         self.initial_size_column = (
             "initial_pr_size" if platform == "github" else "initial_mr_size"
         )
 
+    # =========================================================================
+    # PUBLIC API
+    # =========================================================================
+
     def generate_statistics_csv(
-        self, data: dict, collection_plan, selected_features: List[str] = None
+        self,
+        data: dict,
+        collection_plan,
+        selected_features: Optional[List[str]] = None,
     ) -> str:
         """
-        Generate statistics CSV with metrics per PR/MR.
+        Generate statistics CSV with one row per PR/MR.
 
         Args:
-            data: The filtered PR/MR data
-            collection_plan: The collection plan with repository info
-            selected_features: Optional list of feature IDs to include.
-                             If None or empty, all features are included.
+            data: Filtered PR/MR data dict.
+            collection_plan: Collection plan with repository info.
+            selected_features: Feature IDs to include; None/empty → all features.
+
+        Returns:
+            CSV content as a string.
         """
         items = data.get(self.item_key, [])
-        
-        # Extract project creation date from collected data (stored by collectors)
-        project_created_at_str = data.get('project_created_at')
-        project_created_at = DataExtractor.parse_iso_date(project_created_at_str)
-        
+        project_created_at = DataExtractor.parse_iso_date(
+            data.get("project_created_at")
+        )
+
+        headers = self._build_headers(selected_features)
+
         output = io.StringIO()
-
-        # Build headers based on selected features
-        # Always include Project_ID and item ID column
-        base_headers = ["Project_ID", self.item_id_column]
-
-        # All feature headers (with dynamic column name for initial_size)
-        all_feature_headers = [
-            "Creation_Date",
-            "Lead_Time",
-            "#Discussions",
-            "#Commits",
-            "Mean_Time_between_commits",
-            "Commiters",
-            "#UniqueCommiters",
-            "nb_minor_author",
-            "nb_major_author",
-            "delta_time",
-            "churn_addition",
-            "churn_deletions",
-            self.initial_size_column,
-            "hist_entropy",
-            "modified_files",
-            "filetypes",
-            "state",
-            "rework_size",
-            "Author",
-            "Reviewers",
-            "#people",
-            "#reviewers",
-            "#commiters",
-            "#discussionners",
-            "additions",
-            "deletions",
-            "comments",
-        ]
-
-        # Feature ID to header mapping (handle initial_size special case)
-        feature_to_header = {f: f for f in self.ALL_FEATURES}
-        feature_to_header["initial_size"] = self.initial_size_column
-
-        # Filter headers based on selected features
-        if selected_features:
-            feature_headers = []
-            for feature in self.ALL_FEATURES:
-                if feature in selected_features:
-                    feature_headers.append(feature_to_header[feature])
-        else:
-            # If no selection, include all features
-            feature_headers = all_feature_headers
-
-        headers = base_headers + feature_headers
-
         writer = csv.DictWriter(output, fieldnames=headers)
         writer.writeheader()
 
         for item in items:
             full_row = self._build_row(item, collection_plan, project_created_at)
-            # Filter row to only include selected headers
-            row = {k: v for k, v in full_row.items() if k in headers}
-            writer.writerow(row)
+            filtered_row = {k: v for k, v in full_row.items() if k in headers}
+            writer.writerow(filtered_row)
 
         return output.getvalue()
-    
-    def _build_row(self, item: dict, collection_plan, project_created_at=None) -> dict:
-        """
-        Build a single row using DataExtractor for extraction
-        and MetricsCalculator for calculations.
-        """
+
+    # =========================================================================
+    # HEADER HELPERS
+    # =========================================================================
+
+    def _build_headers(self, selected_features: Optional[List[str]]) -> List[str]:
+        base = ["Project_ID", self.item_id_column]
+        feature_to_header = {f: f for f in self.ALL_FEATURES}
+        feature_to_header["initial_size"] = self.initial_size_column
+
+        if selected_features:
+            feature_headers = [
+                feature_to_header[f]
+                for f in self.ALL_FEATURES
+                if f in selected_features
+            ]
+        else:
+            feature_headers = [feature_to_header[f] for f in self.ALL_FEATURES]
+
+        return base + feature_headers
+
+    # =========================================================================
+    # ROW BUILDER
+    # =========================================================================
+
+    def _build_row(
+        self, item: dict, collection_plan, project_created_at=None
+    ) -> dict:
+        """Build one CSV row for a single PR/MR item."""
+        print(f"Building row for item ID: {self.adapter.get_item_id(item.get('details', {}))}")
         details = item.get("details", {})
         commits = self.extractor.get_commits(item)
 
-        # =====================================================================
-        # STEP 1: DATA EXTRACTION (using DataExtractor)
-        # =====================================================================
-
-        # Basic item info
-        item_id = self.extractor.get_item_id(details)
-        state = self.extractor.get_state(details)
+        # --- Dates -----------------------------------------------------------
         created_at_str = self.extractor.get_created_at(details)
         closed_at_str = self.extractor.get_closed_at(
             details
         ) or self.extractor.get_merged_at(details)
-
-        # Parse dates
         created_at = DataExtractor.parse_iso_date(created_at_str)
         closed_at = DataExtractor.parse_iso_date(closed_at_str)
 
-        # Extract commit dates for time-based metrics
-        commit_dates = []
-        for commit in commits:
-            date_str = self.extractor.get_commit_date(commit)
-            parsed_date = DataExtractor.parse_iso_date(date_str)
-            if parsed_date:
-                commit_dates.append(parsed_date)
+        author = self._extract_author(details)
 
-        # Extract commit author counts
-        author_counts = {}
-        for commit in commits:
-            author = self.extractor.get_commit_author_name(commit)
-            if author:
-                author_counts[author] = author_counts.get(author, 0) + 1
-        committers = set(author_counts.keys())
+        # "Commiters" column = set of author names found in each commit's details.
+        # "#UniqueCommiters" counts unique logins/usernames for deduplication.
+        committer_names, committer_logins, author_counts = self._extract_committers(
+            commits
+        )
 
-        # Extract commit churn (additions/deletions per commit)
+        # --- Files & churn ---------------------------------------------------
+        files = self.extractor.get_files(item)
+        file_changes = [
+            self.extractor.get_file_additions(f) + self.extractor.get_file_deletions(f)
+            for f in files
+        ]
         commit_additions = [self.extractor.get_commit_additions(c) for c in commits]
         commit_deletions = [self.extractor.get_commit_deletions(c) for c in commits]
 
-        # Extract files and file-level changes
-        files = self.extractor.get_files(item)
-        file_changes = []
-        for f in files:
-            adds = self.extractor.get_file_additions(f)
-            dels = self.extractor.get_file_deletions(f)
-            file_changes.append(adds + dels)
-
-        # Extract PR/MR level additions/deletions (from details)
+        # --- PR/MR-level additions/deletions ---------------------------------
         if self.platform == "github":
             additions = self.extractor.get_pr_additions(details)
             deletions = self.extractor.get_pr_deletions(details)
         else:
-            # For GitLab, sum from files or use 0
             additions = sum(self.extractor.get_file_additions(f) for f in files)
             deletions = sum(self.extractor.get_file_deletions(f) for f in files)
 
-        # Extract reviewers and discussioners (using adapter for now)
+        # --- Social data -----------------------------------------------------
         reviewers = self.adapter.get_reviewers(item)
         discussioners = self.adapter.get_discussioners(item)
         discussions_count = self.adapter.get_discussions_count(item)
-
-        # Extract first review date (boundary between initial_size and rework)
-        first_review_date_str = self.extractor.get_first_review_date(item)
-        first_review_date = DataExtractor.parse_iso_date(first_review_date_str)
-
-        # Count human comments (non-system notes/review-comments)
         nb_comments = self.extractor.count_human_comments(item)
 
-        # Count review comments with suggestions (for rework estimation)
-        review_comment_count = 0
-        diff_note_count = 0
+        # --- First review date (rework boundary) -----------------------------
+        first_review_date = DataExtractor.parse_iso_date(
+            self.extractor.get_first_review_date(item)
+        )
 
-        # GitHub: check review_comments
-        for rc in item.get("review_comments", []):
-            body = rc.get("body", "")
-            if "suggestion" in body.lower() or "```" in body:
-                review_comment_count += 1
+        # --- Commit dates ----------------------------------------------------
+        commit_dates = [
+            DataExtractor.parse_iso_date(self.extractor.get_commit_date(c))
+            for c in commits
+        ]
+        commit_dates = [d for d in commit_dates if d]
 
-        # GitLab: check diff notes
-        for discussion in item.get("discussions", []):
-            for note in discussion.get("notes", []):
-                if note.get("type") == "DiffNote":
-                    diff_note_count += 1
-
-        # =====================================================================
-        # STEP 2: METRICS CALCULATION (using MetricsCalculator)
-        # =====================================================================
-
-        # Lead time
+        # --- Metrics ---------------------------------------------------------
         lead_time = MetricsCalculator.calculate_lead_time(created_at, closed_at)
-
-        # Mean time between commits
         mean_time_commits = MetricsCalculator.calculate_mean_time_between_commits(
             commit_dates
         )
-
-        # Author contributions (minor/major)
-        nb_minor, nb_major = MetricsCalculator.calculate_author_contributions(author_counts)
-        
-        # Delta time (days between project creation and MR/PR creation)
-        delta_time = MetricsCalculator.calculate_delta_time(created_at, project_created_at)
-        
-        # Churn = sum of all commit-level additions + deletions (not MR net diff)
-        churn_add, churn_del = MetricsCalculator.calculate_churn(commit_additions, commit_deletions)
-        
-        # Entropy (file change distribution)
+        nb_minor, nb_major = MetricsCalculator.calculate_author_contributions(
+            author_counts
+        )
+        delta_time = MetricsCalculator.calculate_delta_time(
+            created_at, project_created_at
+        )
+        churn_add, churn_del = MetricsCalculator.calculate_churn(
+            commit_additions, commit_deletions
+        )
         hist_entropy = MetricsCalculator.calculate_entropy(file_changes)
-        
-        # Rework size: commits AFTER first review comment (not after MR creation)
         rework_size = MetricsCalculator.calculate_rework_size(
             commits, first_review_date, self.extractor
         )
-        
-        # =====================================================================
-        # STEP 3: BUILD OUTPUT ROW
-        # =====================================================================
-        
-        # initial_size: lines changed in commits BEFORE the MR/PR creation.
-        # If created_at is unknown, all commits count as initial_size.
-        initial_add = 0
-        initial_del = 0
-        for commit in commits:
-            commit_date_str = self.extractor.get_commit_date(commit)
-            commit_date = DataExtractor.parse_iso_date(commit_date_str)
-            if commit_date is None:
-                continue
-            # Boundary: commits authored before or at MR creation
-            if created_at is None or commit_date <= created_at:
-                initial_add += self.extractor.get_commit_additions(commit)
-                initial_del += self.extractor.get_commit_deletions(commit)
-        initial_size = initial_add + initial_del
-        
-        modified_files_count = len(files)
-        filetypes = self._count_filetypes(files)
-        
-        # Count unique people involved: union(reviewers, committers, discussioners)
-        # The MR author is already in committers (they pushed at least one commit).
-        people = set(committers)
-        people.update(reviewers)
-        people.update(discussioners)
-        people_count = len(people)
 
-        # Handle open PRs/MRs
-        if state in ["opened", "open"]:
-            lead_time_display = "open"
-        else:
-            lead_time_display = lead_time if lead_time else 0
+        # --- Initial size (commits up to MR creation) ------------------------
+        initial_size = self._calculate_initial_size(commits, created_at)
+
+        # --- People count ----------------------------------------------------
+        people = set(committer_logins) | set(reviewers) | set(discussioners)
+
+        # --- Lead time display -----------------------------------------------
+        state = self.extractor.get_state(details)
+        lead_time_display = (
+            "open" if state in ("opened", "open") else (lead_time or 0)
+        )
 
         return {
             "Project_ID": collection_plan.repository_id,
-            self.item_id_column: item_id,
-            'Creation_Date': created_at_str or '',
-            'Lead_Time': lead_time_display,
-            '#Discussions': discussions_count,
-            '#Commits': len(commits),
-            'Mean_Time_between_commits': mean_time_commits,
-            'Commiters': ', '.join(sorted(committers)) if committers else '',
-            '#UniqueCommiters': len(committers),
-            'nb_minor_author': nb_minor,
-            'nb_major_author': nb_major,
-            'delta_time': delta_time,
-            'churn_addition': churn_add,
-            'churn_deletions': churn_del,
+            self.item_id_column: self.extractor.get_item_id(details),
+            "Creation_Date": created_at_str or "",
+            "Lead_Time": lead_time_display,
+            "#Discussions": discussions_count,
+            "#Commits": len(commits),
+            "Mean_Time_between_commits": mean_time_commits,
+            # Commiter_Names kept for backward-compat; Commiters = same display names
+            "Commiters": ", ".join(sorted(committer_names)) if committer_names else "",
+            "Commiter_Names": ", ".join(sorted(committer_names)) if committer_names else "",
+            "#UniqueCommiters": len(committer_logins),
+            "nb_minor_author": nb_minor,
+            "nb_major_author": nb_major,
+            "delta_time": delta_time,
+            "churn_addition": churn_add,
+            "churn_deletions": churn_del,
             self.initial_size_column: initial_size,
-            'hist_entropy': hist_entropy,
-            'modified_files': modified_files_count,
-            'filetypes': filetypes,
-            'state': state,
-            'rework_size': rework_size,
-            'Author': self.extractor.get_author(details),
-            'Reviewers': ', '.join(sorted(reviewers)) if reviewers else '',
-            '#people': people_count,
-            '#reviewers': len(reviewers),
-            '#commiters': len(committers),
-            '#discussionners': len(discussioners),
-            'additions': additions,
-            'deletions': deletions,
-            'comments': nb_comments
+            "hist_entropy": hist_entropy,
+            "modified_files": len(files),
+            "filetypes": self._count_filetypes(files),
+            "state": state,
+            "rework_size": rework_size,
+            "Author": author,
+            "Reviewers": ", ".join(sorted(reviewers)) if reviewers else "",
+            "#people": len(people),
+            "#reviewers": len(reviewers),
+            "#commiters": len(committer_logins),
+            "#discussionners": len(discussioners),
+            "additions": additions,
+            "deletions": deletions,
+            "comments": nb_comments,
         }
 
-    def _parse_date(self, date_str: str):
-        """Parse ISO date string"""
-        if not date_str:
-            return None
-        try:
-            return datetime.fromisoformat(date_str.replace("Z", "+00:00"))
-        except:
-            return None
+    # =========================================================================
+    # EXTRACTION HELPERS
+    # =========================================================================
 
-    def _calculate_lead_time(self, created_at, closed_at):
+    def _extract_author(self, details: dict) -> str:
         """
-        Calculate lead time in MINUTES.
-        Lead Time = temps entre création et merge/close du PR/MR
-        Retourne en minutes
-        """
-        if not created_at or not closed_at:
-            return 0
-        delta = closed_at - created_at
-        return round(delta.total_seconds() / 60, 2)
-    
-    def _calculate_mean_time_between_commits(self, commits: List):
-        """Calculate mean time between commits in seconds"""
-        if len(commits) < 2:
-            return 0
+        Return the PR/MR author identifier.
 
-        dates = []
+        - GitLab: details['author']['username']
+        - GitHub: details['user']['login']
+        Falls back to empty string if missing.
+        """
+        if self.platform == "gitlab":
+            author_obj = details.get("author") or {}
+            return author_obj.get("username", "")
+        # GitHub stores the PR author in the 'user' field
+        user_obj = details.get("user") or {}
+        return user_obj.get("login", "")
+
+    def _extract_committers(self, commits: list) -> tuple[set, set, dict]:
+        """
+        Return (committer_names, committer_logins, author_counts).
+
+        committer_names  – display names from commit author_name (used in "Commiters" column)
+        committer_logins – unique login/username identifiers   (used for #UniqueCommiters)
+        author_counts    – login → commit count                (used for minor/major split)
+        """
+        committer_names: set = set()
+        committer_logins: set = set()
+        author_counts: dict = {}
+
         for commit in commits:
-            date_str = self.adapter.get_commit_date(commit)
-            if date_str:
-                try:
-                    dates.append(
-                        datetime.fromisoformat(date_str.replace("Z", "+00:00"))
-                    )
-                except:
-                    pass
+            name = self.extractor.get_commit_author_name(commit)
+            login = self.extractor.get_commit_author_login(commit)
 
-        if len(dates) < 2:
-            return 0
+            if name:
+                committer_names.add(name)
 
-        dates.sort()
-        time_diffs = [
-            (dates[i + 1] - dates[i]).total_seconds() for i in range(len(dates) - 1)
-        ]
-        return round(sum(time_diffs) / len(time_diffs), 2)
+            key = login or name
+            if key:
+                committer_logins.add(key)
+                author_counts[key] = author_counts.get(key, 0) + 1
 
-    def _get_committers(self, commits: List) -> set:
-        """Get unique committers"""
-        committers = set()
+        return committer_names, committer_logins, author_counts
+
+    def _calculate_initial_size(self, commits: list, created_at) -> int:
+        """Lines changed in commits authored before or at MR/PR creation."""
+        total = 0
         for commit in commits:
-            author = self.adapter.get_commit_author(commit)
-            if author:
-                committers.add(author)
-        return committers
-
-    def _calculate_author_contributions(self, commits: List) -> tuple:
-        """
-        Calculate minor and major author counts.
-        Major author: contributed > 5% of commits
-        Minor author: contributed <= 5% of commits
-        """
-        if not commits:
-            return 0, 0
-
-        author_counts = {}
-        for commit in commits:
-            author = self.adapter.get_commit_author(commit)
-            if author:
-                author_counts[author] = author_counts.get(author, 0) + 1
-
-        total_commits = len(commits)
-        if total_commits == 0:
-            return 0, 0
-
-        nb_minor = 0
-        nb_major = 0
-
-        for author, count in author_counts.items():
-            contribution_pct = count / total_commits
-            if contribution_pct > 0.05:
-                nb_major += 1
-            else:
-                nb_minor += 1
-
-        return nb_minor, nb_major
-    
-    def _calculate_delta_time(self, created_at, project_created_at=None) -> float:
-        """
-        Calculate delta time:
-        Days between the project creation date and the MR/PR creation date.
-        """
-        if not created_at:
-            return 0.0
-        
-        if project_created_at:
-            delta = created_at - project_created_at
-            return round(delta.total_seconds() / 86400, 6)
-        
-        # Fallback: days since epoch
-        if created_at.tzinfo is None:
-            created_at = created_at.replace(tzinfo=timezone.utc)
-        epoch = datetime(1970, 1, 1, tzinfo=timezone.utc)
-        delta = created_at - epoch
-        return round(delta.total_seconds() / 86400, 6)
-    
-    def _calculate_churn(self, item: dict) -> tuple:
-        """
-        Calculate churn (CORRIGÉ):
-        Utilise directement les totaux du MR/PR au lieu des commits individuels.
-        Churn = total des lignes ajoutées et supprimées dans le MR/PR.
-        """
-        details = item.get("details", {})
-
-        # Utiliser les totaux du MR/PR directement via l'adapter
-        additions = self.adapter.get_additions(details)
-        deletions = self.adapter.get_deletions(details)
-
-        # Si pas de données au niveau MR, essayer de les calculer des commits
-        if additions == 0 and deletions == 0:
-            for commit in item.get("commits", []):
-                # Essayer d'obtenir les stats du commit
-                commit_details = commit.get("details", {})
-                stats = commit_details.get("stats", {})
-                if stats:
-                    additions += stats.get("additions", 0) or 0
-                    deletions += stats.get("deletions", 0) or 0
-
-                # Essayer le format 'changes'
-                changes = commit.get("changes", [])
-                for change in changes:
-                    additions += change.get("additions", 0) or 0
-                    deletions += change.get("deletions", 0) or 0
-
-        return float(additions), float(deletions)
-
-    def _count_filetypes(self, files: List) -> int:
-        """Count unique file types/extensions"""
-        extensions = set()
-        for file in files:
-            filename = self.extractor.get_file_name(file)
-            if "." in filename:
-                ext = filename.rsplit(".", 1)[-1].lower()
-                extensions.add(ext)
-        return len(extensions)
-
-    def _calculate_entropy(self, files: List) -> float:
-        """
-        Calculate historical entropy based on file modifications.
-        Uses Shannon entropy formula on file change distribution.
-        H = -Σ(p * log2(p)) où p = changements_fichier / total_changements
-        """
-        if not files:
-            return 0.0
-
-        # Get changes per file
-        changes = []
-        for file in files:
-            file_changes = (file.get("additions", 0) or 0) + (
-                file.get("deletions", 0) or 0
+            commit_date = DataExtractor.parse_iso_date(
+                self.extractor.get_commit_date(commit)
             )
-            if file_changes > 0:
-                changes.append(file_changes)
+            if commit_date is None:
+                continue
+            if created_at is None or commit_date <= created_at:
+                total += self.extractor.get_commit_additions(commit)
+                total += self.extractor.get_commit_deletions(commit)
+        return total
 
-        if not changes:
-            return 0.0
-
-        total = sum(changes)
-        if total == 0:
-            return 0.0
-
-        # Shannon entropy formula
-        entropy = 0.0
-        for c in changes:
-            if c > 0:
-                p = c / total
-                entropy -= p * math.log2(p)
-
-        return round(entropy, 6)
-    
-    def _calculate_rework_size(self, item: dict, first_review_date=None) -> float:
-        """
-        Calculate rework size:
-        Lines changed in commits authored AFTER the first human review comment.
-        Kept for backward-compatibility with callers outside _build_row.
-        """
-        if not first_review_date:
-            return 0.0
-
-        commits = self.extractor.get_commits(item)
-        rework = 0
-        for commit in commits:
-            commit_date_str = self.extractor.get_commit_date(commit)
-            commit_date = DataExtractor.parse_iso_date(commit_date_str)
-            if commit_date and commit_date > first_review_date:
-                rework += self.extractor.get_commit_additions(commit)
-                rework += self.extractor.get_commit_deletions(commit)
-        return float(rework)
-    
-    def _count_unique_people(self, item: dict, committers: set, discussioners: set) -> int:
-        """Count total unique people involved in the MR/PR"""
-        people = set()
-
-        # Add committers
-        people.update(committers)
-
-        # Add discussioners
-        people.update(discussioners)
-
-        # Add author using adapter
-        details = item.get("details", {})
-        author = self.adapter.get_author(details)
-        if author:
-            people.add(author)
-
-        # Add reviewers
-        reviewers = self.adapter.get_reviewers(item)
-        people.update(reviewers)
-
-        return len(people)
+    def _count_filetypes(self, files: list) -> int:
+        """Count unique file extensions across all changed files."""
+        extensions = {
+            self.extractor.get_file_name(f).rsplit(".", 1)[-1].lower()
+            for f in files
+            if "." in self.extractor.get_file_name(f)
+        }
+        return len(extensions)

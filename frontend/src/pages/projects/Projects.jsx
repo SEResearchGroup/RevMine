@@ -15,13 +15,12 @@ import {
   Search,
   Settings,
   ArrowLeft,
-  Star,
-  GitFork,
   Plus,
 } from "lucide-react";
 import { workspaceService } from "../../services/api";
 import WorkspaceModal from "../../components/workspaces/WorkspaceModal";
 import ImportRepositoriesModal from "../../components/workspaces/ImportRepositoriesModal";
+import RepositoryCard from "../../components/repositories/RepositoryCard";
 
 function Projects() {
   const { id } = useParams();
@@ -56,10 +55,10 @@ function Projects() {
   );
 
   const getTimeDiff = (date) => {
+    if (!date) return "";
     const now = new Date();
     const past = new Date(date);
     const diffInDays = Math.floor((now - past) / (1000 * 60 * 60 * 24));
-
     if (diffInDays === 0) return "today";
     if (diffInDays === 1) return "yesterday";
     if (diffInDays < 7) return `${diffInDays} days ago`;
@@ -215,57 +214,13 @@ function Projects() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5">
             {filteredRepositories.map((repo) => (
-              <div
+              <RepositoryCard
                 key={repo.id}
+                repo={repo}
+                platform={workspace.platform}
                 onClick={() => handleRepositoryClick(repo.id)}
-                className="bg-white rounded-xl border border-gray-200 p-4 sm:p-5 hover:shadow-lg transition-shadow cursor-pointer"
-              >
-                <div className="flex items-start gap-3 mb-4">
-                  <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gray-100 rounded-full flex items-center justify-center shrink-0">
-                    <FolderGit2 className="w-5 h-5 sm:w-6 sm:h-6 text-gray-600" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-sm sm:text-base text-gray-900 truncate">
-                      {repo.name}
-                    </h3>
-                  </div>
-                </div>
-
-                <p className="text-gray-600 text-xs sm:text-sm mb-4 line-clamp-2 min-h-[2.5rem]">
-                  {repo.description || "No description provided."}
-                </p>
-
-                <div className="space-y-2 text-xs sm:text-sm text-gray-600">
-                  {repo.language && (
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-                      <span>{repo.language}</span>
-                    </div>
-                  )}
-
-                  <div className="flex items-center gap-4">
-                    {repo.stars_count !== undefined && (
-                      <div className="flex items-center gap-1">
-                        <Star className="w-4 h-4" />
-                        <span>{repo.stars_count}</span>
-                      </div>
-                    )}
-                    {repo.forks_count !== undefined && (
-                      <div className="flex items-center gap-1">
-                        <GitFork className="w-4 h-4" />
-                        <span>{repo.forks_count}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <Clock className="w-4 h-4 shrink-0" />
-                    <span className="truncate">
-                      Updated {getTimeDiff(repo.updated_at)}
-                    </span>
-                  </div>
-                </div>
-              </div>
+                onCollect={() => handleRepositoryClick(repo.id)}
+              />
             ))}
           </div>
         )}

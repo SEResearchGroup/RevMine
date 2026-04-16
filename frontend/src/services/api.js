@@ -174,8 +174,8 @@ export const authService = {
 };
 
 export const workspaceService = {
-  getAll: () => {
-    return workspaceApi.get("/");
+  getAll: (params = {}) => {
+    return workspaceApi.get("/", { params });
   },
 
   getById: (id) => {
@@ -208,6 +208,10 @@ export const workspaceService = {
 
   getRepositories: (workspaceId) => {
     return workspaceApi.get(`/${workspaceId}/repositories/`);
+  },
+
+  getAllRepositories: (params = {}) => {
+    return workspaceApi.get("/repositories/all/", { params });
   },
 };
 

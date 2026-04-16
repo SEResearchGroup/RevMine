@@ -7,6 +7,7 @@ import ProtectedRoute from "./ProtectedRoute";
 import LayoutAuth from "../components/layout/LayoutAuth";
 import LayoutPublic from "../components/layout/LayoutPublic";
 import Projects from "../pages/projects/Projects";
+import AllProjects from "../pages/projects/AllProjects";
 import ProjectDetail from "../pages/collection/ProjectDetail";
 import CollectionProgress from "../pages/collection/CollectionProgress";
 import CollectionResults from "../pages/collection/CollectionResults";
@@ -21,6 +22,9 @@ import {
   GoogleCallback,
 } from "../pages/auth/OAuthCallbacks";
 import Profile from "../pages/profile/Profile";
+import Settings from "../pages/Settings";
+import GetStarted from "../pages/help/GetStarted";
+import Faq from "../pages/help/Faq";
 
 // Analysis Pages
 import DatasetSelectionPage from "../pages/Analysis/DatasetSelectionPage";
@@ -58,7 +62,11 @@ const AppRoutes = () => {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/workspaces" element={<Workspaces />} />
         <Route path="/workspaces/:id" element={<Projects />} />
+        <Route path="/projects" element={<AllProjects />} />
         <Route path="/data-cleaning" element={<DataCleaningList />} />
+        <Route path="/settings" element={<Settings />} />
+        <Route path="/help/get-started" element={<GetStarted />} />
+        <Route path="/help/faqs" element={<Faq />} />
         <Route path="/external/collection/:collectionId" element={<ExternalCollectionDetail />} />
         <Route path="/external/collection/:collectionId/cleaned-data/new" element={<DataCleaning />} />
         <Route path="/external/collection/:collectionId/cleaned-data/:cleanedDataId" element={<CleaningDetail />} />

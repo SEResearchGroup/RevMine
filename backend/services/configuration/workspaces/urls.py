@@ -8,9 +8,16 @@ from .views import (
     RepositoryListView,
     RepositoryDetailView,
     WorkspaceTokenView,
+    AllRepositoriesView,
 )
 
 urlpatterns = [
+    # ===== All Repositories (across workspaces) =====
+    path(
+        "workspaces/repositories/all/",
+        AllRepositoriesView.as_view(),
+        name="all-repositories",
+    ),
     # ===== Workspaces =====
     path(
         "workspaces/", WorkspaceListCreateView.as_view(), name="workspace-list-create"

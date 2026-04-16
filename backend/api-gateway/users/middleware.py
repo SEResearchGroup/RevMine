@@ -37,7 +37,8 @@ class ServiceProxyMiddleware:
         self.collection_service_url = getattr(
             settings,
             "COLLECTION_SERVICE_URL",
-            "http://collection-service:8002/api/collections",
+            # "http://collection-service:8002/api/collections",
+            "http://localhost:8002/api/collections",
         )
 
         self.analyze_service_url = getattr(

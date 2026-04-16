@@ -4,10 +4,12 @@ import { authService } from "../../services/api";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../hooks/useAuth";
 import NotificationDropdown from "../ui/NotificationDropdown";
+import WorkspaceModal from "../workspaces/WorkspaceModal";
 
 const NavbarAuth = () => {
   const [userInformation, setUserInformation] = useState({});
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [showWorkspaceModal, setShowWorkspaceModal] = useState(false);
   const dropdownRef = useRef(null);
 
   const navigate = useNavigate();
@@ -42,6 +44,7 @@ const NavbarAuth = () => {
   };
 
   return (
+    <>
     <nav className="flex items-center justify-between px-3 sm:px-6 py-3 bg-white border-b border-gray-200">
       {/* Search - Hidden on small screens */}
       <div className="hidden md:flex flex-1 max-w-xl mx-auto">
@@ -63,7 +66,7 @@ const NavbarAuth = () => {
       {/* Right side actions */}
       <div className="flex items-center gap-2 sm:gap-4">
         {/* Action buttons - Some hidden on mobile */}
-        <button className="hidden sm:block p-2 hover:bg-gray-100 rounded-lg transition">
+        <button className="hidden sm:block p-2 hover:bg-gray-100 rounded-lg transition" onClick={() => setShowWorkspaceModal(true)} title="New workspace">
           <Plus className="w-5 h-5 text-blue-500" />
         </button>
         <button className="hidden lg:block p-2 hover:bg-gray-100 rounded-lg transition">
@@ -166,6 +169,14 @@ const NavbarAuth = () => {
         </div>
       </div>
     </nav>
+
+    {showWorkspaceModal && (
+      <WorkspaceModal
+        workspace={null}
+        onClose={() => setShowWorkspaceModal(false)}
+      />
+    )}
+    </>
   );
 };
 

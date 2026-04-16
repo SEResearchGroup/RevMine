@@ -16,6 +16,8 @@ from .minio_client import MinIOClient
 from .csv_generator import CSVGenerator, StatisticsCSVGenerator
 from .tasks import run_collection_in_background, cancellation_registry
 from .serializers import CollectionSerializer, CleanedDataSerializer
+from .metadata_extractor import _ReplayStream
+import ijson
 
 logger = logging.getLogger(__name__)
 
@@ -664,6 +666,7 @@ class DataCleaningService:
         stats_csv_content = stats_generator.generate_statistics_csv(
             filtered_data, collection
         )
+        
 
         # Save structured CSV
         structured_filename = minio_client.generate_filename(
@@ -743,9 +746,6 @@ class CleanedDataService:
             minio_client = MinIOClient()
             
             if collection.is_external:
-                # Stream-parse from MinIO to avoid loading full JSON into memory
-                from .metadata_extractor import _ReplayStream
-                import ijson
                 
                 item_key = 'pull_requests' if collection.platform == 'github' else 'merge_requests'
                 stream = minio_client.get_object_stream(collection.raw_data_filename)
