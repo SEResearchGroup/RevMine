@@ -19,12 +19,42 @@ If you use RevMine in your research, please cite our paper:
 > *RevMine: A Tool for Mining and Analyzing Modern Code Review Data* — **[link to paper](#)** *(https://ieeexplore.ieee.org/abstract/document/11344241)*
 
 ```bibtex
-@inproceedings{revmine,
-  title     = {RevMine: A Tool for Mining and Analyzing Modern Code Review Data},
-  author    = {Kansab, Samah and others},
-  year      = {2026},
-  note      = {TODO: fill in venue / DOI}
+@inproceedings{kansab2025revmine,
+  title={RevMine: An LLM-assisted tool for code review mining and analysis across Git platforms},
+  author={Kansab, Samah and Bordeleau, Francis and Tizghadam, Ali},
+  booktitle={2025 IEEE International Conference on Collaborative Advances in Software and COmputiNg (CASCON)},
+  pages={577--578},
+  year={2025},
+  organization={IEEE}
 }
+```
+
+---
+
+## Quick Start
+
+The entire stack — frontend, backend microservices, databases, Kafka, MinIO, Redis, Ollama, and observability — runs through Docker Compose with a single command:
+
+```bash
+docker compose up --build -d
+```
+
+Once the containers are healthy, open the app at:
+
+**http://localhost:5173/**
+
+> ⚠️ **Before the first run**, you need to create the `.env` files for each backend service. They are gitignored and must be filled in locally with your own secrets (OAuth credentials, encryption keys, MinIO credentials, etc.). See **[docs/environment-setup.md](docs/environment-setup.md)** for the variables and where to obtain each value.
+
+After the stack is up, pull the default LLM model (one-time):
+
+```bash
+docker exec -it ollama-service ollama pull deepseek-r1
+```
+
+To stop the stack:
+
+```bash
+docker compose down
 ```
 
 ---
@@ -64,7 +94,7 @@ git clone https://gitlab.com/samah37/revmine.git
 cd revmine
 ```
 
-Before starting, create the `.env` files described in the [Environment Setup](#environment-setup) section. They are gitignored and must be created locally.
+Before starting, create the `.env` files described in **[docs/environment-setup.md](docs/environment-setup.md)**. They are gitignored and must be created locally.
 
 Then start everything:
 
@@ -78,161 +108,14 @@ The frontend will be available at `http://localhost:5173`.
 
 ## Environment Setup
 
-Each service that requires secrets ships with a `.env.example`. Copy it to `.env` in the same folder and fill in the values.
+Each backend service reads its secrets from a local `.env` file that must be created before the first run. Step-by-step instructions — variables, how to generate keys, and where to obtain each OAuth credential — are split per service to keep things easy to scan:
 
-```bash
-cp backend/api-gateway/.env.example            backend/api-gateway/.env
-cp backend/services/configuration/.env.example backend/services/configuration/.env
-cp backend/services/collection/.env.example    backend/services/collection/.env
-cp backend/services/analyze/.env.example       backend/services/analyze/.env
-# LLM service has no .env.example — create it manually (see below)
-touch backend/services/llm/.env
-```
-
-Below is what each variable means and where to get it.
-
-### 1. `backend/api-gateway/.env`
-
-Central auth + routing service. Needs OAuth credentials for each provider users can sign in with.
-
-```env
-SECRET_KEY=<any long random string>
-DEBUG=True
-DATABASE_HOST=gateway-db
-DATABASE_NAME=gateway_db
-DATABASE_USER=postgres
-DATABASE_PASSWORD=postgres
-DATABASE_PORT=5432
-ALLOWED_HOSTS=localhost,127.0.0.1
-CORS_ALLOWED_ORIGINS=http://localhost:5173
-
-CONFIGURATION_SERVICE_URL=http://configuration-service:8001/api/workspaces
-LLM_SERVICE_URL=http://llm-service:8004
-COLLECTION_SERVICE_URL=http://collection-service:8002/api/collections
-
-# --- GitHub OAuth ---
-GITHUB_CLIENT_ID=
-GITHUB_CLIENT_SECRET=
-GITHUB_REDIRECT_URI=http://localhost:5173/auth/github/callback
-
-# --- GitLab OAuth ---
-GITLAB_CLIENT_ID=
-GITLAB_CLIENT_SECRET=
-GITLAB_REDIRECT_URI=http://localhost:5173/auth/gitlab/callback
-
-# --- Google OAuth ---
-GOOGLE_CLIENT_ID=
-GOOGLE_CLIENT_SECRET=
-GOOGLE_REDIRECT_URI=http://localhost:5173/auth/google/callback
-
-FRONTEND_URL=http://localhost:5173
-```
-
-**Where to get the OAuth credentials:**
-
-- **GitHub** → https://github.com/settings/developers → *New OAuth App*
-  - Homepage URL: `http://localhost:5173`
-  - Authorization callback URL: `http://localhost:5173/auth/github/callback`
-  - Copy the Client ID and generate a Client Secret.
-- **GitLab** → https://gitlab.com/-/user_settings/applications → *Add new application*
-  - Redirect URI: `http://localhost:5173/auth/gitlab/callback`
-  - Scopes: `read_user`, `read_api`, `read_repository`, `api`.
-- **Google** → https://console.cloud.google.com/apis/credentials → *Create Credentials → OAuth client ID* (Web application)
-  - Authorized redirect URI: `http://localhost:5173/auth/google/callback`
-
-`SECRET_KEY` can be any random string; generate one with:
-```bash
-python -c "import secrets; print(secrets.token_urlsafe(50))"
-```
-
-### 2. `backend/services/configuration/.env`
-
-```env
-SECRET_KEY=<any long random string>
-DEBUG=True
-DATABASE_NAME=configuration_db
-DATABASE_USER=postgres
-DATABASE_PASSWORD=postgres
-DATABASE_HOST=configuration-db
-DATABASE_PORT=5432
-ALLOWED_HOSTS=localhost,127.0.0.1,configuration-service
-CORS_ALLOWED_ORIGINS=http://localhost:5173
-ENCRYPTION_KEY=<Fernet key>
-```
-
-`ENCRYPTION_KEY` is a Fernet key used to encrypt provider tokens. Generate one with:
-```bash
-python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
-```
-
-### 3. `backend/services/collection/.env`
-
-This service also provides the credentials used to boot MinIO, so **both the MinIO container and the collection service read this file**. Keep the `MINIO_*` values consistent.
-
-```env
-SECRET_KEY=<any long random string>
-DEBUG=True
-DATABASE_HOST=collection-db
-DATABASE_NAME=collection_db
-DATABASE_USER=postgres
-DATABASE_PASSWORD=postgres
-DATABASE_PORT=5432
-ALLOWED_HOSTS=localhost,127.0.0.1,collection-service
-CORS_ALLOWED_ORIGINS=http://localhost:5173
-ENCRYPTION_KEY=<same Fernet key as configuration service>
-CONFIGURATION_SERVICE_URL=http://configuration-service:8001/api
-
-# --- MinIO (object storage for collected artifacts) ---
-MINIO_ROOT_USER=<pick a username>
-MINIO_ROOT_PASSWORD=<pick a strong password, ≥8 chars>
-MINIO_BUCKET_NAME=revmine-collections
-MINIO_ENDPOINT=minio:9000
-MINIO_ACCESS_KEY=<same as MINIO_ROOT_USER>
-MINIO_SECRET_KEY=<same as MINIO_ROOT_PASSWORD>
-MINIO_SECURE=False
-```
-
-After startup, the MinIO console is at http://localhost:9001 (login with the values above).
-
-### 4. `backend/services/analyze/.env`
-
-```env
-SECRET_KEY=<any long random string>
-DEBUG=True
-DATABASE_HOST=analyze-db
-DATABASE_NAME=analyze_db
-DATABASE_USER=postgres
-DATABASE_PASSWORD=postgres
-DATABASE_PORT=5432
-ALLOWED_HOSTS=localhost,127.0.0.1,analyze-service
-CORS_ALLOWED_ORIGINS=http://localhost:5173
-ENCRYPTION_KEY=<same Fernet key as configuration service>
-```
-
-### 5. `backend/services/llm/.env`
-
-The LLM service can route to either a local Ollama model (default) or an OpenRouter-hosted model.
-
-```env
-OLLAMA_DEFAULT_MODEL=deepseek-r1
-OLLAMA_HOST=http://ollama-service:11434/
-
-# Optional — only needed if you want to use OpenRouter-hosted models
-OPENROUTER_API_KEY=
-OPENROUTER_SITE_URL=http://localhost/
-```
-
-**Where to get the keys:**
-
-- **Ollama** — runs as a container (`ollama-service`), no key needed. Pull the model once the stack is up:
-  ```bash
-  docker exec -it ollama-service ollama pull deepseek-r1
-  ```
-- **OpenRouter** (optional) → https://openrouter.ai/keys → *Create Key*.
-
-### 6. Notification service
-
-The Go notification service reads its configuration from environment variables set directly in [docker-compose.yaml](docker-compose.yaml) — no `.env` needed.
+- [Overview & shared keys](docs/environment-setup.md)
+- [API Gateway (GitHub / GitLab / Google OAuth)](docs/env/api-gateway.md)
+- [Configuration service](docs/env/configuration.md)
+- [Collection service (includes MinIO)](docs/env/collection.md)
+- [Analyze service](docs/env/analyze.md)
+- [LLM service (Ollama / OpenRouter)](docs/env/llm.md)
 
 ---
 
