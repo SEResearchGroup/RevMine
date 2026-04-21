@@ -118,6 +118,15 @@ const Sidebar = () => {
       case "Projects":
         navigate("/projects");
         break;
+      case "Manual Collect":
+        navigate("/collection/manual");
+        break;
+      case "Intelligent collect":
+        navigate("/collection/intelligent");
+        break;
+      case "Import dataset":
+        navigate("/collection/import");
+        break;
       case "Data Cleaning":
         navigate("/data-cleaning");
         break;

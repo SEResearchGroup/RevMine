@@ -16,6 +16,9 @@ import CleaningDetail from "../pages/collection/CleaningDetail";
 import DataCleaning from "../pages/collection/DataCleaning";
 import DataCleaningList from "../pages/collection/DataCleaningList";
 import ExternalCollectionDetail from "../pages/collection/ExternalCollectionDetail";
+import ManualCollectionLanding from "../pages/collection/ManualCollectionLanding";
+import IntelligentCollectionLanding from "../pages/collection/IntelligentCollectionLanding";
+import ImportDataset from "../pages/collection/ImportDataset";
 import {
   GitHubCallback,
   GitLabCallback,
@@ -77,6 +80,9 @@ const AppRoutes = () => {
         <Route path="/workspaces" element={<Workspaces />} />
         <Route path="/workspaces/:id" element={<Projects />} />
         <Route path="/projects" element={<AllProjects />} />
+        <Route path="/collection/manual" element={<ManualCollectionLanding />} />
+        <Route path="/collection/intelligent" element={<IntelligentCollectionLanding />} />
+        <Route path="/collection/import" element={<ImportDataset />} />
         <Route path="/data-cleaning" element={<DataCleaningList />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="/help/get-started" element={<GetStarted />} />

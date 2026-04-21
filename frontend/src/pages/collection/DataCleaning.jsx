@@ -215,7 +215,9 @@ function DataCleaning() {
       setCreatedCleanedData(response.data.cleaned_data);
       setShowResults(true);
     } catch (err) {
-      alert("Error creating cleaned data: " + err.message);
+      const data = err?.response?.data;
+      const apiMessage = data?.error || data?.detail || err?.message;
+      alert("Error creating cleaned data: " + (apiMessage || "Unknown error"));
     } finally {
       setProcessing(false);
     }

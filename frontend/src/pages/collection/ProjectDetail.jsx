@@ -41,6 +41,11 @@ function ProjectDetail() {
   const navigate = useNavigate();
   const location = useLocation();
 
+  const initialMode = (() => {
+    const raw = new URLSearchParams(location.search).get("mode");
+    return raw === "automatic" || raw === "intelligent" ? "automatic" : "manual";
+  })();
+
   const [repository, setRepository] = useState(null);
   const [workspace, setWorkspace] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -72,7 +77,7 @@ function ProjectDetail() {
   const [saveBatchSize, setSaveBatchSize] = useState(1);
   const [editingBatchSize, setEditingBatchSize] = useState(false);
   const [batchSizeDraft, setBatchSizeDraft] = useState(1);
-  const [collectionMode, setCollectionMode] = useState("manual");
+  const [collectionMode, setCollectionMode] = useState(initialMode);
 
   // Global date range of MRs/PRs in the repository
   const [dateRange, setDateRange] = useState({ first_date: null, last_date: null });

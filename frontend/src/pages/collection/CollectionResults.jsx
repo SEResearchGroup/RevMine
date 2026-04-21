@@ -49,8 +49,103 @@ function CollectionResults() {
     }
   };
 
-  const handleExport = (format) => {
-    alert(`Export to ${format} - Coming soon!`);
+  const [exporting, setExporting] = useState(null);
+
+  const saveBlob = async (blob, suggestedName, mimeType, accept) => {
+    if (window.showSaveFilePicker) {
+      try {
+        const handle = await window.showSaveFilePicker({
+          suggestedName,
+          types: [{ description: suggestedName, accept: { [mimeType]: accept } }],
+        });
+        const writable = await handle.createWritable();
+        await writable.write(blob);
+        await writable.close();
+        return;
+      } catch (err) {
+        if (err.name === "AbortError") return;
+      }
+    }
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = suggestedName;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  };
+
+  const extractErrorMessage = async (err, fallback) => {
+    const data = err?.response?.data;
+    if (data instanceof Blob) {
+      try {
+        const text = await data.text();
+        const parsed = JSON.parse(text);
+        return parsed.error || parsed.detail || text || fallback;
+      } catch {
+        return fallback;
+      }
+    }
+    return data?.error || data?.detail || err?.message || fallback;
+  };
+
+  const handleExportJSON = async () => {
+    try {
+      setExporting("JSON");
+      const response = await collectionService.downloadCollectionJSON(planId);
+      const suggested =
+        response.headers?.["content-disposition"]?.match(/filename="?([^";]+)"?/)?.[1] ||
+        `${repository.full_name.replace("/", "_")}_collection${planId}.json`;
+      await saveBlob(response.data, suggested, "application/json", [".json"]);
+    } catch (err) {
+      const msg = await extractErrorMessage(err, "Failed to download JSON");
+      alert(`Error downloading JSON: ${msg}`);
+    } finally {
+      setExporting(null);
+    }
+  };
+
+  const handleExportCSV = async (fileType) => {
+    try {
+      setExporting(fileType);
+      const listRes = await collectionService.getCollectionCleanedData(planId);
+      const items = listRes.data?.cleaned_data || [];
+      const completed = items
+        .filter((c) => c.status === "completed")
+        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+      if (completed.length === 0) {
+        alert(
+          "No cleaned CSV available yet. Please create a structured CSV first using the \"Create Structured CSV\" button above."
+        );
+        return;
+      }
+
+      const cleaned = completed[0];
+      const filename =
+        fileType === "structured"
+          ? cleaned.structured_csv_filename
+          : cleaned.statistics_csv_filename;
+
+      if (!filename) {
+        alert(
+          `The latest cleaned dataset does not include a ${fileType} CSV. Re-run cleaning to generate it.`
+        );
+        return;
+      }
+
+      const response = await collectionService.downloadCleanedDataCSV(
+        cleaned.id,
+        fileType
+      );
+      await saveBlob(response.data, filename, "text/csv", [".csv"]);
+    } catch (err) {
+      const msg = await extractErrorMessage(err, "Failed to download CSV");
+      alert(`Error downloading CSV: ${msg}`);
+    } finally {
+      setExporting(null);
+    }
   };
 
   const handleCreateStructuredCSV = () => {
@@ -233,8 +328,9 @@ function CollectionResults() {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <button
-              onClick={() => handleExport("JSON")}
-              className="bg-white border border-gray-200 rounded-xl p-6 hover:shadow-lg transition-shadow text-left"
+              onClick={handleExportJSON}
+              disabled={exporting !== null}
+              className="bg-white border border-gray-200 rounded-xl p-6 hover:shadow-lg transition-shadow text-left disabled:opacity-60 disabled:cursor-not-allowed"
             >
               <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center mb-4">
                 <Download className="w-6 h-6 text-yellow-600" />
@@ -243,37 +339,39 @@ function CollectionResults() {
               <p className="text-sm text-gray-600 mb-3">Complete raw format</p>
               <div className="mt-4 flex items-center gap-2 text-blue-600 font-medium">
                 <Download className="w-4 h-4" />
-                <span>Download</span>
+                <span>{exporting === "JSON" ? "Downloading..." : "Download"}</span>
               </div>
             </button>
 
             <button
-              onClick={() => handleExport("CSV")}
-              className="bg-white border border-gray-200 rounded-xl p-6 hover:shadow-lg transition-shadow text-left"
+              onClick={() => handleExportCSV("structured")}
+              disabled={exporting !== null}
+              className="bg-white border border-gray-200 rounded-xl p-6 hover:shadow-lg transition-shadow text-left disabled:opacity-60 disabled:cursor-not-allowed"
             >
               <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mb-4">
                 <Download className="w-6 h-6 text-green-600" />
               </div>
               <h4 className="font-semibold text-gray-900 mb-2">CSV</h4>
-              <p className="text-sm text-gray-600 mb-3">Table format</p>
+              <p className="text-sm text-gray-600 mb-3">Table format (latest cleaning)</p>
               <div className="mt-4 flex items-center gap-2 text-blue-600 font-medium">
                 <Download className="w-4 h-4" />
-                <span>Download</span>
+                <span>{exporting === "structured" ? "Downloading..." : "Download"}</span>
               </div>
             </button>
 
             <button
-              onClick={() => handleExport("Statistics CSV")}
-              className="bg-white border border-gray-200 rounded-xl p-6 hover:shadow-lg transition-shadow text-left"
+              onClick={() => handleExportCSV("statistics")}
+              disabled={exporting !== null}
+              className="bg-white border border-gray-200 rounded-xl p-6 hover:shadow-lg transition-shadow text-left disabled:opacity-60 disabled:cursor-not-allowed"
             >
               <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mb-4">
                 <Download className="w-6 h-6 text-purple-600" />
               </div>
               <h4 className="font-semibold text-gray-900 mb-2">Statistics CSV</h4>
-              <p className="text-sm text-gray-600 mb-3">Project metrics</p>
+              <p className="text-sm text-gray-600 mb-3">Project metrics (latest cleaning)</p>
               <div className="mt-4 flex items-center gap-2 text-blue-600 font-medium">
                 <Download className="w-4 h-4" />
-                <span>Download</span>
+                <span>{exporting === "statistics" ? "Downloading..." : "Download"}</span>
               </div>
             </button>
           </div>

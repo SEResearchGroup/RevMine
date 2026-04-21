@@ -1,11 +1,29 @@
 import csv
 import io
 import math
+import traceback
 from datetime import datetime, timezone
-from typing import Dict, List, Optional, Tuple, Set
+from typing import Any, Dict, List, Optional, Tuple, Set
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+def _dig(d: Any, *keys, default: Any = None) -> Any:
+    """Chained dict traversal that tolerates None / non-dict at any level.
+
+    `dict.get(key, default)` returns the default only when the key is *missing*.
+    If the key exists but the value is None (common in PR/MR JSON where the
+    upstream API returns nulls), subsequent `.get()` calls blow up with
+    `AttributeError: 'NoneType' object has no attribute 'get'`. Use this
+    helper instead of chained `.get("k", {}).get("k2", {}).get(...)`.
+    """
+    current = d
+    for k in keys:
+        if not isinstance(current, dict):
+            return default
+        current = current.get(k)
+    return default if current is None else current
 
 
 # =============================================================================
@@ -77,7 +95,7 @@ class GitHubDataExtractor(DataExtractor):
     @staticmethod
     def get_author(details: dict) -> str:
         """Get PR author login"""
-        return details.get("user", {}).get("login", "")
+        return _dig(details, "user", "login", default="") or ""
 
     @staticmethod
     def get_state(details: dict) -> str:
@@ -100,73 +118,78 @@ class GitHubDataExtractor(DataExtractor):
 
     @staticmethod
     def get_merged_by(details: dict) -> str:
-        merged_by = details.get("merged_by")
-        return merged_by.get("login", "") if merged_by else ""
+        return _dig(details, "merged_by", "login", default="") or ""
 
     @staticmethod
     def get_commits(item: dict) -> List[dict]:
         """Get list of commits from PR"""
-        return item.get("commits", [])
+        commits = item.get("commits") if isinstance(item, dict) else None
+        if not isinstance(commits, list):
+            return []
+        return [c for c in commits if isinstance(c, dict)]
 
     @staticmethod
     def get_commit_sha(commit: dict) -> str:
-        """Get commit SHA"""
-        return commit.get("commit_sha", "") or commit.get("sha", "")
+        if not isinstance(commit, dict):
+            return ""
+        return commit.get("commit_sha") or commit.get("sha") or ""
 
     @staticmethod
     def get_commit_author_name(commit: dict) -> str:
-        """Extract commit author name from GitHub commit structure"""
         # Structure: commit.details.commit.author.name
-        details = commit.get("details", {})
-        return details.get("commit", {}).get("author", {}).get("name", "")
+        return _dig(commit, "details", "commit", "author", "name", default="") or ""
 
     @staticmethod
     def get_commit_author_login(commit: dict) -> str:
-        """Extract commit author login from GitHub commit structure"""
         # Structure: commit.details.author.login
-        details = commit.get("details", {})
-        return details.get("author", {}).get("login", "")
+        return _dig(commit, "details", "author", "login", default="") or ""
 
     @staticmethod
     def get_commit_date(commit: dict) -> Optional[str]:
-        """Extract commit date from GitHub commit structure"""
         # Structure: commit.details.commit.author.date
-        details = commit.get("details", {})
-        return details.get("commit", {}).get("author", {}).get("date")
+        return _dig(commit, "details", "commit", "author", "date")
 
     @staticmethod
     def get_commit_message(commit: dict) -> str:
-        """Extract commit message from GitHub commit structure"""
-        details = commit.get("details", {})
-        return details.get("commit", {}).get("message", "")
+        return _dig(commit, "details", "commit", "message", default="") or ""
 
     @staticmethod
     def get_commit_additions(commit: dict) -> int:
-        """Get additions from commit changes"""
-        changes = commit.get("changes", [])
-        return sum(c.get("additions", 0) or 0 for c in changes)
+        changes = commit.get("changes") if isinstance(commit, dict) else None
+        if not isinstance(changes, list):
+            return 0
+        return sum((c.get("additions", 0) or 0) for c in changes if isinstance(c, dict))
 
     @staticmethod
     def get_commit_deletions(commit: dict) -> int:
-        """Get deletions from commit changes"""
-        changes = commit.get("changes", [])
-        return sum(c.get("deletions", 0) or 0 for c in changes)
+        changes = commit.get("changes") if isinstance(commit, dict) else None
+        if not isinstance(changes, list):
+            return 0
+        return sum((c.get("deletions", 0) or 0) for c in changes if isinstance(c, dict))
 
     @staticmethod
     def get_files(item: dict) -> List[dict]:
-        """Get list of modified files"""
-        return item.get("files", [])
+        files = item.get("files") if isinstance(item, dict) else None
+        if not isinstance(files, list):
+            return []
+        return [f for f in files if isinstance(f, dict)]
 
     @staticmethod
     def get_file_name(file: dict) -> str:
-        return file.get("filename", "")
+        if not isinstance(file, dict):
+            return ""
+        return file.get("filename", "") or ""
 
     @staticmethod
     def get_file_additions(file: dict) -> int:
+        if not isinstance(file, dict):
+            return 0
         return file.get("additions", 0) or 0
 
     @staticmethod
     def get_file_deletions(file: dict) -> int:
+        if not isinstance(file, dict):
+            return 0
         return file.get("deletions", 0) or 0
 
     @staticmethod
@@ -196,39 +219,40 @@ class GitHubDataExtractor(DataExtractor):
 
     @staticmethod
     def get_comment_author(comment: dict) -> str:
-        return comment.get("user", {}).get("login", "")
+        return _dig(comment, "user", "login", default="") or ""
 
     @staticmethod
     def get_review_author(review: dict) -> str:
-        return review.get("user", {}).get("login", "")
+        return _dig(review, "user", "login", default="") or ""
 
     @staticmethod
     def get_unique_reviewers(item: dict) -> Set[str]:
-        """Get set of unique reviewers"""
-        reviewers = set()
-        for review in item.get("reviews", []):
-            user = review.get("user", {}).get("login")
+        reviewers: Set[str] = set()
+        reviews = item.get("reviews") if isinstance(item, dict) else None
+        for review in reviews or []:
+            user = _dig(review, "user", "login")
             if user:
                 reviewers.add(user)
         return reviewers
 
     @staticmethod
     def get_unique_discussioners(item: dict) -> Set[str]:
-        """Get set of unique users who participated in discussions"""
-        discussioners = set()
+        discussioners: Set[str] = set()
+        if not isinstance(item, dict):
+            return discussioners
 
-        for comment in item.get("comments", []):
-            user = comment.get("user", {}).get("login")
+        for comment in item.get("comments") or []:
+            user = _dig(comment, "user", "login")
             if user:
                 discussioners.add(user)
 
-        for review in item.get("reviews", []):
-            user = review.get("user", {}).get("login")
+        for review in item.get("reviews") or []:
+            user = _dig(review, "user", "login")
             if user:
                 discussioners.add(user)
 
-        for rc in item.get("review_comments", []):
-            user = rc.get("user", {}).get("login")
+        for rc in item.get("review_comments") or []:
+            user = _dig(rc, "user", "login")
             if user:
                 discussioners.add(user)
 
@@ -945,60 +969,88 @@ class CSVGenerator:
         writer = csv.DictWriter(output, fieldnames=headers)
         writer.writeheader()
 
+        def _safe_len(v):
+            return len(v) if isinstance(v, list) else 0
+
+        skipped = 0
         for item in items:
-            details = item.get("details", {})
+            try:
+                if not isinstance(item, dict):
+                    skipped += 1
+                    continue
+                details = item.get("details") if isinstance(item.get("details"), dict) else {}
 
-            if self.platform == "github":
-                row = {
-                    "PR_Number": details.get("number"),
-                    "Title": details.get("title", ""),
-                    "Author": details.get("user", {}).get("login", ""),
-                    "Status": details.get("state", ""),
-                    "State": (
-                        "merged" if details.get("merged") else details.get("state")
-                    ),
-                    "Creation_Date": self._format_date(details.get("created_at")),
-                    "Merge_Date": self._format_date(details.get("merged_at")),
-                    "Close_Date": self._format_date(details.get("closed_at")),
-                    "Merged_By": (
-                        details.get("merged_by", {}).get("login", "")
-                        if details.get("merged_by")
-                        else ""
-                    ),
-                    "Commits_Count": len(item.get("commits", [])),
-                    "Comments_Count": len(item.get("comments", [])),
-                    "Reviews_Count": len(item.get("reviews", [])),
-                    "Review_Comments_Count": len(item.get("review_comments", [])),
-                    "Files_Changed": len(item.get("files", [])),
-                    "Additions": details.get("additions", 0),
-                    "Deletions": details.get("deletions", 0),
-                }
-            else:
-                row = {
-                    'MR_IID': details.get('iid'),
-                    'Title': details.get('title', ''),
-                    'Author': details.get('author', {}).get('username', ''),
-                    'Status': details.get('state', ''),
-                    'State': details.get('state', ''),
-                    'Creation_Date': self._format_date(details.get('created_at')),
-                    'Merge_Date': self._format_date(details.get('merged_at')),
-                    'Close_Date': self._format_date(details.get('closed_at')),
-                    'Merged_By': details.get('merged_by', {}).get('username', '') if details.get('merged_by') else '',
-                    'Commits_Count': len(item.get('commits', [])),
-                    'Notes_Count': len(item.get('notes', [])),
-                    'Discussions_Count': len(item.get('discussions', [])),
-                    'Files_Changed': len(item.get('changes', {}).get('changes', []) or item.get('changes', {}).get('diffs', [])) if item.get('changes') else 0,
-                    'Additions': sum(
-                        sum(1 for l in f.get('diff','').splitlines() if l.startswith('+') and not l.startswith('+++'))
-                        for f in (item.get('changes', {}).get('changes', []) if isinstance(item.get('changes'), dict) else [])
-                    ),
-                    'Deletions': sum(
-                        sum(1 for l in f.get('diff','').splitlines() if l.startswith('-') and not l.startswith('---'))
-                        for f in (item.get('changes', {}).get('changes', []) if isinstance(item.get('changes'), dict) else [])
-                    )
-                }
+                if self.platform == "github":
+                    row = {
+                        "PR_Number": details.get("number"),
+                        "Title": details.get("title", ""),
+                        "Author": _dig(details, "user", "login", default="") or "",
+                        "Status": details.get("state", ""),
+                        "State": (
+                            "merged" if details.get("merged") else details.get("state")
+                        ),
+                        "Creation_Date": self._format_date(details.get("created_at")),
+                        "Merge_Date": self._format_date(details.get("merged_at")),
+                        "Close_Date": self._format_date(details.get("closed_at")),
+                        "Merged_By": _dig(details, "merged_by", "login", default="") or "",
+                        "Commits_Count": _safe_len(item.get("commits")),
+                        "Comments_Count": _safe_len(item.get("comments")),
+                        "Reviews_Count": _safe_len(item.get("reviews")),
+                        "Review_Comments_Count": _safe_len(item.get("review_comments")),
+                        "Files_Changed": _safe_len(item.get("files")),
+                        "Additions": details.get("additions", 0) or 0,
+                        "Deletions": details.get("deletions", 0) or 0,
+                    }
+                else:
+                    changes_obj = item.get("changes") if isinstance(item.get("changes"), dict) else {}
+                    gitlab_changes = changes_obj.get("changes") or changes_obj.get("diffs") or []
+                    if not isinstance(gitlab_changes, list):
+                        gitlab_changes = []
+                    row = {
+                        "MR_IID": details.get("iid"),
+                        "Title": details.get("title", ""),
+                        "Author": _dig(details, "author", "username", default="") or "",
+                        "Status": details.get("state", ""),
+                        "State": details.get("state", ""),
+                        "Creation_Date": self._format_date(details.get("created_at")),
+                        "Merge_Date": self._format_date(details.get("merged_at")),
+                        "Close_Date": self._format_date(details.get("closed_at")),
+                        "Merged_By": _dig(details, "merged_by", "username", default="") or "",
+                        "Commits_Count": _safe_len(item.get("commits")),
+                        "Notes_Count": _safe_len(item.get("notes")),
+                        "Discussions_Count": _safe_len(item.get("discussions")),
+                        "Files_Changed": len(gitlab_changes),
+                        "Additions": sum(
+                            sum(
+                                1 for l in (f.get("diff", "") or "").splitlines()
+                                if l.startswith("+") and not l.startswith("+++")
+                            )
+                            for f in gitlab_changes if isinstance(f, dict)
+                        ),
+                        "Deletions": sum(
+                            sum(
+                                1 for l in (f.get("diff", "") or "").splitlines()
+                                if l.startswith("-") and not l.startswith("---")
+                            )
+                            for f in gitlab_changes if isinstance(f, dict)
+                        ),
+                    }
 
-            writer.writerow(row)
+                writer.writerow(row)
+            except Exception as exc:
+                skipped += 1
+                logger.warning(
+                    "Skipping structured CSV row due to error: %s\n%s",
+                    exc,
+                    traceback.format_exc(),
+                )
+
+        if skipped:
+            logger.warning(
+                "Structured CSV generation skipped %d malformed item(s) out of %d",
+                skipped,
+                len(items),
+            )
 
         return output.getvalue()
 
@@ -1114,74 +1166,70 @@ class GitHubAdapter(PlatformAdapter):
         return "pull_requests"
 
     def get_item_id(self, details: dict):
+        if not isinstance(details, dict):
+            return None
         return details.get("number")
 
     def get_author(self, details: dict) -> str:
-        return details.get("user", {}).get("login", "")
+        return _dig(details, "user", "login", default="") or ""
 
     def get_merged_by(self, details: dict) -> str:
-        merged_by = details.get("merged_by")
-        return merged_by.get("login", "") if merged_by else ""
+        return _dig(details, "merged_by", "login", default="") or ""
 
     def get_discussions_count(self, item: dict) -> int:
-        # GitHub: count comments
-        return len(item.get("comments", []))
+        comments = item.get("comments") if isinstance(item, dict) else None
+        return len(comments) if isinstance(comments, list) else 0
 
     def get_reviewers(self, item: dict) -> set:
-        reviewers = set()
-        for review in item.get("reviews", []):
-            user = review.get("user", {}).get("login")
+        reviewers: set = set()
+        reviews = item.get("reviews") if isinstance(item, dict) else None
+        for review in reviews or []:
+            user = _dig(review, "user", "login")
             if user:
                 reviewers.add(user)
         return reviewers
 
     def get_discussioners(self, item: dict) -> set:
-        discussioners = set()
+        discussioners: set = set()
+        if not isinstance(item, dict):
+            return discussioners
 
-        # From comments
-        for comment in item.get("comments", []):
-            user = comment.get("user", {}).get("login")
+        for comment in item.get("comments") or []:
+            user = _dig(comment, "user", "login")
             if user:
                 discussioners.add(user)
 
-        # From reviews
-        for review in item.get("reviews", []):
-            user = review.get("user", {}).get("login")
+        for review in item.get("reviews") or []:
+            user = _dig(review, "user", "login")
             if user:
                 discussioners.add(user)
 
-        # From review comments
-        for rc in item.get("review_comments", []):
-            user = rc.get("user", {}).get("login")
+        for rc in item.get("review_comments") or []:
+            user = _dig(rc, "user", "login")
             if user:
                 discussioners.add(user)
 
         return discussioners
 
     def get_files(self, item: dict) -> list:
-        return item.get("files", [])
+        files = item.get("files") if isinstance(item, dict) else None
+        return [f for f in files if isinstance(f, dict)] if isinstance(files, list) else []
 
     def get_additions(self, details: dict) -> int:
+        if not isinstance(details, dict):
+            return 0
         return details.get("additions", 0) or 0
 
     def get_deletions(self, details: dict) -> int:
+        if not isinstance(details, dict):
+            return 0
         return details.get("deletions", 0) or 0
 
     def get_commit_author(self, commit: dict) -> str:
-        return (
-            commit.get("details", {})
-            .get("commit", {})
-            .get("author", {})
-            .get("name", "")
-        )
+        return _dig(commit, "details", "commit", "author", "name", default="") or ""
 
     def get_commit_date(self, commit: dict) -> str:
-        return (
-            commit.get("details", {})
-            .get("commit", {})
-            .get("author", {})
-            .get("date", "")
-        )
+        return _dig(commit, "details", "commit", "author", "date", default="") or ""
 
 
 class GitLabAdapter(PlatformAdapter):
@@ -1378,10 +1426,30 @@ class StatisticsCSVGenerator:
         writer = csv.DictWriter(output, fieldnames=headers)
         writer.writeheader()
 
+        skipped = 0
         for item in items:
-            full_row = self._build_row(item, collection_plan, project_created_at)
-            filtered_row = {k: v for k, v in full_row.items() if k in headers}
-            writer.writerow(filtered_row)
+            item_id = None
+            try:
+                if isinstance(item, dict):
+                    item_id = _dig(item, "details", "number") or _dig(item, "details", "iid")
+                full_row = self._build_row(item, collection_plan, project_created_at)
+                filtered_row = {k: v for k, v in full_row.items() if k in headers}
+                writer.writerow(filtered_row)
+            except Exception as exc:
+                skipped += 1
+                logger.warning(
+                    "Skipping stats row for item_id=%s due to error: %s\n%s",
+                    item_id,
+                    exc,
+                    traceback.format_exc(),
+                )
+
+        if skipped:
+            logger.warning(
+                "Statistics CSV generation skipped %d malformed item(s) out of %d",
+                skipped,
+                len(items),
+            )
 
         return output.getvalue()
 
