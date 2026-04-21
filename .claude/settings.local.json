@@ -4,7 +4,8 @@
       "Bash(node --input-type=module -e \"import\\('./src/services/api.js'\\).then\\(\\(\\)=>console.log\\('api.js imports OK'\\)\\).catch\\(e=>{console.error\\('api.js error:',e.message\\);process.exit\\(1\\)}\\)\")",
       "Bash(python -c \"import ast; [ast.parse\\(open\\(p,'r',encoding='utf-8'\\).read\\(\\),p\\) for p in ['analytics/models.py','analytics/serializers.py','analytics/views.py','analytics/urls.py','analytics/analysis_service.py','analytics/dataset_services.py','analytics/devops_views.py','analytics/devops_collectors.py','analytics/migrations/0005_add_devops_source_type.py','analytics/migrations/0006_seed_devops_metrics.py']]; print\\('All Python files parse OK'\\)\")",
       "Bash(node -e ' *)",
-      "Bash(python -c ' *)"
+      "Bash(python -c ' *)",
+      "Bash(git -C \"c:/Users/Sam/Desktop/PhD/Revmine_latest/revmine/\" tag --sort=-v:refname)"
     ]
   }
 }

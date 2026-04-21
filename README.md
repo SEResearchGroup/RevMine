@@ -2,12 +2,15 @@
 
 **RevMine** is an open-source tool for *mining and analyzing modern code review data*. It connects to your Git hosting provider (GitHub or GitLab), collects merge/pull request activity, and surfaces process metrics — lead time, rework, review size, reviewer workload, and more — through an interactive dashboard with an LLM-assisted exploration interface.
 
+In addition to its core code-review focus, RevMine now ships **light analytics for Kanban boards (GitHub Projects v2, GitLab Issue Boards) and CI/CD pipelines (GitHub Actions, GitLab CI)** — covering flow metrics (lead/cycle time, throughput, WIP, CFD) and pipeline reliability metrics (success rate, build duration, MTTR, deploy frequency, flaky jobs). These DevOps tracks are intentionally minimal in this release and will be deepened in upcoming versions.
+
 RevMine is designed for researchers and practitioners who want reproducible, end-to-end code review analytics without stitching together ad-hoc scripts.
 
 ### Key features
 
 - **Multi-provider collection** — pull review history from GitHub and GitLab via OAuth.
 - **Process analytics** — lead time, rework size, review iteration counts, and distribution histograms with adaptive binning and time-based filters.
+- **DevOps tracks (light, evolving)** — Kanban flow metrics and CI/CD pipeline metrics with async background collection, progress bar, and a metrics-CSV export. Slated for deeper coverage in future releases.
 - **LLM-assisted insights** — ask natural-language questions over collected data (via local Ollama or OpenRouter-hosted models).
 - **Microservice architecture** — each concern (collection, configuration, analysis, notification, LLM) runs as an independent service, orchestrated with Docker Compose.
 - **Observability built in** — Grafana + Loki + Promtail for logs out of the box.
