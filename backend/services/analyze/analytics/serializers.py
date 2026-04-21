@@ -13,6 +13,7 @@ class DatasetSerializer(serializers.ModelSerializer):
         model = Dataset
         fields = [
             'id', 'workspace_id', 'repository_id', 'platform',
+            'source_type', 'source_config', 'collection_id',
             'filename', 'file_path', 'rows_count', 'columns_count',
             'columns_metadata', 'uploaded_at', 'updated_at'
         ]
@@ -57,7 +58,7 @@ class MetricDefinitionSerializer(serializers.ModelSerializer):
     class Meta:
         model = MetricDefinition
         fields = [
-            'id', 'code', 'name', 'description', 'category',
+            'id', 'code', 'name', 'description', 'category', 'source_type',
             'default_chart_type', 'supported_chart_types',
             'required_columns', 'supports_time_aggregation',
             'supports_custom_axes', 'default_aggregation',

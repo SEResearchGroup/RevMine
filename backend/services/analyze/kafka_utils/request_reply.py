@@ -1,5 +1,5 @@
 import json
-import threading
+import time
 import uuid
 import logging
 from typing import Optional
@@ -16,7 +16,7 @@ class RequestReplyClient:
     Le demandeur publie avec un correlation_id et écoute
     sur un topic de réponse dédié jusqu'à timeout.
 
-    Usage (côté Collection service) :
+    Usage :
         client = RequestReplyClient()
         result = client.call(
             request_topic=Topics.TOKENS_REQUEST,
@@ -40,42 +40,38 @@ class RequestReplyClient:
         timeout: int = 10,
     ) -> Optional[dict]:
         correlation_id = str(uuid.uuid4())
-        event = threading.Event()
-        listener_ready = threading.Event()
-        result_holder = {}
+        deadline = time.time() + timeout
+        consumer = KafkaConsumer(
+            response_topic,
+            bootstrap_servers=get_kafka_bootstrap(),
+            group_id=None,  # pas de group → lit depuis maintenant
+            value_deserializer=lambda m: json.loads(m.decode('utf-8')),
+            auto_offset_reset='latest',
+            consumer_timeout_ms=1000,
+        )
 
-        # Consumer éphémère qui écoute SA réponse uniquement
-        def _listen():
-            consumer = KafkaConsumer(
-                response_topic,
-                bootstrap_servers=get_kafka_bootstrap(),
-                group_id=None,  # pas de group → lit depuis maintenant
-                value_deserializer=lambda m: json.loads(m.decode('utf-8')),
-                auto_offset_reset='latest',
-                consumer_timeout_ms=timeout * 1000,
+        try:
+            # Ensure partition assignment is ready BEFORE publishing the
+            # request — otherwise the reply may be produced and seeked past
+            # while the consumer is still joining.
+            while not consumer.assignment() and time.time() < deadline:
+                consumer.poll(timeout_ms=100)
+
+            request_payload = {**payload, 'correlation_id': correlation_id}
+            self.producer.send(request_topic, value=request_payload)
+            self.producer.flush()
+
+            while time.time() < deadline:
+                records = consumer.poll(timeout_ms=500)
+                for messages in records.values():
+                    for message in messages:
+                        data = message.value
+                        if data.get('correlation_id') == correlation_id:
+                            return data
+
+            logger.error(
+                f"[Kafka] Request-reply timeout on {request_topic} (correlation_id={correlation_id})"
             )
-            listener_ready.set()
-            for message in consumer:
-                data = message.value
-                if data.get('correlation_id') == correlation_id:
-                    result_holder['data'] = data
-                    event.set()
-                    break
-            consumer.close()
-
-        listener = threading.Thread(target=_listen, daemon=True)
-        listener.start()
-        listener_ready.wait(timeout=2)
-
-        # Publie la requête avec le correlation_id
-        request_payload = {**payload, 'correlation_id': correlation_id}
-        self.producer.send(request_topic, value=request_payload)
-        self.producer.flush()
-
-        # Attend la réponse
-        got_response = event.wait(timeout=timeout)
-        if not got_response:
-            logger.error(f"[Kafka] Request-reply timeout on {request_topic} (correlation_id={correlation_id})")
             return None
-
-        return result_holder.get('data')
+        finally:
+            consumer.close()

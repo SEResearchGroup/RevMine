@@ -428,8 +428,11 @@ export const analyzeService = {
     return response.data;
   },
 
-  getMetricsByCategory: async () => {
-    const response = await analyzeApi.get('/metrics/by_category/');
+  getMetricsByCategory: async (sourceType) => {
+    const url = sourceType
+      ? `/metrics/by_category/?source_type=${encodeURIComponent(sourceType)}`
+      : '/metrics/by_category/';
+    const response = await analyzeApi.get(url);
     return response.data;
   },
 
@@ -497,6 +500,142 @@ export const analyzeService = {
   },
 };
 
+// ============================================================
+// DevOps: Kanban (GitHub Projects v2 + GitLab Issue Boards)
+// ============================================================
+export const kanbanService = {
+  listBoards: async (payload) => {
+    const response = await analyzeApi.post('/devops/kanban/boards/', payload, {
+      timeout: 60000,
+    });
+    return response.data;
+  },
+
+  startCollection: async (payload) => {
+    // Async: the server kicks off a background job and returns a job
+    // descriptor (status + progress fields). Poll getJobStatus until the
+    // status is "completed" / "failed".
+    const response = await analyzeApi.post('/devops/kanban/collect/', payload, {
+      timeout: 60000,
+    });
+    return response.data;
+  },
+
+  getJobStatus: async (jobId) => {
+    const response = await analyzeApi.get(`/devops/jobs/${jobId}/status/`);
+    return response.data;
+  },
+
+  listDatasets: async () => {
+    const response = await analyzeApi.get('/devops/datasets/?source_type=kanban');
+    return response.data;
+  },
+
+  listMetrics: async () => {
+    const response = await analyzeApi.get('/metrics/by_category/?source_type=kanban');
+    return response.data;
+  },
+
+  // List workspaces + their imported repositories. Reuses the existing
+  // configuration-service endpoints so the user picks from repos that
+  // already have a stored OAuth token.
+  listWorkspaceRepos: async () => {
+    const response = await workspaceApi.get('/repositories/all/');
+    return response.data;
+  },
+
+  downloadDataset: async (datasetId, format = 'csv') => {
+    const response = await analyzeApi.get(
+      `/devops/datasets/${datasetId}/download/?format=${format}`,
+      { responseType: 'blob' }
+    );
+    return response.data; // Blob
+  },
+
+  computeMetrics: async (datasetId, metricCodes) => {
+    const response = await analyzeApi.post(
+      `/devops/datasets/${datasetId}/compute-metrics/`,
+      { metric_codes: metricCodes },
+      { timeout: 300000 }
+    );
+    return response.data;
+  },
+
+  downloadMetricsCSV: async (datasetId, metricCodes) => {
+    const response = await analyzeApi.post(
+      `/devops/datasets/${datasetId}/compute-metrics/csv/`,
+      { metric_codes: metricCodes },
+      { responseType: 'blob', timeout: 300000 }
+    );
+    return response.data;
+  },
+};
+
+// ============================================================
+// DevOps: CI/CD (GitHub Actions + GitLab CI)
+// ============================================================
+export const cicdService = {
+  listPipelines: async (payload) => {
+    const response = await analyzeApi.post('/devops/cicd/pipelines/', payload, {
+      timeout: 60000,
+    });
+    return response.data;
+  },
+
+  startCollection: async (payload) => {
+    const response = await analyzeApi.post('/devops/cicd/collect/', payload, {
+      timeout: 60000,
+    });
+    return response.data;
+  },
+
+  getJobStatus: async (jobId) => {
+    const response = await analyzeApi.get(`/devops/jobs/${jobId}/status/`);
+    return response.data;
+  },
+
+  listDatasets: async () => {
+    const response = await analyzeApi.get('/devops/datasets/?source_type=cicd');
+    return response.data;
+  },
+
+  listMetrics: async () => {
+    const response = await analyzeApi.get('/metrics/by_category/?source_type=cicd');
+    return response.data;
+  },
+
+  listWorkspaceRepos: async () => {
+    const response = await workspaceApi.get('/repositories/all/');
+    return response.data;
+  },
+
+  downloadDataset: async (datasetId, format = 'csv') => {
+    const response = await analyzeApi.get(
+      `/devops/datasets/${datasetId}/download/?format=${format}`,
+      { responseType: 'blob' }
+    );
+    return response.data;
+  },
+
+  computeMetrics: async (datasetId, metricCodes) => {
+    const response = await analyzeApi.post(
+      `/devops/datasets/${datasetId}/compute-metrics/`,
+      { metric_codes: metricCodes },
+      { timeout: 300000 }
+    );
+    return response.data;
+  },
+
+  downloadMetricsCSV: async (datasetId, metricCodes) => {
+    const response = await analyzeApi.post(
+      `/devops/datasets/${datasetId}/compute-metrics/csv/`,
+      { metric_codes: metricCodes },
+      { responseType: 'blob', timeout: 300000 }
+    );
+    return response.data;
+  },
+};
+
 export const notificationService = {
   getAll: (limit = 20, offset = 0) => {
     return notificationApi.get(`/?limit=${limit}&offset=${offset}`);
@@ -520,5 +659,7 @@ export default {
   workspace: workspaceService,
   collection: collectionService,
   analyze: analyzeService,
+  kanban: kanbanService,
+  cicd: cicdService,
   notification: notificationService,
 };

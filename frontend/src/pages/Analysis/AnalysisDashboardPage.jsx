@@ -295,10 +295,19 @@ const FullscreenOverlay = ({ result, chartTypeOverride, onChartTypeChange, onClo
 /* ================================================================== */
 /*  MAIN DASHBOARD PAGE                                               */
 /* ================================================================== */
+// Derive which section (analysis/kanban/cicd) owns this dashboard so the
+// "change metrics" and "project detail" links go back to the right entry.
+const DASHBOARD_SECTIONS = new Set(["analysis", "kanban", "cicd"]);
+const deriveDashboardSection = (pathname) => {
+  const first = (pathname || "").split("/").filter(Boolean)[0];
+  return DASHBOARD_SECTIONS.has(first) ? first : "analysis";
+};
+
 const AnalysisDashboardPage = () => {
   const { datasetId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+  const section = deriveDashboardSection(location.pathname);
 
   const [dataset, setDataset] = useState(location.state?.dataset || null);
   const [summary, setSummary] = useState(null);
@@ -572,7 +581,11 @@ const AnalysisDashboardPage = () => {
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-6">
           <div className="flex items-center gap-3">
             <button
-              onClick={() => navigate(`/analysis/${datasetId}/detail`)}
+              onClick={() =>
+                section === "analysis"
+                  ? navigate(`/analysis/${datasetId}/detail`)
+                  : navigate(`/${section}/history`)
+              }
               className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-white transition-colors"
             >
               <ArrowLeft className="w-5 h-5" />
@@ -631,7 +644,7 @@ const AnalysisDashboardPage = () => {
 
             {/* Add more metrics */}
             <button
-              onClick={() => navigate(`/analysis/${datasetId}/metrics`)}
+              onClick={() => navigate(`/${section}/${datasetId}/metrics`)}
               className="flex items-center gap-2 px-4 py-2.5 bg-linear-to-r from-indigo-600 to-blue-600 text-white rounded-xl text-sm font-medium shadow-sm hover:from-indigo-700 hover:to-blue-700 transition-all"
             >
               <TrendingUp className="w-4 h-4" />
@@ -684,7 +697,7 @@ const AnalysisDashboardPage = () => {
             <BarChart3 className="w-12 h-12 mx-auto mb-4 text-slate-300" />
             <p className="text-slate-500 mb-4">No charts generated yet.</p>
             <button
-              onClick={() => navigate(`/analysis/${datasetId}/metrics`)}
+              onClick={() => navigate(`/${section}/${datasetId}/metrics`)}
               className="px-6 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700 transition-colors"
             >
               Select Metrics
