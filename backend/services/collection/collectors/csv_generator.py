@@ -1519,7 +1519,7 @@ class StatisticsCSVGenerator:
             self.initial_size_column: initial_size,
             "hist_entropy": hist_entropy,
             "modified_files": len(files),
-            "filetypes": self._count_filetypes(files),
+            "filetypes": self._get_filetypes(files),
             "state": state,
             "rework_size": rework_size,
             "Author": author,
@@ -1592,11 +1592,11 @@ class StatisticsCSVGenerator:
                 total += self.extractor.get_commit_deletions(commit)
         return total
 
-    def _count_filetypes(self, files: list) -> int:
-        """Count unique file extensions across all changed files."""
-        extensions = {
+    def _get_filetypes(self, files: list) -> str:
+        """Return a sorted comma-separated string of unique file extensions across all changed files."""
+        extensions = sorted({
             self.extractor.get_file_name(f).rsplit(".", 1)[-1].lower()
             for f in files
             if "." in self.extractor.get_file_name(f)
-        }
-        return len(extensions)
+        })
+        return ",".join(extensions)

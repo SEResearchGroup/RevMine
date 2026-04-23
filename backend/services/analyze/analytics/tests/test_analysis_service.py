@@ -110,6 +110,13 @@ def _assert_valid_chart_data(chart_data):
     assert 'data' in chart_data, "chart_data missing 'data'"
     assert 'options' in chart_data, "chart_data missing 'options'"
 
+    # multi_chart: validate each sub-chart recursively
+    if chart_data['type'] == 'multi_chart':
+        assert 'charts' in chart_data, "multi_chart missing 'charts' list"
+        for sub in chart_data['charts']:
+            _assert_valid_chart_data(sub)
+        return
+
     data = chart_data['data']
     # Scatter charts might not have labels
     if chart_data['type'] != 'scatter' and chart_data['type'] != 'heatmap':
@@ -278,6 +285,17 @@ class TestAnalysisService(TestCase):
     def test_filetypes_distribution(self):
         result = self._run_analysis('filetypes_distribution', chart_type='bar')
         self._validate_result(result)
+        cd = result['chart_data']
+        self.assertEqual(cd['type'], 'multi_chart')
+        self.assertEqual(len(cd['charts']), 2)
+        # Chart 1: extensions → MR counts
+        chart1 = cd['charts'][0]
+        self.assertIn('labels', chart1['data'])
+        self.assertIn('datasets', chart1['data'])
+        # Chart 2: number of file types → MR counts
+        chart2 = cd['charts'][1]
+        self.assertIn('labels', chart2['data'])
+        self.assertIn('datasets', chart2['data'])
 
     def test_entropy_analysis(self):
         result = self._run_analysis('entropy_analysis', chart_type='bar')

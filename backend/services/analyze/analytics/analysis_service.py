@@ -1570,60 +1570,133 @@ class AnalysisService:
     
     def analyze_filetypes_distribution(self, df, analysis):
         """
-        Analyze distribution of file types in MRs
+        Analyze distribution of file types in MRs.
+
+        The 'filetypes' column contains comma-separated extension strings
+        (e.g. "py,java,js").  Two charts are produced:
+          1. MRs per file extension  – how many MRs touched each extension.
+          2. MRs by number of file types changed – distribution of unique-extension
+             counts per MR (e.g. 100 MRs changed 1 type, 20 changed 2, …).
         """
         config = analysis.config
         filetypes_col = config.get('x_axis') or 'filetypes'
-        
+
         df = self._apply_config(df, config)
-        
+
         if filetypes_col not in df.columns:
             raise ValueError(f"Column '{filetypes_col}' not found in dataset")
-        
+
         df_copy = df.copy()
-        df_copy[filetypes_col] = pd.to_numeric(df_copy[filetypes_col], errors='coerce').fillna(0).astype(int)
-        
-        filetypes_dist = df_copy[filetypes_col].value_counts().sort_index()
-        
-        if len(filetypes_dist) > 15:
-            filetypes_dist = filetypes_dist.head(15)
-        
-        chart_data = {
+        # Normalise: handle legacy int/float values as well as the new string format
+        df_copy[filetypes_col] = df_copy[filetypes_col].fillna('').astype(str)
+
+        # -------------------------------------------------------------------
+        # Chart 1 – MRs per extension
+        # -------------------------------------------------------------------
+        ext_mr_counts: dict = {}  # extension -> set of row indices
+        per_mr_ext_counts = []    # number of unique extensions per MR
+
+        for idx, raw in df_copy[filetypes_col].items():
+            raw = raw.strip()
+            if not raw or raw in ('0', 'nan', ''):
+                per_mr_ext_counts.append(0)
+                continue
+            # Support both comma-separated strings and legacy integer strings
+            if ',' in raw or not raw.isdigit():
+                exts = [e.strip() for e in raw.split(',') if e.strip()]
+            else:
+                # Legacy: numeric count – we can't recover the actual extensions
+                per_mr_ext_counts.append(int(raw))
+                continue
+            per_mr_ext_counts.append(len(exts))
+            for ext in exts:
+                ext_mr_counts.setdefault(ext, 0)
+                ext_mr_counts[ext] += 1
+
+        # Sort extensions by MR count descending, keep top 25
+        sorted_exts = sorted(ext_mr_counts.items(), key=lambda x: x[1], reverse=True)[:25]
+        ext_labels = [e for e, _ in sorted_exts]
+        ext_values = [c for _, c in sorted_exts]
+
+        chart1 = {
             'type': 'bar',
             'data': {
-                'labels': [str(x) for x in filetypes_dist.index.tolist()],
+                'labels': ext_labels,
                 'datasets': [{
                     'label': 'Number of MRs',
-                    'data': filetypes_dist.values.tolist(),
+                    'data': ext_values,
                 }]
             },
             'options': {
-                'title': 'Distribution of File Types per MR',
-                'xLabel': 'Number of File Types',
+                'title': 'MRs per file extension',
+                'xLabel': 'File extension',
                 'yLabel': 'Number of MRs',
             }
         }
-        
-        fig, ax = plt.subplots(figsize=(10, 6))
-        ax.bar(range(len(filetypes_dist)), filetypes_dist.values, color='steelblue')
-        ax.set_xlabel('Number of File Types')
-        ax.set_ylabel('Number of MRs')
-        ax.set_title('Distribution of File Types per MR')
-        ax.set_xticks(range(len(filetypes_dist)))
-        ax.set_xticklabels([str(x) for x in filetypes_dist.index])
-        ax.grid(axis='y', alpha=0.3)
-        plt.tight_layout()
-        
-        chart_image = self._generate_matplotlib_image(fig)
-        
-        stats = df_copy[filetypes_col].describe()
-        statistics = {
-            'count': int(stats['count']),
-            'mean': float(stats['mean']),
-            'median': float(stats['50%']),
-            'max': int(stats['max']),
+
+        # -------------------------------------------------------------------
+        # Chart 2 – MRs by number of file types changed
+        # -------------------------------------------------------------------
+        counts_series = pd.Series(per_mr_ext_counts, dtype=int)
+        dist = counts_series.value_counts().sort_index()
+        # Exclude 0 if present (MRs with no parseable extension info)
+        dist = dist[dist.index > 0]
+
+        chart2 = {
+            'type': 'bar',
+            'data': {
+                'labels': [str(x) for x in dist.index.tolist()],
+                'datasets': [{
+                    'label': 'Number of MRs',
+                    'data': dist.values.tolist(),
+                }]
+            },
+            'options': {
+                'title': 'MRs by number of file types changed',
+                'xLabel': 'Number of unique file types',
+                'yLabel': 'Number of MRs',
+            }
         }
-        
+
+        chart_data = {
+            'type': 'multi_chart',
+            'options': {'title': 'File Types Analysis'},
+            'charts': [chart1, chart2],
+        }
+
+        # -------------------------------------------------------------------
+        # Matplotlib image – two side-by-side subplots
+        # -------------------------------------------------------------------
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
+
+        # Subplot 1
+        ax1.bar(range(len(ext_labels)), ext_values, color='steelblue')
+        ax1.set_xlabel('File extension')
+        ax1.set_ylabel('Number of MRs')
+        ax1.set_title('MRs per file extension')
+        ax1.set_xticks(range(len(ext_labels)))
+        ax1.set_xticklabels(ext_labels, rotation=45, ha='right')
+        ax1.grid(axis='y', alpha=0.3)
+
+        # Subplot 2
+        ax2.bar(range(len(dist)), dist.values, color='teal')
+        ax2.set_xlabel('Number of unique file types')
+        ax2.set_ylabel('Number of MRs')
+        ax2.set_title('MRs by number of file types changed')
+        ax2.set_xticks(range(len(dist)))
+        ax2.set_xticklabels([str(x) for x in dist.index], rotation=0)
+        ax2.grid(axis='y', alpha=0.3)
+
+        plt.tight_layout()
+        chart_image = self._generate_matplotlib_image(fig)
+
+        statistics = {
+            'total_extensions': len(ext_mr_counts),
+            'top_extension': ext_labels[0] if ext_labels else None,
+            'top_extension_mrs': ext_values[0] if ext_values else 0,
+            'mean_types_per_mr': float(counts_series[counts_series > 0].mean()) if any(c > 0 for c in per_mr_ext_counts) else 0.0,
+        }
+
         return {
             'chart_data': chart_data,
             'chart_image': chart_image,
