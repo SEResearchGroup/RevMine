@@ -84,6 +84,8 @@ function ProjectDetail() {
   const [automationLoading, setAutomationLoading] = useState(false);
   const [automationExecuting, setAutomationExecuting] = useState(false);
   const [automationError, setAutomationError] = useState(null);
+  const [automationProvider, setAutomationProvider] = useState("openrouter");
+  const [automationModel, setAutomationModel] = useState("openai/gpt-4o-mini");
 
   // Modal
   const [showPlanModal, setShowPlanModal] = useState(false);
@@ -471,6 +473,8 @@ function ProjectDetail() {
         workspace_id: Number(workspaceId),
         repository_id: Number(repositoryId),
         prompt: automationPrompt,
+        llm_provider: automationProvider,
+        model: automationModel,
       });
 
       setAutomationDraft(response.data.draft);
@@ -1341,6 +1345,10 @@ function ProjectDetail() {
               onApprove={handleApproveAutomation}
               prompt={automationPrompt}
               onPromptChange={setAutomationPrompt}
+              llmProvider={automationProvider}
+              onProviderChange={setAutomationProvider}
+              llmModel={automationModel}
+              onModelChange={setAutomationModel}
             />
           )}
         </div>

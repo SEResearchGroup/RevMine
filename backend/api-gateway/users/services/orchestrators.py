@@ -128,6 +128,8 @@ class CollectionOrchestrator:
 
         repository_id = body_data.get("repository_id")
         workspace_id = body_data.get("workspace_id")
+        llm_provider = body_data.get("llm_provider") or "openrouter"
+        endpoint = "ollama" if llm_provider == "ollama" else "openrouter"
         model = body_data.get("model") or DEFAULT_LLM_MODEL
 
         try:
@@ -142,9 +144,10 @@ class CollectionOrchestrator:
             )
 
         logger.info(
-            "Generating automatic collection draft for repository=%s workspace=%s model=%s prompt_length=%s",
+            "Generating automatic collection draft for repository=%s workspace=%s provider=%s model=%s prompt_length=%s",
             repository_id,
             workspace_id,
+            llm_provider,
             model,
             len(prompt),
         )
@@ -158,6 +161,7 @@ class CollectionOrchestrator:
             llm_response, llm_status = self.llm_client.generate_collection_draft(
                 prompt=llm_prompt,
                 model=model,
+                endpoint=endpoint,
             )
 
             if llm_status >= 400:
@@ -254,6 +258,8 @@ class AnalysisOrchestrator:
             return error_response
 
         dataset_id = body_data.get("dataset_id")
+        llm_provider = body_data.get("llm_provider") or "openrouter"
+        endpoint = "ollama" if llm_provider == "ollama" else "openrouter"
         model = body_data.get("model") or DEFAULT_ANALYSIS_LLM_MODEL
 
         try:
@@ -265,8 +271,9 @@ class AnalysisOrchestrator:
             return JsonResponse({"error": "dataset_id is required"}, status=400)
 
         logger.info(
-            "Generating automatic analysis draft for dataset=%s model=%s prompt_length=%s",
+            "Generating automatic analysis draft for dataset=%s provider=%s model=%s prompt_length=%s",
             dataset_id,
+            llm_provider,
             model,
             len(prompt),
         )
@@ -297,6 +304,7 @@ class AnalysisOrchestrator:
             llm_response, llm_status = self.llm_client.generate_analysis_draft(
                 prompt=llm_prompt,
                 model=model,
+                endpoint=endpoint,
             )
 
             if llm_status >= 400:

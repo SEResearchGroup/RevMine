@@ -26,6 +26,27 @@ def health_check() -> dict:
     return {"status": "ok"}
 
 
+@app.get("/models")
+def get_available_models() -> dict:
+    """Return the list of available LLM providers and their models."""
+    return {
+        "openrouter": {
+            "default": settings.OPENROUTER_DEFAULT_MODEL,
+            "models": [
+                {"id": "openai/gpt-4o-mini", "name": "GPT-4o Mini (OpenAI)"},
+                {"id": "meta-llama/llama-3.1-8b-instruct", "name": "Llama 3.1 8B (Free)"},
+                {"id": "google/gemma-3-4b-it", "name": "Gemma 3 4B (Free)"},
+                {"id": "microsoft/phi-3-mini-128k-instruct", "name": "Phi-3 Mini (Free)"},
+                {"id": "qwen/qwen3-8b", "name": "Qwen3 8B (Free)"},
+                {"id": "deepseek/deepseek-r1", "name": "DeepSeek R1 (Free)"},
+            ],
+        },
+        "ollama": {
+            "default": settings.DEFAULT_MODEL,
+        },
+    }
+
+
 @app.post("/openrouter", response_model=ParseResponse)
 def openrouter_parse_request(
     payload: ParseRequest,
