@@ -58,7 +58,7 @@ const Settings = () => {
           label: "Change password",
           description: "Update your account password",
           action: () => navigate("/profile"),
-          iconColor: "text-indigo-600 bg-indigo-50",
+          iconColor: "text-blue-600 bg-blue-50",
         },
       ],
     },
@@ -66,14 +66,14 @@ const Settings = () => {
       title: "Permissions",
       description: "Tokens, workspaces and access control",
       icon: Key,
-      color: "text-emerald-600 bg-emerald-50",
+      color: "text-green-600 bg-green-50",
       items: [
         {
           icon: Key,
           label: "API tokens & workspaces",
           description: "Manage your GitHub/GitLab tokens and workspace connections",
           action: () => navigate("/workspaces"),
-          iconColor: "text-emerald-600 bg-emerald-50",
+          iconColor: "text-green-600 bg-green-50",
         },
       ],
     },
@@ -97,21 +97,21 @@ const Settings = () => {
       title: "Help & Support",
       description: "Guides and frequently asked questions",
       icon: HelpCircle,
-      color: "text-purple-600 bg-purple-50",
+      color: "text-blue-600 bg-blue-50",
       items: [
         {
           icon: HelpCircle,
           label: "Get started guide",
           description: "Learn how to use RevMine step by step",
           action: () => navigate("/help/get-started"),
-          iconColor: "text-purple-600 bg-purple-50",
+          iconColor: "text-blue-600 bg-blue-50",
         },
         {
           icon: HelpCircle,
           label: "FAQs",
           description: "Frequently asked questions and answers",
           action: () => navigate("/help/faqs"),
-          iconColor: "text-violet-600 bg-violet-50",
+          iconColor: "text-blue-600 bg-blue-50",
         },
       ],
     },
@@ -252,7 +252,7 @@ const Settings = () => {
       {/* Delete confirmation modal */}
       {showDeleteConfirm && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl">
+          <div className="bg-white rounded-xl p-6 max-w-md w-full shadow-2xl">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-11 h-11 bg-red-100 rounded-full flex items-center justify-center">
                 <AlertTriangle className="w-5 h-5 text-red-600" />

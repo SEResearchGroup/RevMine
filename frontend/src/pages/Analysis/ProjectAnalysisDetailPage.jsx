@@ -37,26 +37,26 @@ import { analyzeService } from "../../services/api";
 /* ------------------------------------------------------------------ */
 const StatCard = ({ icon: Icon, label, value, color = "indigo", sub }) => {
   const colorMap = {
-    indigo: "from-indigo-500 to-blue-600 shadow-indigo-200/50",
-    emerald: "from-emerald-500 to-teal-600 shadow-emerald-200/50",
-    amber: "from-amber-500 to-orange-600 shadow-amber-200/50",
-    rose: "from-rose-500 to-pink-600 shadow-rose-200/50",
-    violet: "from-violet-500 to-purple-600 shadow-violet-200/50",
-    cyan: "from-cyan-500 to-sky-600 shadow-cyan-200/50",
+    indigo: "bg-blue-600",
+    emerald: "bg-green-600",
+    amber:   "bg-amber-500",
+    rose:    "bg-red-500",
+    violet:  "bg-blue-600",
+    cyan:    "bg-blue-500",
   };
   return (
-    <div className="bg-white rounded-xl border border-slate-200/60 p-4 flex items-center gap-3">
+    <div className="bg-white rounded-xl border border-gray-200 p-4 flex items-center gap-3">
       <div
-        className={`w-10 h-10 rounded-xl bg-linear-to-br ${colorMap[color]} flex items-center justify-center shadow-lg shrink-0`}
+        className={`w-10 h-10 rounded-xl ${colorMap[color] || "bg-blue-600"} flex items-center justify-center shrink-0`}
       >
         <Icon className="w-5 h-5 text-white" />
       </div>
       <div className="min-w-0">
-        <p className="text-[10px] uppercase tracking-wider text-slate-400 font-medium">
+        <p className="text-[10px] uppercase tracking-wider text-gray-400 font-medium">
           {label}
         </p>
-        <p className="text-lg font-bold text-slate-800 truncate">{value}</p>
-        {sub && <p className="text-xs text-slate-500 truncate">{sub}</p>}
+        <p className="text-lg font-bold text-gray-800 truncate">{value}</p>
+        {sub && <p className="text-xs text-gray-500 truncate">{sub}</p>}
       </div>
     </div>
   );
@@ -67,7 +67,7 @@ const StatCard = ({ icon: Icon, label, value, color = "indigo", sub }) => {
 /* ------------------------------------------------------------------ */
 const AnalysisRow = ({ analysis, onClick }) => {
   const statusConfig = {
-    completed: { icon: CheckCircle2, class: "text-emerald-500 bg-emerald-50", label: "Completed" },
+    completed: { icon: CheckCircle2, class: "text-green-500 bg-green-50", label: "Completed" },
     processing: { icon: Loader2, class: "text-blue-500 bg-blue-50 animate-spin", label: "Processing" },
     pending: { icon: Clock, class: "text-amber-500 bg-amber-50", label: "Pending" },
     failed: { icon: AlertCircle, class: "text-red-500 bg-red-50", label: "Failed" },
@@ -89,21 +89,21 @@ const AnalysisRow = ({ analysis, onClick }) => {
   return (
     <button
       onClick={onClick}
-      className="w-full flex items-center gap-4 px-4 py-3 hover:bg-slate-50 transition-colors rounded-xl text-left group"
+      className="w-full flex items-center gap-4 px-4 py-3 hover:bg-gray-50 transition-colors rounded-xl text-left group"
     >
       <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${st.class}`}>
         <StatusIcon className="w-4 h-4" />
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-slate-700 truncate group-hover:text-indigo-700 transition-colors">
+        <p className="text-sm font-medium text-gray-700 truncate group-hover:text-blue-700 transition-colors">
           {(analysis.metric_code || "").replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}
         </p>
-        <p className="text-xs text-slate-400">{formatDate(analysis.created_at)}</p>
+        <p className="text-xs text-gray-400">{formatDate(analysis.created_at)}</p>
       </div>
-      <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[10px] font-medium uppercase">
+      <span className="px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 text-[10px] font-medium uppercase">
         {analysis.chart_type || "auto"}
       </span>
-      <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-indigo-400 transition-colors" />
+      <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-blue-400 transition-colors" />
     </button>
   );
 };
@@ -162,20 +162,20 @@ const ProjectAnalysisDetailPage = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-linear-to-br from-slate-50 via-blue-50/30 to-indigo-50/40 flex items-center justify-center">
-        <Loader2 className="w-10 h-10 animate-spin text-indigo-500" />
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Loader2 className="w-10 h-10 animate-spin text-blue-500" />
       </div>
     );
   }
 
   if (error || !dataset) {
     return (
-      <div className="min-h-screen bg-linear-to-br from-slate-50 via-blue-50/30 to-indigo-50/40 flex flex-col items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center">
         <AlertCircle className="w-12 h-12 text-red-400 mb-3" />
-        <p className="text-slate-600">{error || "Dataset not found"}</p>
+        <p className="text-gray-600">{error || "Dataset not found"}</p>
         <button
           onClick={() => navigate("/analysis/history")}
-          className="mt-4 px-4 py-2 text-sm text-indigo-600 hover:text-indigo-700 font-medium"
+          className="mt-4 px-4 py-2 text-sm text-blue-600 hover:text-blue-700 font-medium"
         >
           Back to History
         </button>
@@ -184,7 +184,7 @@ const ProjectAnalysisDetailPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-slate-50 via-blue-50/30 to-indigo-50/40">
+    <div className="min-h-screen bg-gray-50">
       <div className="max-w-6xl mx-auto px-6 py-8">
         {/* Back button + header */}
         <div className="flex items-center gap-4 mb-8">
@@ -192,13 +192,13 @@ const ProjectAnalysisDetailPage = () => {
             onClick={() => navigate("/analysis/history")}
             className="p-2 rounded-xl hover:bg-white hover:shadow-sm transition-all"
           >
-            <ArrowLeft className="w-5 h-5 text-slate-500" />
+            <ArrowLeft className="w-5 h-5 text-gray-500" />
           </button>
           <div className="flex-1">
-            <h1 className="text-2xl font-bold text-slate-800">
+            <h1 className="text-2xl font-bold text-gray-800">
               {dataset.filename || "Unnamed Dataset"}
             </h1>
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-gray-500">
               Uploaded {formatDate(dataset.uploaded_at)}
               {dataset.platform && ` · ${dataset.platform}`}
             </p>
@@ -206,14 +206,14 @@ const ProjectAnalysisDetailPage = () => {
           <div className="flex gap-2">
             <button
               onClick={() => navigate(`/analysis/${datasetId}/metrics`)}
-              className="flex items-center gap-2 px-4 py-2.5 border border-slate-200 bg-white text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50 transition-colors"
+              className="flex items-center gap-2 px-4 py-2.5 border border-gray-200 bg-white text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-50 transition-colors"
             >
               <Plus className="w-4 h-4" />
               Add Metrics
             </button>
             <button
               onClick={() => navigate(`/analysis/${datasetId}/dashboard`)}
-              className="flex items-center gap-2 px-5 py-2.5 bg-linear-to-r from-indigo-600 to-blue-600 text-white rounded-xl text-sm font-medium shadow-lg shadow-indigo-200/50 hover:from-indigo-700 hover:to-blue-700 transition-all"
+              className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-medium shadow-lg shadow-blue-200/50 hover:bg-blue-700 transition-all"
             >
               <BarChart3 className="w-4 h-4" />
               View Dashboard
@@ -265,8 +265,8 @@ const ProjectAnalysisDetailPage = () => {
           {/* Left: Summary info */}
           <div className="lg:col-span-1 space-y-4">
             {/* Dataset Info Card */}
-            <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm p-5">
-              <h2 className="text-sm font-bold text-slate-700 uppercase tracking-wider mb-4">
+            <div className="bg-white rounded-xl border border-gray-200/60 shadow-sm p-5">
+              <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-4">
                 Dataset Info
               </h2>
               <div className="space-y-3">
@@ -287,8 +287,8 @@ const ProjectAnalysisDetailPage = () => {
 
             {/* Summary Stats Card */}
             {summary && (
-              <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm p-5">
-                <h2 className="text-sm font-bold text-slate-700 uppercase tracking-wider mb-4">
+              <div className="bg-white rounded-xl border border-gray-200/60 shadow-sm p-5">
+                <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-4">
                   Data Summary
                 </h2>
                 <div className="space-y-3">
@@ -326,22 +326,22 @@ const ProjectAnalysisDetailPage = () => {
             {/* Numeric summaries */}
             {summary?.numeric_summaries &&
               Object.keys(summary.numeric_summaries).length > 0 && (
-                <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm p-5">
-                  <h2 className="text-sm font-bold text-slate-700 uppercase tracking-wider mb-4">
+                <div className="bg-white rounded-xl border border-gray-200/60 shadow-sm p-5">
+                  <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-4">
                     Numeric Summaries
                   </h2>
                   <div className="space-y-4">
                     {Object.entries(summary.numeric_summaries).map(
                       ([col, stats]) => (
                         <div key={col}>
-                          <p className="text-xs font-semibold text-slate-600 mb-1.5">
+                          <p className="text-xs font-semibold text-gray-600 mb-1.5">
                             {col.replace(/_/g, " ")}
                           </p>
                           <div className="grid grid-cols-2 gap-y-1 gap-x-4">
                             {Object.entries(stats).map(([k, v]) => (
                               <div key={k} className="flex justify-between text-xs">
-                                <span className="text-slate-400">{k}</span>
-                                <span className="font-medium text-slate-700">
+                                <span className="text-gray-400">{k}</span>
+                                <span className="font-medium text-gray-700">
                                   {typeof v === "number"
                                     ? v.toLocaleString(undefined, {
                                         maximumFractionDigits: 2,
@@ -361,14 +361,14 @@ const ProjectAnalysisDetailPage = () => {
 
           {/* Right: Analyses list */}
           <div className="lg:col-span-2">
-            <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm">
-              <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
-                <h2 className="text-sm font-bold text-slate-700 uppercase tracking-wider">
+            <div className="bg-white rounded-xl border border-gray-200/60 shadow-sm">
+              <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+                <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wider">
                   Analyses ({analyses.length})
                 </h2>
                 <button
                   onClick={() => navigate(`/analysis/${datasetId}/dashboard`)}
-                  className="text-xs font-medium text-indigo-600 hover:text-indigo-700 flex items-center gap-1"
+                  className="text-xs font-medium text-blue-600 hover:text-blue-700 flex items-center gap-1"
                 >
                   Open Dashboard
                   <ChevronRight className="w-3 h-3" />
@@ -377,19 +377,19 @@ const ProjectAnalysisDetailPage = () => {
 
               {analyses.length === 0 ? (
                 <div className="p-10 text-center">
-                  <LayoutGrid className="w-10 h-10 mx-auto mb-3 text-slate-300" />
-                  <p className="text-sm text-slate-500 mb-4">
+                  <LayoutGrid className="w-10 h-10 mx-auto mb-3 text-gray-300" />
+                  <p className="text-sm text-gray-500 mb-4">
                     No analyses have been run on this dataset yet.
                   </p>
                   <button
                     onClick={() => navigate(`/analysis/${datasetId}/metrics`)}
-                    className="px-5 py-2 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700 transition-colors"
+                    className="px-5 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 transition-colors"
                   >
                     Select Metrics &amp; Analyse
                   </button>
                 </div>
               ) : (
-                <div className="divide-y divide-slate-100/80">
+                <div className="divide-y divide-gray-100/80">
                   {analyses.map((a) => (
                     <AnalysisRow
                       key={a.id}
@@ -412,8 +412,8 @@ const ProjectAnalysisDetailPage = () => {
 /* Small helper */
 const InfoRow = ({ label, value }) => (
   <div className="flex justify-between items-center">
-    <span className="text-xs text-slate-400">{label}</span>
-    <span className="text-sm font-medium text-slate-700 text-right max-w-[60%] truncate">
+    <span className="text-xs text-gray-400">{label}</span>
+    <span className="text-sm font-medium text-gray-700 text-right max-w-[60%] truncate">
       {value}
     </span>
   </div>

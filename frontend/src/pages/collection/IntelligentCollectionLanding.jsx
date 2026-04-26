@@ -68,13 +68,13 @@ function IntelligentCollectionLanding() {
         <h1 className="text-xl sm:text-2xl font-semibold text-gray-800 mb-2">
           <span className="text-blue-600">Collection</span> / Intelligent Collect
         </h1>
-        <div className="flex items-start gap-3 bg-gradient-to-br from-sky-50 to-indigo-50 border border-sky-100 rounded-xl p-4 mb-6">
-          <Sparkles className="w-5 h-5 text-sky-600 shrink-0 mt-0.5" />
+        <div className="flex items-start gap-3 bg-gradient-to-br from-sky-50 to-blue-50 border border-sky-100 rounded-xl p-4 mb-6">
+          <Sparkles className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
           <div>
-            <p className="text-sm text-sky-900 font-medium">
+            <p className="text-sm text-blue-900 font-medium">
               Describe what you want in plain English and let RevMine draft the plan.
             </p>
-            <p className="text-sm text-sky-900/80 mt-1">
+            <p className="text-sm text-blue-900/80 mt-1">
               Pick a project below. On the next page you'll get an AI-assisted form —
               enter something like "collect pull requests merged in the last 30 days on
               main, focusing on review latency" and we'll preselect branch, date range,
@@ -99,7 +99,7 @@ function IntelligentCollectionLanding() {
             onClick={() => setShowFilters(!showFilters)}
             className={`px-4 py-2.5 border rounded-lg flex items-center justify-center gap-2 hover:bg-gray-50 transition ${
               hasActiveFilters
-                ? "border-sky-500 text-sky-600 bg-sky-50"
+                ? "border-sky-500 text-blue-600 bg-sky-50"
                 : "border-gray-300"
             }`}
           >
@@ -178,7 +178,7 @@ function IntelligentCollectionLanding() {
                 <button
                   onClick={handleLoadMore}
                   disabled={loadingMore}
-                  className="px-6 py-3 border border-sky-600 text-sky-600 rounded-lg hover:bg-sky-50 transition flex items-center gap-2 disabled:opacity-50"
+                  className="px-6 py-3 border border-sky-600 text-blue-600 rounded-lg hover:bg-sky-50 transition flex items-center gap-2 disabled:opacity-50"
                 >
                   {loadingMore ? (
                     "Loading..."

@@ -80,7 +80,7 @@ const NavbarAuth = () => {
             className="flex items-center gap-2 sm:gap-3 ml-2 cursor-pointer hover:bg-gray-50 p-2 rounded-lg transition"
             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
           >
-            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-linear-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-semibold text-sm sm:text-base">
+            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-semibold text-sm sm:text-base">
               {userInformation.first_name?.[0]}
               {userInformation.last_name?.[0]}
             </div>
@@ -105,7 +105,7 @@ const NavbarAuth = () => {
             <div className="absolute right-0 mt-2 w-72 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
               <div className="p-4 border-b border-gray-200">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-full bg-linear-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-semibold text-lg">
+                  <div className="w-12 h-12 rounded-full bg-blue-600 flex items-center justify-center text-white font-semibold text-lg">
                     {userInformation.first_name?.[0]}
                     {userInformation.last_name?.[0]}
                   </div>

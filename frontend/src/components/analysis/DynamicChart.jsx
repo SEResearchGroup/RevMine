@@ -615,7 +615,7 @@ const DynamicChart = forwardRef(({
 
   if (!chartData) {
     return (
-      <div className="flex items-center justify-center h-full text-slate-400 text-sm">
+      <div className="flex items-center justify-center h-full text-gray-400 text-sm">
         No data available
       </div>
     );
@@ -631,7 +631,7 @@ const DynamicChart = forwardRef(({
         {charts.map((subChart, i) => (
           <div key={i} className="flex flex-col flex-1 min-h-0">
             {subChart.options?.title && (
-              <p className="text-xs font-semibold text-slate-600 mb-1 text-center">
+              <p className="text-xs font-semibold text-gray-600 mb-1 text-center">
                 {subChart.options.title}
               </p>
             )}
@@ -655,15 +655,15 @@ const DynamicChart = forwardRef(({
         <div className="flex items-center gap-2 mb-2 flex-wrap">
           {/* Chart type toggles */}
           {supportedTypes.length > 1 && (
-            <div className="flex items-center bg-slate-100 rounded-lg p-0.5">
+            <div className="flex items-center bg-gray-100 rounded-lg p-0.5">
               {supportedTypes.map((t) => (
                 <button
                   key={t}
                   onClick={() => onChartTypeChange?.(t)}
                   className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors capitalize ${
                     activeType === t
-                      ? "bg-white text-indigo-600 shadow-sm"
-                      : "text-slate-500 hover:text-slate-700"
+                      ? "bg-white text-blue-600 shadow-sm"
+                      : "text-gray-500 hover:text-gray-700"
                   }`}
                 >
                   {t}
@@ -678,8 +678,8 @@ const DynamicChart = forwardRef(({
               onClick={handleSwapAxes}
               className={`px-2.5 py-1 text-xs font-medium rounded-lg border transition-colors ${
                 swapAxes
-                  ? "bg-indigo-50 border-indigo-200 text-indigo-600"
-                  : "bg-white border-slate-200 text-slate-500 hover:border-indigo-200 hover:text-indigo-600"
+                  ? "bg-blue-50 border-blue-200 text-blue-600"
+                  : "bg-white border-gray-200 text-gray-500 hover:border-blue-200 hover:text-blue-600"
               }`}
               title="Swap X / Y axes"
             >
@@ -691,7 +691,7 @@ const DynamicChart = forwardRef(({
           {isHistogram && (
             <button
               onClick={handleResetZoom}
-              className="px-2.5 py-1 text-xs font-medium rounded-lg border bg-white border-slate-200 text-slate-500 hover:border-indigo-200 hover:text-indigo-600 transition-colors"
+              className="px-2.5 py-1 text-xs font-medium rounded-lg border bg-white border-gray-200 text-gray-500 hover:border-blue-200 hover:text-blue-600 transition-colors"
               title="Reset zoom to full range"
             >
               ↺ Reset Zoom

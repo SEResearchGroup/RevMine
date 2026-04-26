@@ -83,7 +83,7 @@ const Register = () => {
   return (
     <div className="w-full flex items-center justify-center px-4 py-2">
       <div className="w-full max-w-md lg:max-w-lg xl:max-w-xl bg-white rounded-lg shadow-lg p-6 sm:p-8">
-        <h2 className="text-xl sm:text-2xl font-bold text-[#008CFF] text-center mb-6 sm:mb-8">
+        <h2 className="text-xl sm:text-2xl font-bold text-blue-600 text-center mb-6 sm:mb-8">
           Create your account
         </h2>
 
@@ -259,15 +259,15 @@ const Register = () => {
 
           <div className="text-xs sm:text-sm text-gray-600">
             By selecting Create my account, I agree to the{" "}
-            <a href="#" className="text-[#008CFF] hover:underline font-medium">
+            <a href="#" className="text-blue-600 hover:underline font-medium">
               Terms of Service
             </a>{" "}
             and{" "}
-            <a href="#" className="text-[#008CFF] hover:underline font-medium">
+            <a href="#" className="text-blue-600 hover:underline font-medium">
               Master Services Agreement
             </a>
             , and acknowledge the{" "}
-            <a href="#" className="text-[#008CFF] hover:underline font-medium">
+            <a href="#" className="text-blue-600 hover:underline font-medium">
               Privacy Policy
             </a>
             .
@@ -283,7 +283,7 @@ const Register = () => {
               !firstName ||
               !lastName
             }
-            className="w-full bg-[#008CFF] text-white py-2.5 sm:py-3 text-sm sm:text-base rounded-lg hover:bg-[#007ACC] transition font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full bg-blue-600 text-white py-2.5 sm:py-3 text-sm sm:text-base rounded-lg hover:bg-blue-700 transition font-medium disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? "Creating..." : "Create my account"}
           </button>
@@ -293,7 +293,7 @@ const Register = () => {
           Already have an account?{" "}
           <a
             href="/login"
-            className="text-[#008CFF] hover:underline font-medium"
+            className="text-blue-600 hover:underline font-medium"
           >
             Login
           </a>

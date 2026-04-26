@@ -59,27 +59,27 @@ const CollectionCard = ({ item, onSelect, selecting }) => {
     <button
       onClick={() => onSelect(item)}
       disabled={!!selecting}
-      className="w-full text-left bg-white rounded-2xl border border-slate-200/60 shadow-sm hover:shadow-md hover:border-emerald-200 transition-all p-5 group disabled:opacity-60 disabled:cursor-wait"
+      className="w-full text-left bg-white rounded-xl border border-gray-200/60 shadow-sm hover:shadow-md hover:border-green-200 transition-all p-5 group disabled:opacity-60 disabled:cursor-wait"
     >
       <div className="flex items-start gap-4">
         {/* Icon */}
-        <div className="w-11 h-11 rounded-xl bg-linear-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-md shadow-emerald-200/50 shrink-0">
+        <div className="w-11 h-11 rounded-xl bg-blue-600 flex items-center justify-center shadow-md shadow-green-200/50 shrink-0">
           <Database className="w-5 h-5 text-white" />
         </div>
 
         {/* Info */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <h3 className="font-semibold text-slate-800 truncate group-hover:text-emerald-700 transition-colors">
+            <h3 className="font-semibold text-gray-800 truncate group-hover:text-green-700 transition-colors">
               {item.repository_full_name || item.repository_name}
             </h3>
-            <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[10px] font-medium uppercase shrink-0">
+            <span className="px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 text-[10px] font-medium uppercase shrink-0">
               {platformIcon(item.platform)}
             </span>
           </div>
 
           {/* Meta row */}
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-sm text-slate-500">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-sm text-gray-500">
             <span className="flex items-center gap-1">
               <Calendar className="w-3.5 h-3.5" />
               Collected {formatDate(item.collection_date)}
@@ -91,7 +91,7 @@ const CollectionCard = ({ item, onSelect, selecting }) => {
           </div>
 
           {/* Date range & stats */}
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1.5 text-sm text-slate-400">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1.5 text-sm text-gray-400">
             {(item.start_date || item.end_date) && (
               <span>
                 Range: {item.start_date || "start"} → {item.end_date || "end"}
@@ -112,9 +112,9 @@ const CollectionCard = ({ item, onSelect, selecting }) => {
         {/* Right side */}
         <div className="flex items-center shrink-0 ml-2">
           {isSelecting ? (
-            <Loader2 className="w-5 h-5 animate-spin text-emerald-500" />
+            <Loader2 className="w-5 h-5 animate-spin text-green-500" />
           ) : (
-            <ChevronRight className="w-5 h-5 text-slate-300 group-hover:text-emerald-400 transition-colors" />
+            <ChevronRight className="w-5 h-5 text-gray-300 group-hover:text-green-400 transition-colors" />
           )}
         </div>
       </div>
@@ -199,21 +199,21 @@ const ProjectSelectionPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-linear-to-b from-slate-50 to-white">
+    <div className="min-h-screen bg-gray-50">
       <div className="max-w-4xl mx-auto px-6 py-8">
         {/* Header */}
         <div className="flex items-center gap-4 mb-8">
           <button
             onClick={() => navigate("/analysis/history")}
-            className="p-2 rounded-xl hover:bg-slate-100 transition-colors"
+            className="p-2 rounded-xl hover:bg-gray-100 transition-colors"
           >
-            <ArrowLeft className="w-5 h-5 text-slate-600" />
+            <ArrowLeft className="w-5 h-5 text-gray-600" />
           </button>
           <div>
-            <h1 className="text-2xl font-bold text-slate-800">
+            <h1 className="text-2xl font-bold text-gray-800">
               Select a Collection
             </h1>
-            <p className="text-sm text-slate-500 mt-0.5">
+            <p className="text-sm text-gray-500 mt-0.5">
               Choose a cleaned dataset from your collections to start analysis
             </p>
           </div>
@@ -221,20 +221,20 @@ const ProjectSelectionPage = () => {
 
         {/* Search Bar */}
         <div className="relative mb-6">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
           <input
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Search by repository or project name..."
-            className="w-full pl-12 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-slate-700 placeholder-slate-400 focus:outline-none focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100 transition-all"
+            className="w-full pl-12 pr-4 py-3 bg-white border border-gray-200 rounded-xl text-gray-700 placeholder-slate-400 focus:outline-none focus:border-green-300 focus:ring-2 focus:ring-emerald-100 transition-all"
           />
           {searchTerm && (
             <button
               onClick={() => setSearchTerm("")}
-              className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-lg hover:bg-slate-100"
+              className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-lg hover:bg-gray-100"
             >
-              <span className="text-xs text-slate-400">Clear</span>
+              <span className="text-xs text-gray-400">Clear</span>
             </button>
           )}
         </div>
@@ -258,21 +258,21 @@ const ProjectSelectionPage = () => {
         {/* Loading State */}
         {loading && (
           <div className="flex flex-col items-center justify-center py-20">
-            <Loader2 className="w-8 h-8 animate-spin text-emerald-500 mb-3" />
-            <p className="text-slate-500 text-sm">Loading collections...</p>
+            <Loader2 className="w-8 h-8 animate-spin text-green-500 mb-3" />
+            <p className="text-gray-500 text-sm">Loading collections...</p>
           </div>
         )}
 
         {/* Empty State */}
         {!loading && collections.length === 0 && (
           <div className="flex flex-col items-center justify-center py-20 text-center">
-            <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
-              <FolderOpen className="w-8 h-8 text-slate-400" />
+            <div className="w-16 h-16 rounded-xl bg-gray-100 flex items-center justify-center mb-4">
+              <FolderOpen className="w-8 h-8 text-gray-400" />
             </div>
-            <h3 className="text-lg font-semibold text-slate-700 mb-1">
+            <h3 className="text-lg font-semibold text-gray-700 mb-1">
               {debouncedSearch ? "No matching collections" : "No cleaned collections"}
             </h3>
-            <p className="text-sm text-slate-500 max-w-md">
+            <p className="text-sm text-gray-500 max-w-md">
               {debouncedSearch
                 ? `No collections match "${debouncedSearch}". Try a different search term.`
                 : "You don't have any cleaned collections with statistics yet. Start by collecting and cleaning data from your repositories."}
@@ -280,7 +280,7 @@ const ProjectSelectionPage = () => {
             {debouncedSearch && (
               <button
                 onClick={() => setSearchTerm("")}
-                className="mt-4 px-4 py-2 text-sm font-medium text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors"
+                className="mt-4 px-4 py-2 text-sm font-medium text-green-600 hover:text-green-700 hover:bg-green-50 rounded-lg transition-colors"
               >
                 Clear search
               </button>
@@ -292,15 +292,15 @@ const ProjectSelectionPage = () => {
         {!loading && collections.length > 0 && (
           <>
             <div className="flex items-center justify-between mb-4">
-              <p className="text-sm text-slate-500">
+              <p className="text-sm text-gray-500">
                 {collections.length} collection{collections.length !== 1 && "s"} available
               </p>
               <button
                 onClick={fetchCollections}
-                className="p-2 rounded-lg hover:bg-slate-100 transition-colors"
+                className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
                 title="Refresh"
               >
-                <RefreshCw className="w-4 h-4 text-slate-400" />
+                <RefreshCw className="w-4 h-4 text-gray-400" />
               </button>
             </div>
             <div className="space-y-3">

@@ -31,12 +31,12 @@ function AutomaticCollectionReview({
     <div className="space-y-6">
       <div className="rounded-xl border border-sky-200 bg-sky-50 p-5">
         <div className="flex items-center gap-3 mb-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-sky-600">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-blue-600">
             <Bot className="w-5 h-5" />
           </div>
           <div>
-            <h3 className="text-lg font-semibold text-sky-950">Automatic Mode</h3>
-            <p className="text-sm text-sky-900/80">
+            <h3 className="text-lg font-semibold text-blue-950">Automatic Mode</h3>
+            <p className="text-sm text-blue-900/80">
             Describe what to collect and clean. We will generate a draft, show it for validation, then reuse the existing workflow after you approve it.
             </p>
           </div>
@@ -45,7 +45,7 @@ function AutomaticCollectionReview({
         {/* LLM Provider & Model selector */}
         <div className="mb-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label className="block text-xs font-medium text-sky-900 mb-1">Provider</label>
+            <label className="block text-xs font-medium text-blue-900 mb-1">Provider</label>
             <div className="flex gap-2">
               <button
                 type="button"
@@ -56,7 +56,7 @@ function AutomaticCollectionReview({
                 className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
                   llmProvider === LLM_PROVIDERS.OPENROUTER
                     ? "border-sky-500 bg-sky-600 text-white"
-                    : "border-sky-200 bg-white text-sky-800 hover:bg-sky-50"
+                    : "border-sky-200 bg-white text-blue-800 hover:bg-sky-50"
                 }`}
               >
                 OpenRouter
@@ -70,7 +70,7 @@ function AutomaticCollectionReview({
                 className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
                   llmProvider === LLM_PROVIDERS.OLLAMA
                     ? "border-sky-500 bg-sky-600 text-white"
-                    : "border-sky-200 bg-white text-sky-800 hover:bg-sky-50"
+                    : "border-sky-200 bg-white text-blue-800 hover:bg-sky-50"
                 }`}
               >
                 Ollama (local)
@@ -78,7 +78,7 @@ function AutomaticCollectionReview({
             </div>
           </div>
           <div>
-            <label className="block text-xs font-medium text-sky-900 mb-1">Model</label>
+            <label className="block text-xs font-medium text-blue-900 mb-1">Model</label>
             {llmProvider === LLM_PROVIDERS.OPENROUTER ? (
               <select
                 value={llmModel}
@@ -101,7 +101,7 @@ function AutomaticCollectionReview({
           </div>
         </div>
 
-        <label className="block text-sm font-medium text-sky-950 mb-2">
+        <label className="block text-sm font-medium text-blue-950 mb-2">
           Prompt
         </label>
         <textarea
@@ -125,7 +125,7 @@ function AutomaticCollectionReview({
             )}
             {generating ? "Generating draft..." : "Generate draft"}
           </button>
-          <p className="text-sm text-sky-900/75">
+          <p className="text-sm text-blue-900/75">
             The generated configuration is treated as untrusted until you review and approve it.
           </p>
         </div>
@@ -206,7 +206,7 @@ function AutomaticCollectionReview({
                     {selectedMetrics.map((metric) => (
                       <span
                         key={metric}
-                        className="rounded-full bg-sky-100 px-3 py-1 text-xs font-medium text-sky-800"
+                        className="rounded-full bg-sky-100 px-3 py-1 text-xs font-medium text-blue-800"
                       >
                         {metricLabels[metric] || metric}
                       </span>
@@ -259,7 +259,7 @@ function AutomaticCollectionReview({
                       {selectedFeatures.map((feature) => (
                         <span
                           key={feature}
-                          className="rounded-full bg-indigo-100 px-3 py-1 text-xs font-medium text-indigo-800"
+                          className="rounded-full bg-blue-100 px-3 py-1 text-xs font-medium text-blue-800"
                         >
                           {FEATURE_LABELS[feature] || feature}
                         </span>
@@ -277,7 +277,7 @@ function AutomaticCollectionReview({
             <button
               onClick={onApprove}
               disabled={submitting}
-              className="rounded-lg bg-emerald-600 px-4 py-2.5 font-medium text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-lg bg-green-600 px-4 py-2.5 font-medium text-white transition-colors hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Review collect plan
             </button>

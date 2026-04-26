@@ -35,7 +35,6 @@ const Workspaces = ({ openCreateModal }) => {
 
   useEffect(() => {
     fetchPage(1, true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchTerm, filterPlatform, filterDateFrom, filterDateTo]);
 
   useEffect(() => {

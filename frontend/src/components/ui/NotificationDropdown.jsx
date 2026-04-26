@@ -21,11 +21,11 @@ const ICON_MAP = {
   collection_failed: { icon: AlertCircle, color: "text-red-500", bg: "bg-red-50" },
   analysis_requested: { icon: Loader2, color: "text-yellow-500", bg: "bg-yellow-50" },
   analysis_completed: { icon: BarChart3, color: "text-purple-500", bg: "bg-purple-50" },
-  devops_kanban_started: { icon: Play, color: "text-violet-500", bg: "bg-violet-50" },
-  devops_kanban_completed: { icon: CheckCircle2, color: "text-violet-600", bg: "bg-violet-50" },
+  devops_kanban_started: { icon: Play, color: "text-blue-500", bg: "bg-blue-50" },
+  devops_kanban_completed: { icon: CheckCircle2, color: "text-blue-600", bg: "bg-blue-50" },
   devops_kanban_failed: { icon: AlertCircle, color: "text-red-500", bg: "bg-red-50" },
-  devops_cicd_started: { icon: Play, color: "text-emerald-500", bg: "bg-emerald-50" },
-  devops_cicd_completed: { icon: CheckCircle2, color: "text-emerald-600", bg: "bg-emerald-50" },
+  devops_cicd_started: { icon: Play, color: "text-green-500", bg: "bg-green-50" },
+  devops_cicd_completed: { icon: CheckCircle2, color: "text-green-600", bg: "bg-green-50" },
   devops_cicd_failed: { icon: AlertCircle, color: "text-red-500", bg: "bg-red-50" },
 };
 

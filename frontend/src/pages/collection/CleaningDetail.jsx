@@ -258,23 +258,23 @@ function CleaningDetail() {
             {/* Keyword Filters */}
             <div className="bg-gray-50 rounded-lg p-4">
               <div className="flex items-center gap-2 mb-3">
-                <Search className="w-4 h-4 text-purple-600" />
+                <Search className="w-4 h-4 text-blue-600" />
                 <h3 className="font-medium text-gray-900">Keyword Filters</h3>
               </div>
               {cleanedData.filters?.keyword_filters && cleanedData.filters.keyword_filters.length > 0 ? (
                 <div className="space-y-2">
                   {cleanedData.filters.keyword_filters.map((filter, idx) => (
                     <div key={idx} className="flex items-start gap-2">
-                      <Tag className="w-4 h-4 text-purple-500 mt-0.5 shrink-0" />
+                      <Tag className="w-4 h-4 text-blue-500 mt-0.5 shrink-0" />
                       <div>
-                        <span className="font-medium text-purple-700 capitalize">
+                        <span className="font-medium text-blue-700 capitalize">
                           {filter.field.replace('_', ' ')}:
                         </span>
                         <div className="flex flex-wrap gap-1 mt-1">
                           {filter.keywords.map((keyword, kidx) => (
                             <span
                               key={kidx}
-                              className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded text-sm"
+                              className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-sm"
                             >
                               {keyword}
                             </span>

@@ -137,7 +137,7 @@ function CollectPlanModal({
                       selectedFeatures.map((feature) => (
                         <span
                           key={feature}
-                          className="rounded-full bg-indigo-100 px-3 py-1 text-xs font-medium text-indigo-800"
+                          className="rounded-full bg-blue-100 px-3 py-1 text-xs font-medium text-blue-800"
                         >
                           {FEATURE_LABELS[feature] || feature}
                         </span>

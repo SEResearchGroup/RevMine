@@ -34,57 +34,57 @@ const NewAnalysisModal = ({ isOpen, onClose, onChoice }) => {
 
   return (
     <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-6">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
-        <div className="flex items-center justify-between p-5 border-b border-slate-100">
-          <h2 className="text-lg font-bold text-slate-800">New Analysis</h2>
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
+        <div className="flex items-center justify-between p-5 border-b border-gray-100">
+          <h2 className="text-lg font-bold text-gray-800">New Analysis</h2>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg hover:bg-slate-100 transition-colors"
+            className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
           >
-            <X className="w-5 h-5 text-slate-500" />
+            <X className="w-5 h-5 text-gray-500" />
           </button>
         </div>
         <div className="p-5 space-y-3">
-          <p className="text-sm text-slate-500 mb-4">
+          <p className="text-sm text-gray-500 mb-4">
             Choose how you want to start your analysis:
           </p>
 
           {/* Option 1: External CSV */}
           <button
             onClick={() => onChoice("csv")}
-            className="w-full flex items-center gap-4 p-4 rounded-xl border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/30 transition-all group text-left"
+            className="w-full flex items-center gap-4 p-4 rounded-xl border border-gray-200 hover:border-blue-300 hover:bg-blue-50/30 transition-all group text-left"
           >
-            <div className="w-12 h-12 rounded-xl bg-linear-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-200/50">
+            <div className="w-12 h-12 rounded-xl bg-blue-600 flex items-center justify-center shadow-lg shadow-blue-200/50">
               <Upload className="w-6 h-6 text-white" />
             </div>
             <div className="flex-1">
-              <p className="font-semibold text-slate-800 group-hover:text-indigo-700 transition-colors">
+              <p className="font-semibold text-gray-800 group-hover:text-blue-700 transition-colors">
                 From External CSV
               </p>
-              <p className="text-sm text-slate-500">
+              <p className="text-sm text-gray-500">
                 Upload a CSV file directly for analysis
               </p>
             </div>
-            <ChevronRight className="w-5 h-5 text-slate-300 group-hover:text-indigo-400 transition-colors" />
+            <ChevronRight className="w-5 h-5 text-gray-300 group-hover:text-blue-400 transition-colors" />
           </button>
 
           {/* Option 2: From workspace/project */}
           <button
             onClick={() => onChoice("project")}
-            className="w-full flex items-center gap-4 p-4 rounded-xl border border-slate-200 hover:border-emerald-300 hover:bg-emerald-50/30 transition-all group text-left"
+            className="w-full flex items-center gap-4 p-4 rounded-xl border border-gray-200 hover:border-green-300 hover:bg-green-50/30 transition-all group text-left"
           >
-            <div className="w-12 h-12 rounded-xl bg-linear-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-200/50">
+            <div className="w-12 h-12 rounded-xl bg-blue-600 flex items-center justify-center shadow-lg shadow-green-200/50">
               <FolderOpen className="w-6 h-6 text-white" />
             </div>
             <div className="flex-1">
-              <p className="font-semibold text-slate-800 group-hover:text-emerald-700 transition-colors">
+              <p className="font-semibold text-gray-800 group-hover:text-green-700 transition-colors">
                 From Workspace / Project
               </p>
-              <p className="text-sm text-slate-500">
+              <p className="text-sm text-gray-500">
                 Select a cleaned dataset from your collections
               </p>
             </div>
-            <ChevronRight className="w-5 h-5 text-slate-300 group-hover:text-emerald-400 transition-colors" />
+            <ChevronRight className="w-5 h-5 text-gray-300 group-hover:text-green-400 transition-colors" />
           </button>
         </div>
       </div>
@@ -117,21 +117,21 @@ const AnalysisProjectCard = ({ item, onClick }) => {
   return (
     <button
       onClick={onClick}
-      className="w-full text-left bg-white rounded-2xl border border-slate-200/60 shadow-sm hover:shadow-md hover:border-indigo-200 transition-all p-5 group"
+      className="w-full text-left bg-white rounded-xl border border-gray-200/60 shadow-sm hover:shadow-md hover:border-blue-200 transition-all p-5 group"
     >
       <div className="flex items-start justify-between">
         <div className="flex items-start gap-4 flex-1 min-w-0">
           {/* Icon */}
-          <div className="w-11 h-11 rounded-xl bg-linear-to-br from-indigo-500 to-blue-600 flex items-center justify-center shadow-md shadow-indigo-200/50 shrink-0">
+          <div className="w-11 h-11 rounded-xl bg-blue-600 flex items-center justify-center shadow-md shadow-blue-200/50 shrink-0">
             <FileSpreadsheet className="w-5 h-5 text-white" />
           </div>
 
           {/* Info */}
           <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-slate-800 truncate group-hover:text-indigo-700 transition-colors">
+            <h3 className="font-semibold text-gray-800 truncate group-hover:text-blue-700 transition-colors">
               {dataset.filename || "Unnamed dataset"}
             </h3>
-            <p className="text-sm text-slate-500 mt-0.5">
+            <p className="text-sm text-gray-500 mt-0.5">
               {dataset.rows_count?.toLocaleString()} rows · {dataset.columns_count} columns
               {dataset.platform && ` · ${dataset.platform}`}
             </p>
@@ -141,13 +141,13 @@ const AnalysisProjectCard = ({ item, onClick }) => {
               {summary.metric_codes.slice(0, 5).map((code) => (
                 <span
                   key={code}
-                  className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-medium"
+                  className="px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 text-[10px] font-medium"
                 >
                   {code.replace(/_/g, " ")}
                 </span>
               ))}
               {summary.metric_codes.length > 5 && (
-                <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[10px] font-medium">
+                <span className="px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 text-[10px] font-medium">
                   +{summary.metric_codes.length - 5} more
                 </span>
               )}
@@ -159,10 +159,10 @@ const AnalysisProjectCard = ({ item, onClick }) => {
         <div className="flex items-center gap-6 ml-4 shrink-0">
           {/* Analyses count */}
           <div className="text-center">
-            <p className="text-lg font-bold text-slate-800">
+            <p className="text-lg font-bold text-gray-800">
               {summary.total_analyses}
             </p>
-            <p className="text-[10px] uppercase tracking-wider text-slate-400 font-medium">
+            <p className="text-[10px] uppercase tracking-wider text-gray-400 font-medium">
               Charts
             </p>
           </div>
@@ -171,8 +171,8 @@ const AnalysisProjectCard = ({ item, onClick }) => {
           <div className="flex items-center gap-2">
             {summary.completed > 0 && (
               <div className="flex items-center gap-1">
-                <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                <span className="text-sm font-medium text-emerald-600">
+                <CheckCircle2 className="w-4 h-4 text-green-500" />
+                <span className="text-sm font-medium text-green-600">
                   {summary.completed}
                 </span>
               </div>
@@ -197,13 +197,13 @@ const AnalysisProjectCard = ({ item, onClick }) => {
 
           {/* Date */}
           <div className="text-right hidden md:block">
-            <p className="text-xs text-slate-400">Last analysis</p>
-            <p className="text-sm font-medium text-slate-600">
+            <p className="text-xs text-gray-400">Last analysis</p>
+            <p className="text-sm font-medium text-gray-600">
               {formatDate(summary.last_analysis_date)}
             </p>
           </div>
 
-          <ChevronRight className="w-5 h-5 text-slate-300 group-hover:text-indigo-400 transition-colors" />
+          <ChevronRight className="w-5 h-5 text-gray-300 group-hover:text-blue-400 transition-colors" />
         </div>
       </div>
     </button>
@@ -261,19 +261,19 @@ const AnalysisHistoryPage = () => {
   });
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-slate-50 via-blue-50/30 to-indigo-50/40">
+    <div className="min-h-screen bg-gray-50">
       <div className="max-w-6xl mx-auto px-6 py-8">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-linear-to-br from-indigo-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-200/50">
+            <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-200/50">
               <BarChart3 className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-slate-800">
+              <h1 className="text-2xl font-bold text-gray-800">
                 Analysis Panel
               </h1>
-              <p className="text-sm text-slate-500">
+              <p className="text-sm text-gray-500">
                 {history.length} project{history.length !== 1 ? "s" : ""} analysed
               </p>
             </div>
@@ -281,7 +281,7 @@ const AnalysisHistoryPage = () => {
 
           <button
             onClick={() => setShowModal(true)}
-            className="flex items-center gap-2 px-5 py-2.5 bg-linear-to-r from-indigo-600 to-blue-600 text-white rounded-xl text-sm font-medium shadow-lg shadow-indigo-200/50 hover:from-indigo-700 hover:to-blue-700 transition-all"
+            className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-medium shadow-lg shadow-blue-200/50 hover:bg-blue-700 transition-all"
           >
             <Plus className="w-4 h-4" />
             New Analysis
@@ -290,29 +290,29 @@ const AnalysisHistoryPage = () => {
 
         {/* Search */}
         <div className="relative mb-6">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
           <input
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Search by filename, platform, metric..."
-            className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent"
+            className="w-full pl-10 pr-4 py-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent"
           />
         </div>
 
         {/* Content */}
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20">
-            <Loader2 className="w-10 h-10 animate-spin text-indigo-500 mb-3" />
-            <p className="text-slate-500">Loading analysis history...</p>
+            <Loader2 className="w-10 h-10 animate-spin text-blue-500 mb-3" />
+            <p className="text-gray-500">Loading analysis history...</p>
           </div>
         ) : filtered.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-slate-200/60 p-16 text-center">
-            <Database className="w-12 h-12 mx-auto mb-4 text-slate-300" />
-            <h3 className="text-lg font-semibold text-slate-600 mb-2">
+          <div className="bg-white rounded-xl border border-gray-200/60 p-16 text-center">
+            <Database className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+            <h3 className="text-lg font-semibold text-gray-600 mb-2">
               {searchTerm ? "No matching analyses" : "No analyses yet"}
             </h3>
-            <p className="text-sm text-slate-400 mb-6">
+            <p className="text-sm text-gray-400 mb-6">
               {searchTerm
                 ? "Try a different search term"
                 : "Start by creating a new analysis from a CSV file or workspace project."}
@@ -320,7 +320,7 @@ const AnalysisHistoryPage = () => {
             {!searchTerm && (
               <button
                 onClick={() => setShowModal(true)}
-                className="px-6 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700 transition-colors"
+                className="px-6 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 transition-colors"
               >
                 Create First Analysis
               </button>

@@ -364,8 +364,8 @@ function CollectionResults() {
               disabled={exporting !== null}
               className="bg-white border border-gray-200 rounded-xl p-6 hover:shadow-lg transition-shadow text-left disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mb-4">
-                <Download className="w-6 h-6 text-purple-600" />
+              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mb-4">
+                <Download className="w-6 h-6 text-blue-600" />
               </div>
               <h4 className="font-semibold text-gray-900 mb-2">Statistics CSV</h4>
               <p className="text-sm text-gray-600 mb-3">Project metrics (latest cleaning)</p>

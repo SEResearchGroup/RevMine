@@ -340,8 +340,8 @@ function DataCleaningList() {
 
           <div className="bg-white rounded-xl border border-gray-200 p-5">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                <Calendar className="w-6 h-6 text-purple-600" />
+              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                <Calendar className="w-6 h-6 text-blue-600" />
               </div>
               <div>
                 <p className="text-sm font-semibold text-gray-900 truncate">
@@ -478,7 +478,7 @@ function DataCleaningList() {
                       </span>
                     )}
                     {collection.is_external && (
-                      <span className="px-2 py-1 bg-violet-100 text-violet-700 text-xs font-medium rounded-full flex items-center gap-1">
+                      <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded-full flex items-center gap-1">
                         Extern
                       </span>
                     )}

@@ -1,8 +1,3 @@
-/**
- * frontend/src/pages/projects/Projects.jsx
- * Updated: Navigate to collection page on card click
- */
-
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
@@ -171,7 +166,7 @@ function Projects() {
         </div>
 
         {/* Search et Import */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6">
           <div className="relative flex-1 max-w-full sm:max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
             <input

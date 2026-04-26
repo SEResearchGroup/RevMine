@@ -443,16 +443,16 @@ function CollectionProgress() {
                   <div className="flex items-start gap-3">
                     <div className="mt-0.5">
                       {automaticCleaning.running ? (
-                        <Loader2 className="w-5 h-5 animate-spin text-sky-700" />
+                        <Loader2 className="w-5 h-5 animate-spin text-blue-700" />
                       ) : (
-                        <Play className="w-5 h-5 text-sky-700" />
+                        <Play className="w-5 h-5 text-blue-700" />
                       )}
                     </div>
                     <div className="flex-1">
-                      <p className="font-medium text-sky-950 mb-1">
+                      <p className="font-medium text-blue-950 mb-1">
                         Automatic collection + cleaning workflow
                       </p>
-                      <p className="text-sm text-sky-900">
+                      <p className="text-sm text-blue-900">
                         {collectionStatusValue === "completed"
                           ? automaticCleaning.running
                             ? automaticCleaning.message
