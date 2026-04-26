@@ -1,4 +1,4 @@
-import { AlertTriangle, Bot, CheckCircle2, Loader2, Sparkles } from "lucide-react";
+import { AlertTriangle, Bot, CheckCircle2, Info, Loader2, Sparkles } from "lucide-react";
 import { FEATURE_LABELS, KEYWORD_FIELD_LABELS } from "./collectionFeatureConfig";
 import {
   LLM_PROVIDERS,
@@ -29,15 +29,15 @@ function AutomaticCollectionReview({
 
   return (
     <div className="space-y-6">
-      <div className="rounded-xl border border-sky-200 bg-sky-50 p-5">
-        <div className="flex items-center gap-3 mb-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-blue-600">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200/60 p-5">
+        <div className="flex items-start gap-3 mb-4">
+          <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
             <Bot className="w-5 h-5" />
           </div>
           <div>
-            <h3 className="text-lg font-semibold text-blue-950">Automatic Mode</h3>
-            <p className="text-sm text-blue-900/80">
-            Describe what to collect and clean. We will generate a draft, show it for validation, then reuse the existing workflow after you approve it.
+            <h3 className="text-lg font-semibold text-gray-800">Describe the collection</h3>
+            <p className="text-sm text-gray-500">
+              Describe what to collect and clean. A draft will be generated for your review before any data is collected.
             </p>
           </div>
         </div>
@@ -45,7 +45,7 @@ function AutomaticCollectionReview({
         {/* LLM Provider & Model selector */}
         <div className="mb-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label className="block text-xs font-medium text-blue-900 mb-1">Provider</label>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Provider</label>
             <div className="flex gap-2">
               <button
                 type="button"
@@ -53,10 +53,10 @@ function AutomaticCollectionReview({
                   onProviderChange(LLM_PROVIDERS.OPENROUTER);
                   onModelChange(DEFAULT_OPENROUTER_MODEL);
                 }}
-                className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+                className={`flex-1 rounded-xl border px-3 py-2 text-sm font-medium transition-all ${
                   llmProvider === LLM_PROVIDERS.OPENROUTER
-                    ? "border-sky-500 bg-sky-600 text-white"
-                    : "border-sky-200 bg-white text-blue-800 hover:bg-sky-50"
+                    ? "border-blue-400 bg-blue-600 text-white"
+                    : "border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100"
                 }`}
               >
                 OpenRouter
@@ -67,10 +67,10 @@ function AutomaticCollectionReview({
                   onProviderChange(LLM_PROVIDERS.OLLAMA);
                   onModelChange(DEFAULT_OLLAMA_MODEL);
                 }}
-                className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+                className={`flex-1 rounded-xl border px-3 py-2 text-sm font-medium transition-all ${
                   llmProvider === LLM_PROVIDERS.OLLAMA
-                    ? "border-sky-500 bg-sky-600 text-white"
-                    : "border-sky-200 bg-white text-blue-800 hover:bg-sky-50"
+                    ? "border-blue-400 bg-blue-600 text-white"
+                    : "border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100"
                 }`}
               >
                 Ollama (local)
@@ -78,12 +78,12 @@ function AutomaticCollectionReview({
             </div>
           </div>
           <div>
-            <label className="block text-xs font-medium text-blue-900 mb-1">Model</label>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Model</label>
             {llmProvider === LLM_PROVIDERS.OPENROUTER ? (
               <select
                 value={llmModel}
                 onChange={(e) => onModelChange(e.target.value)}
-                className="w-full rounded-lg border border-sky-200 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-sky-500"
+                className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 {OPENROUTER_MODELS.map((m) => (
                   <option key={m.id} value={m.id}>{m.name}</option>
@@ -95,13 +95,13 @@ function AutomaticCollectionReview({
                 value={llmModel}
                 onChange={(e) => onModelChange(e.target.value)}
                 placeholder="e.g. deepseek-r1, llama3.2"
-                className="w-full rounded-lg border border-sky-200 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-sky-500"
+                className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             )}
           </div>
         </div>
 
-        <label className="block text-sm font-medium text-blue-950 mb-2">
+        <label className="block text-xs font-medium text-gray-600 mb-1">
           Prompt
         </label>
         <textarea
@@ -109,14 +109,19 @@ function AutomaticCollectionReview({
           onChange={(event) => onPromptChange(event.target.value)}
           rows={4}
           placeholder="Collect merged pull requests from the last 6 months on main, then clean for Python files and bug-related titles."
-          className="w-full resize-y rounded-lg border border-sky-200 bg-white px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-sky-500"
+          className="w-full min-h-28 resize-y rounded-xl border border-gray-200 bg-gray-50/60 px-4 py-3 text-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
         />
+
+        <div className="mt-3 p-3 rounded-xl bg-gray-50 border border-gray-200 text-sm text-gray-600 flex items-start gap-2">
+          <Info className="w-4 h-4 mt-0.5 shrink-0 text-gray-400" />
+          The generated configuration is treated as untrusted until you review and approve it. The next step reuses the same collect-plan validation as manual mode.
+        </div>
 
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <button
             onClick={onGenerate}
             disabled={generating || submitting || !prompt.trim()}
-            className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2.5 font-medium text-white transition-colors hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {generating ? (
               <Loader2 className="w-4 h-4 animate-spin" />
@@ -125,9 +130,6 @@ function AutomaticCollectionReview({
             )}
             {generating ? "Generating draft..." : "Generate draft"}
           </button>
-          <p className="text-sm text-blue-900/75">
-            The generated configuration is treated as untrusted until you review and approve it.
-          </p>
         </div>
       </div>
 
