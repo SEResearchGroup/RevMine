@@ -22,6 +22,12 @@ import {
   Bot,
 } from "lucide-react";
 import { analyzeService } from "../../services/api";
+import {
+  LLM_PROVIDERS,
+  OPENROUTER_MODELS,
+  DEFAULT_OLLAMA_MODEL,
+  DEFAULT_OPENROUTER_MODEL,
+} from "../../utils/llmConfig";
 
 const CATEGORY_META = {
   timeseries: { icon: LineChart, color: "blue", label: "Time Series" },
@@ -93,8 +99,8 @@ const MetricsSelectionPage = () => {
   const [selectedMetrics, setSelectedMetrics] = useState([]);
   const [llmPrompt, setLlmPrompt] = useState("");
   const [aiPreview, setAiPreview] = useState(null);
-  const [llmProvider, setLlmProvider] = useState("openrouter");
-  const [llmModel, setLlmModel] = useState("openai/gpt-4o-mini");
+  const [llmProvider, setLlmProvider] = useState(LLM_PROVIDERS.OPENROUTER);
+  const [llmModel, setLlmModel] = useState(DEFAULT_OPENROUTER_MODEL);
 
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -471,9 +477,12 @@ const MetricsSelectionPage = () => {
                   <div className="flex gap-2">
                     <button
                       type="button"
-                      onClick={() => { setLlmProvider("openrouter"); setLlmModel("openai/gpt-4o-mini"); }}
+                      onClick={() => {
+                        setLlmProvider(LLM_PROVIDERS.OPENROUTER);
+                        setLlmModel(DEFAULT_OPENROUTER_MODEL);
+                      }}
                       className={`flex-1 rounded-xl border px-3 py-2 text-sm font-medium transition-all ${
-                        llmProvider === "openrouter"
+                        llmProvider === LLM_PROVIDERS.OPENROUTER
                           ? "border-indigo-400 bg-indigo-600 text-white"
                           : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100"
                       }`}
@@ -482,9 +491,12 @@ const MetricsSelectionPage = () => {
                     </button>
                     <button
                       type="button"
-                      onClick={() => { setLlmProvider("ollama"); setLlmModel("deepseek-r1"); }}
+                      onClick={() => {
+                        setLlmProvider(LLM_PROVIDERS.OLLAMA);
+                        setLlmModel(DEFAULT_OLLAMA_MODEL);
+                      }}
                       className={`flex-1 rounded-xl border px-3 py-2 text-sm font-medium transition-all ${
-                        llmProvider === "ollama"
+                        llmProvider === LLM_PROVIDERS.OLLAMA
                           ? "border-indigo-400 bg-indigo-600 text-white"
                           : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100"
                       }`}
@@ -495,18 +507,15 @@ const MetricsSelectionPage = () => {
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">Model</label>
-                  {llmProvider === "openrouter" ? (
+                  {llmProvider === LLM_PROVIDERS.OPENROUTER ? (
                     <select
                       value={llmModel}
                       onChange={(e) => setLlmModel(e.target.value)}
                       className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     >
-                      <option value="openai/gpt-4o-mini">GPT-4o Mini (OpenAI)</option>
-                      <option value="meta-llama/llama-3.1-8b-instruct">Llama 3.1 8B (Free)</option>
-                      <option value="google/gemma-3-4b-it">Gemma 3 4B (Free)</option>
-                      <option value="microsoft/phi-3-mini-128k-instruct">Phi-3 Mini (Free)</option>
-                      <option value="qwen/qwen3-8b">Qwen3 8B (Free)</option>
-                      <option value="deepseek/deepseek-r1">DeepSeek R1 (Free)</option>
+                      {OPENROUTER_MODELS.map((m) => (
+                        <option key={m.id} value={m.id}>{m.name}</option>
+                      ))}
                     </select>
                   ) : (
                     <input

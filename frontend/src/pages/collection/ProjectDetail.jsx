@@ -25,6 +25,7 @@ import { workspaceService, collectionService } from "../../services/api";
 import CollectPlanModal from "../../components/collection/CollectPlanModal";
 import AutomaticCollectionReview from "../../components/collection/AutomaticCollectionReview";
 import { persistAutomaticWorkflow } from "../../components/collection/automaticWorkflow";
+import { LLM_PROVIDERS, DEFAULT_OPENROUTER_MODEL } from "../../utils/llmConfig";
 
 const getApiErrorMessage = (error, fallbackMessage) => {
   return (
@@ -84,8 +85,8 @@ function ProjectDetail() {
   const [automationLoading, setAutomationLoading] = useState(false);
   const [automationExecuting, setAutomationExecuting] = useState(false);
   const [automationError, setAutomationError] = useState(null);
-  const [automationProvider, setAutomationProvider] = useState("openrouter");
-  const [automationModel, setAutomationModel] = useState("openai/gpt-4o-mini");
+  const [automationProvider, setAutomationProvider] = useState(LLM_PROVIDERS.OPENROUTER);
+  const [automationModel, setAutomationModel] = useState(DEFAULT_OPENROUTER_MODEL);
 
   // Modal
   const [showPlanModal, setShowPlanModal] = useState(false);

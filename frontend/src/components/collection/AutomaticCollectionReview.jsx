@@ -1,14 +1,11 @@
 import { AlertTriangle, Bot, CheckCircle2, Loader2, Sparkles } from "lucide-react";
 import { FEATURE_LABELS, KEYWORD_FIELD_LABELS } from "./collectionFeatureConfig";
-
-const OPENROUTER_MODELS = [
-  { id: "openai/gpt-4o-mini", name: "GPT-4o Mini (OpenAI)" },
-  { id: "meta-llama/llama-3.1-8b-instruct", name: "Llama 3.1 8B (Free)" },
-  { id: "google/gemma-3-4b-it", name: "Gemma 3 4B (Free)" },
-  { id: "microsoft/phi-3-mini-128k-instruct", name: "Phi-3 Mini (Free)" },
-  { id: "qwen/qwen3-8b", name: "Qwen3 8B (Free)" },
-  { id: "deepseek/deepseek-r1", name: "DeepSeek R1 (Free)" },
-];
+import {
+  LLM_PROVIDERS,
+  OPENROUTER_MODELS,
+  DEFAULT_OLLAMA_MODEL,
+  DEFAULT_OPENROUTER_MODEL,
+} from "../../utils/llmConfig";
 
 function AutomaticCollectionReview({
   draft,
@@ -52,9 +49,12 @@ function AutomaticCollectionReview({
             <div className="flex gap-2">
               <button
                 type="button"
-                onClick={() => { onProviderChange("openrouter"); onModelChange(OPENROUTER_MODELS[0].id); }}
+                onClick={() => {
+                  onProviderChange(LLM_PROVIDERS.OPENROUTER);
+                  onModelChange(DEFAULT_OPENROUTER_MODEL);
+                }}
                 className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
-                  llmProvider === "openrouter"
+                  llmProvider === LLM_PROVIDERS.OPENROUTER
                     ? "border-sky-500 bg-sky-600 text-white"
                     : "border-sky-200 bg-white text-sky-800 hover:bg-sky-50"
                 }`}
@@ -63,9 +63,12 @@ function AutomaticCollectionReview({
               </button>
               <button
                 type="button"
-                onClick={() => { onProviderChange("ollama"); onModelChange("deepseek-r1"); }}
+                onClick={() => {
+                  onProviderChange(LLM_PROVIDERS.OLLAMA);
+                  onModelChange(DEFAULT_OLLAMA_MODEL);
+                }}
                 className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
-                  llmProvider === "ollama"
+                  llmProvider === LLM_PROVIDERS.OLLAMA
                     ? "border-sky-500 bg-sky-600 text-white"
                     : "border-sky-200 bg-white text-sky-800 hover:bg-sky-50"
                 }`}
@@ -76,7 +79,7 @@ function AutomaticCollectionReview({
           </div>
           <div>
             <label className="block text-xs font-medium text-sky-900 mb-1">Model</label>
-            {llmProvider === "openrouter" ? (
+            {llmProvider === LLM_PROVIDERS.OPENROUTER ? (
               <select
                 value={llmModel}
                 onChange={(e) => onModelChange(e.target.value)}

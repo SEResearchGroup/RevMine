@@ -238,7 +238,6 @@ export const collectionService = {
   },
 
   generateAutomationDraft: (data) => {
-    console.log("Generating automation draft with data:", data);
     return collectionApi.post("/automation/preview/", data, { timeout: 60000 });
   },
 

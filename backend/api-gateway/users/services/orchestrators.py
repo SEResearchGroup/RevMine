@@ -27,6 +27,21 @@ from .service_clients import (
 
 logger = logging.getLogger(__name__)
 
+OLLAMA_DEFAULT_MODEL = "deepseek-r1"
+
+
+def _resolve_provider_and_model(body_data, openrouter_default):
+    """Pick the LLM provider, downstream endpoint, and a provider-aware default model."""
+    llm_provider = body_data.get("llm_provider") or "openrouter"
+    if llm_provider == "ollama":
+        endpoint = "ollama"
+        default_model = OLLAMA_DEFAULT_MODEL
+    else:
+        endpoint = "openrouter"
+        default_model = openrouter_default
+    model = body_data.get("model") or default_model
+    return llm_provider, endpoint, model
+
 
 class CollectionOrchestrator:
     def __init__(self, config_client, collection_client, llm_client):
@@ -128,9 +143,9 @@ class CollectionOrchestrator:
 
         repository_id = body_data.get("repository_id")
         workspace_id = body_data.get("workspace_id")
-        llm_provider = body_data.get("llm_provider") or "openrouter"
-        endpoint = "ollama" if llm_provider == "ollama" else "openrouter"
-        model = body_data.get("model") or DEFAULT_LLM_MODEL
+        llm_provider, endpoint, model = _resolve_provider_and_model(
+            body_data, DEFAULT_LLM_MODEL
+        )
 
         try:
             prompt = sanitize_user_prompt(body_data.get("prompt"))
@@ -258,9 +273,9 @@ class AnalysisOrchestrator:
             return error_response
 
         dataset_id = body_data.get("dataset_id")
-        llm_provider = body_data.get("llm_provider") or "openrouter"
-        endpoint = "ollama" if llm_provider == "ollama" else "openrouter"
-        model = body_data.get("model") or DEFAULT_ANALYSIS_LLM_MODEL
+        llm_provider, endpoint, model = _resolve_provider_and_model(
+            body_data, DEFAULT_ANALYSIS_LLM_MODEL
+        )
 
         try:
             prompt = sanitize_analysis_prompt(body_data.get("prompt"))
