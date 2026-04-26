@@ -820,9 +820,14 @@ class CleanedDataService:
             return cleaned_data
 
         except Exception as e:
-            logger.error(f"Error creating cleaned data: {e}")
+            logger.exception(
+                "Error creating cleaned data (cleaned_data_id=%s, collection_id=%s, platform=%s)",
+                cleaned_data.id,
+                collection.id,
+                collection.platform,
+            )
             cleaned_data.status = "failed"
-            cleaned_data.error_message = str(e)
+            cleaned_data.error_message = f"{type(e).__name__}: {e}"
             cleaned_data.save()
             raise
 

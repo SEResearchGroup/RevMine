@@ -51,6 +51,24 @@ class AnalysisService:
             'review_duration': self.analyze_review_duration,
             'approval_time': self.analyze_approval_time,
             'cycle_time': self.analyze_cycle_time,
+            # Kanban (DevOps) metrics
+            'kanban_lead_time': self.analyze_kanban_lead_time,
+            'kanban_cycle_time': self.analyze_kanban_cycle_time,
+            'kanban_throughput': self.analyze_kanban_throughput,
+            'kanban_wip': self.analyze_kanban_wip,
+            'kanban_cfd': self.analyze_kanban_cfd,
+            'kanban_column_time': self.analyze_kanban_column_time,
+            'kanban_blocked_ratio': self.analyze_kanban_blocked_ratio,
+            'kanban_assignee_load': self.analyze_kanban_assignee_load,
+            # CI/CD (DevOps) metrics
+            'cicd_success_rate': self.analyze_cicd_success_rate,
+            'cicd_build_duration': self.analyze_cicd_build_duration,
+            'cicd_failure_rate_by_job': self.analyze_cicd_failure_rate_by_job,
+            'cicd_mttr': self.analyze_cicd_mttr,
+            'cicd_deploy_frequency': self.analyze_cicd_deploy_frequency,
+            'cicd_queue_time': self.analyze_cicd_queue_time,
+            'cicd_runner_utilization': self.analyze_cicd_runner_utilization,
+            'cicd_flaky_jobs': self.analyze_cicd_flaky_jobs,
         }
     
     def _parse_dates(self, df):
@@ -2267,7 +2285,7 @@ class AnalysisService:
             'projects_count': len(project_stats),
             'total_mrs': int(project_stats['count'].sum()),
         }
-        
+
         return {
             'chart_data': chart_data,
             'chart_image': chart_image,
@@ -2546,3 +2564,412 @@ class AnalysisService:
             title='Cycle Time Distribution',
             xlabel='Cycle Time (hours)',
         )
+
+    # ==================== DevOps helpers ====================
+
+    def _devops_hours_between(self, df, start_col, end_col):
+        """Return a Series of hours between two datetime columns (NaT → NaN)."""
+        start = pd.to_datetime(df[start_col], errors='coerce')
+        end = pd.to_datetime(df[end_col], errors='coerce')
+        return (end - start).dt.total_seconds() / 3600.0
+
+    def _devops_histogram(self, values, title, x_label, bins=20):
+        series = pd.to_numeric(pd.Series(values), errors='coerce').dropna()
+        if series.empty:
+            return {
+                'type': 'histogram',
+                'data': {'labels': [], 'datasets': [{'label': x_label, 'data': []}]},
+                'title': title,
+                'xLabel': x_label,
+                'yLabel': 'Count',
+            }, {'count': 0}
+        counts, edges = np.histogram(series, bins=bins)
+        labels = [f"{edges[i]:.1f}–{edges[i+1]:.1f}" for i in range(len(counts))]
+        statistics = {
+            'count': int(series.count()),
+            'mean': float(series.mean()),
+            'median': float(series.median()),
+            'p90': float(series.quantile(0.9)),
+        }
+        chart_data = {
+            'type': 'histogram',
+            'data': {
+                'labels': labels,
+                'datasets': [{'label': x_label, 'data': [int(c) for c in counts]}],
+            },
+            'title': title,
+            'xLabel': x_label,
+            'yLabel': 'Count',
+        }
+        return chart_data, statistics
+
+    def _devops_time_bucket(self, dt_series, freq):
+        """Group a datetime series to a Period with the given freq."""
+        dt = pd.to_datetime(dt_series, errors='coerce').dropna()
+        return dt.dt.to_period(freq)
+
+    # ==================== Kanban analyses ====================
+
+    def analyze_kanban_lead_time(self, df, analysis):
+        df = self._apply_config(df, analysis.config or {})
+        hours = self._devops_hours_between(df, 'created_at', 'closed_at').dropna()
+        chart_data, statistics = self._devops_histogram(
+            hours, 'Lead Time Distribution', 'Hours', bins=20
+        )
+        chart_data['type'] = analysis.chart_type or 'histogram'
+        return {'chart_data': chart_data, 'statistics': statistics}
+
+    def analyze_kanban_cycle_time(self, df, analysis):
+        df = self._apply_config(df, analysis.config or {})
+        hours = self._devops_hours_between(df, 'in_progress_at', 'done_at').dropna()
+        chart_data, statistics = self._devops_histogram(
+            hours, 'Cycle Time Distribution', 'Hours', bins=20
+        )
+        chart_data['type'] = analysis.chart_type or 'box'
+        return {'chart_data': chart_data, 'statistics': statistics}
+
+    def analyze_kanban_throughput(self, df, analysis):
+        config = analysis.config or {}
+        freq = config.get('time_aggregation') or 'W'
+        df = self._apply_config(df, config)
+        periods = self._devops_time_bucket(df['done_at'], freq)
+        counts = periods.groupby(periods).size().sort_index()
+        labels = [str(p) for p in counts.index]
+        chart_data = {
+            'type': analysis.chart_type or 'bar',
+            'data': {
+                'labels': labels,
+                'datasets': [{'label': 'Completed items', 'data': [int(v) for v in counts.values]}],
+            },
+            'title': f'Throughput (per {freq})',
+            'xLabel': 'Period',
+            'yLabel': 'Completed items',
+        }
+        return {'chart_data': chart_data, 'statistics': {'total': int(counts.sum())}}
+
+    def analyze_kanban_wip(self, df, analysis):
+        config = analysis.config or {}
+        freq = config.get('time_aggregation') or 'D'
+        df = self._apply_config(df, config)
+        entered = pd.to_datetime(df['entered_at'], errors='coerce')
+        left = pd.to_datetime(df['left_at'], errors='coerce')
+        mask = entered.notna()
+        entered = entered[mask]
+        left = left[mask]
+        if entered.empty:
+            return {
+                'chart_data': {
+                    'type': analysis.chart_type or 'area',
+                    'data': {'labels': [], 'datasets': [{'label': 'WIP', 'data': []}]},
+                    'title': 'Work in Progress',
+                },
+                'statistics': {'max_wip': 0},
+            }
+        start = entered.min().to_period(freq).to_timestamp()
+        end = (left.fillna(pd.Timestamp.utcnow()).max()).to_period(freq).to_timestamp()
+        buckets = pd.date_range(start, end, freq=freq)
+        wip = []
+        for ts in buckets:
+            active = ((entered <= ts) & (left.fillna(pd.Timestamp.max) > ts)).sum()
+            wip.append(int(active))
+        labels = [ts.strftime('%Y-%m-%d') for ts in buckets]
+        chart_data = {
+            'type': analysis.chart_type or 'area',
+            'data': {'labels': labels, 'datasets': [{'label': 'WIP', 'data': wip}]},
+            'title': 'Work in Progress Over Time',
+            'xLabel': 'Period',
+            'yLabel': 'In-flight items',
+        }
+        return {'chart_data': chart_data, 'statistics': {'max_wip': max(wip) if wip else 0}}
+
+    def analyze_kanban_cfd(self, df, analysis):
+        config = analysis.config or {}
+        freq = config.get('time_aggregation') or 'D'
+        df = self._apply_config(df, config)
+        dates = pd.to_datetime(df['date'], errors='coerce').dt.to_period(freq).dt.to_timestamp()
+        pivot = (
+            df.assign(_period=dates)
+              .groupby(['_period', 'column']).size()
+              .unstack(fill_value=0)
+              .sort_index()
+              .cumsum()
+        )
+        labels = [ts.strftime('%Y-%m-%d') for ts in pivot.index]
+        datasets = [
+            {'label': col, 'data': [int(v) for v in pivot[col].values]}
+            for col in pivot.columns
+        ]
+        chart_data = {
+            'type': analysis.chart_type or 'area',
+            'data': {'labels': labels, 'datasets': datasets},
+            'title': 'Cumulative Flow Diagram',
+            'xLabel': 'Period',
+            'yLabel': 'Cumulative items',
+            'stacked': True,
+        }
+        return {'chart_data': chart_data, 'statistics': {'columns': list(pivot.columns)}}
+
+    def analyze_kanban_column_time(self, df, analysis):
+        df = self._apply_config(df, analysis.config or {})
+        grouped = df.dropna(subset=['column', 'duration_h']).groupby('column')['duration_h']
+        labels = list(grouped.groups.keys())
+        medians = [float(grouped.get_group(c).median()) for c in labels]
+        chart_data = {
+            'type': analysis.chart_type or 'bar',
+            'data': {
+                'labels': labels,
+                'datasets': [{'label': 'Median hours', 'data': medians}],
+            },
+            'title': 'Median Residency per Column',
+            'xLabel': 'Column',
+            'yLabel': 'Hours',
+        }
+        return {'chart_data': chart_data, 'statistics': {'columns': labels}}
+
+    def analyze_kanban_blocked_ratio(self, df, analysis):
+        df = self._apply_config(df, analysis.config or {})
+        labels_col = df['labels'].fillna('').astype(str).str.lower()
+        is_blocked = labels_col.str.contains('block')
+        blocked_hours = float(df.loc[is_blocked, 'duration_h'].sum() or 0)
+        flowing_hours = float(df.loc[~is_blocked, 'duration_h'].sum() or 0)
+        chart_data = {
+            'type': analysis.chart_type or 'pie',
+            'data': {
+                'labels': ['Blocked', 'Flowing'],
+                'datasets': [{'label': 'Hours', 'data': [blocked_hours, flowing_hours]}],
+            },
+            'title': 'Blocked vs Flowing Hours',
+        }
+        total = blocked_hours + flowing_hours
+        statistics = {
+            'blocked_hours': blocked_hours,
+            'flowing_hours': flowing_hours,
+            'blocked_ratio': (blocked_hours / total) if total else 0,
+        }
+        return {'chart_data': chart_data, 'statistics': statistics}
+
+    def analyze_kanban_assignee_load(self, df, analysis):
+        df = self._apply_config(df, analysis.config or {})
+        open_df = df[df['status'].astype(str).str.lower() != 'closed']
+        counts = open_df['assignee'].fillna('Unassigned').value_counts().head(15)
+        chart_data = {
+            'type': analysis.chart_type or 'bar',
+            'data': {
+                'labels': counts.index.tolist(),
+                'datasets': [{'label': 'Open items', 'data': [int(v) for v in counts.values]}],
+            },
+            'title': 'Open Items per Assignee',
+            'xLabel': 'Assignee',
+            'yLabel': 'Open items',
+        }
+        return {'chart_data': chart_data, 'statistics': {'total_open': int(counts.sum())}}
+
+    # ==================== CI/CD analyses ====================
+
+    def _cicd_normalize_conclusion(self, series):
+        """Return a boolean Series: True for success."""
+        s = series.fillna('').astype(str).str.lower()
+        return s.isin(['success', 'passed', 'ok'])
+
+    def analyze_cicd_success_rate(self, df, analysis):
+        config = analysis.config or {}
+        freq = config.get('time_aggregation') or 'D'
+        df = self._apply_config(df, config)
+        periods = self._devops_time_bucket(df['created_at'], freq)
+        success = self._cicd_normalize_conclusion(df.loc[periods.index, 'conclusion'])
+        grouped = success.groupby(periods)
+        rate = (grouped.sum() / grouped.count()).sort_index() * 100.0
+        labels = [str(p) for p in rate.index]
+        chart_data = {
+            'type': analysis.chart_type or 'line',
+            'data': {
+                'labels': labels,
+                'datasets': [{'label': 'Success %', 'data': [float(v) for v in rate.values]}],
+            },
+            'title': 'CI/CD Success Rate Over Time',
+            'xLabel': 'Period',
+            'yLabel': 'Success %',
+        }
+        overall = float(success.mean() * 100) if len(success) else 0.0
+        return {'chart_data': chart_data, 'statistics': {'overall_success_pct': overall}}
+
+    def analyze_cicd_build_duration(self, df, analysis):
+        config = analysis.config or {}
+        freq = config.get('time_aggregation') or 'D'
+        df = self._apply_config(df, config)
+        duration_min = pd.to_numeric(df['duration_s'], errors='coerce') / 60.0
+        periods = self._devops_time_bucket(df['created_at'], freq)
+        grouped = duration_min.groupby(periods)
+        median = grouped.median().sort_index()
+        p90 = grouped.quantile(0.9).sort_index()
+        labels = [str(p) for p in median.index]
+        chart_data = {
+            'type': analysis.chart_type or 'line',
+            'data': {
+                'labels': labels,
+                'datasets': [
+                    {'label': 'Median minutes', 'data': [float(v) for v in median.values]},
+                    {'label': 'P90 minutes', 'data': [float(v) for v in p90.values]},
+                ],
+            },
+            'title': 'Build Duration Trend',
+            'xLabel': 'Period',
+            'yLabel': 'Minutes',
+        }
+        statistics = {
+            'median_minutes': float(duration_min.median()) if not duration_min.empty else 0.0,
+            'p90_minutes': float(duration_min.quantile(0.9)) if not duration_min.empty else 0.0,
+        }
+        return {'chart_data': chart_data, 'statistics': statistics}
+
+    def analyze_cicd_failure_rate_by_job(self, df, analysis):
+        df = self._apply_config(df, analysis.config or {})
+        success = self._cicd_normalize_conclusion(df['conclusion'])
+        grouped = success.groupby(df['job_name'])
+        fail_rate = (1 - grouped.mean()) * 100.0
+        fail_rate = fail_rate.sort_values(ascending=False).head(20)
+        chart_data = {
+            'type': analysis.chart_type or 'bar',
+            'data': {
+                'labels': fail_rate.index.tolist(),
+                'datasets': [{'label': 'Failure %', 'data': [float(v) for v in fail_rate.values]}],
+            },
+            'title': 'Failure Rate by Job',
+            'xLabel': 'Job',
+            'yLabel': 'Failure %',
+        }
+        return {'chart_data': chart_data, 'statistics': {'worst_job': fail_rate.index[0] if len(fail_rate) else None}}
+
+    def analyze_cicd_mttr(self, df, analysis):
+        config = analysis.config or {}
+        freq = config.get('time_aggregation') or 'W'
+        df = self._apply_config(df, config).sort_values('created_at')
+        success = self._cicd_normalize_conclusion(df['conclusion'])
+        created = pd.to_datetime(df['created_at'], errors='coerce')
+        recovery_min = []
+        recovery_periods = []
+        open_failure_at = None
+        for ts, ok in zip(created, success):
+            if pd.isna(ts):
+                continue
+            if not ok and open_failure_at is None:
+                open_failure_at = ts
+            elif ok and open_failure_at is not None:
+                recovery_min.append((ts - open_failure_at).total_seconds() / 60.0)
+                recovery_periods.append(ts.to_period(freq))
+                open_failure_at = None
+        if not recovery_min:
+            chart_data = {
+                'type': analysis.chart_type or 'line',
+                'data': {'labels': [], 'datasets': [{'label': 'MTTR minutes', 'data': []}]},
+                'title': 'Mean Time To Recovery',
+            }
+            return {'chart_data': chart_data, 'statistics': {'mttr_minutes': 0}}
+        series = pd.Series(recovery_min, index=recovery_periods)
+        mttr = series.groupby(series.index).mean().sort_index()
+        labels = [str(p) for p in mttr.index]
+        chart_data = {
+            'type': analysis.chart_type or 'line',
+            'data': {
+                'labels': labels,
+                'datasets': [{'label': 'MTTR minutes', 'data': [float(v) for v in mttr.values]}],
+            },
+            'title': 'Mean Time To Recovery',
+            'xLabel': 'Period',
+            'yLabel': 'Minutes',
+        }
+        return {'chart_data': chart_data, 'statistics': {'mttr_minutes': float(series.mean())}}
+
+    def analyze_cicd_deploy_frequency(self, df, analysis):
+        config = analysis.config or {}
+        freq = config.get('time_aggregation') or 'W'
+        df = self._apply_config(df, config)
+        deploy_mask = df['workflow_name'].fillna('').astype(str).str.contains('deploy', case=False)
+        success = self._cicd_normalize_conclusion(df['conclusion'])
+        deploys = df[deploy_mask & success]
+        periods = self._devops_time_bucket(deploys['created_at'], freq)
+        counts = periods.groupby(periods).size().sort_index()
+        labels = [str(p) for p in counts.index]
+        chart_data = {
+            'type': analysis.chart_type or 'bar',
+            'data': {
+                'labels': labels,
+                'datasets': [{'label': 'Deployments', 'data': [int(v) for v in counts.values]}],
+            },
+            'title': f'Deployment Frequency (per {freq})',
+            'xLabel': 'Period',
+            'yLabel': 'Deployments',
+        }
+        return {'chart_data': chart_data, 'statistics': {'total_deploys': int(counts.sum())}}
+
+    def analyze_cicd_queue_time(self, df, analysis):
+        df = self._apply_config(df, analysis.config or {})
+        queue_s = (
+            pd.to_datetime(df['started_at'], errors='coerce')
+            - pd.to_datetime(df['created_at'], errors='coerce')
+        ).dt.total_seconds()
+        queue_s = queue_s.dropna()
+        queue_s = queue_s[queue_s >= 0]
+        chart_data, statistics = self._devops_histogram(
+            queue_s, 'Queue Time Distribution', 'Seconds', bins=20
+        )
+        chart_data['type'] = analysis.chart_type or 'histogram'
+        return {'chart_data': chart_data, 'statistics': statistics}
+
+    def analyze_cicd_runner_utilization(self, df, analysis):
+        df = self._apply_config(df, analysis.config or {})
+        started = pd.to_datetime(df['started_at'], errors='coerce')
+        duration_min = pd.to_numeric(df['duration_s'], errors='coerce') / 60.0
+        hours = started.dt.hour
+        pivot = (
+            pd.DataFrame({
+                'runner': df['runner_name'].fillna('unknown'),
+                'hour': hours,
+                'minutes': duration_min,
+            })
+            .dropna()
+            .groupby(['runner', 'hour'])['minutes'].sum()
+            .unstack(fill_value=0)
+        )
+        heatmap = []
+        runners = pivot.index.tolist()
+        hour_labels = [int(h) for h in pivot.columns.tolist()]
+        for i, runner in enumerate(runners):
+            for j, hour in enumerate(hour_labels):
+                heatmap.append([j, i, float(pivot.iloc[i, j])])
+        chart_data = {
+            'type': 'heatmap',
+            'data': {
+                'xLabels': [f'{h:02d}:00' for h in hour_labels],
+                'yLabels': runners,
+                'values': heatmap,
+            },
+            'title': 'Runner Utilization (minutes per hour)',
+            'xLabel': 'Hour of day',
+            'yLabel': 'Runner',
+        }
+        return {'chart_data': chart_data, 'statistics': {'runners': runners}}
+
+    def analyze_cicd_flaky_jobs(self, df, analysis):
+        df = self._apply_config(df, analysis.config or {})
+        success = self._cicd_normalize_conclusion(df['conclusion'])
+        grouped = (
+            df.assign(_ok=success)
+              .groupby(['sha', 'job_name'])['_ok']
+              .agg(['nunique', 'count'])
+              .reset_index()
+        )
+        # A flaky job/sha has both a success and a failure.
+        flaky = grouped[grouped['nunique'] > 1]
+        counts = flaky.groupby('job_name').size().sort_values(ascending=False).head(20)
+        chart_data = {
+            'type': analysis.chart_type or 'bar',
+            'data': {
+                'labels': counts.index.tolist(),
+                'datasets': [{'label': 'Flaky occurrences', 'data': [int(v) for v in counts.values]}],
+            },
+            'title': 'Flaky Jobs (conclusion flipped on same SHA)',
+            'xLabel': 'Job',
+            'yLabel': 'Flaky SHAs',
+        }
+        return {'chart_data': chart_data, 'statistics': {'flaky_jobs': int(len(counts))}}

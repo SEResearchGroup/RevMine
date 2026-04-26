@@ -10,6 +10,8 @@ import {
   Settings,
   HelpCircle,
   Menu,
+  Kanban,
+  Workflow,
 } from "lucide-react";
 import logo from "../../assets/images/logo_v1.png";
 import { useNavigate } from "react-router-dom";
@@ -23,6 +25,8 @@ const Sidebar = () => {
     collection: false,
     dataManagement: false,
     analysis: false,
+    kanbanAnalysis: false,
+    cicdAnalysis: false,
     settings: false,
     help: false,
   });
@@ -80,6 +84,18 @@ const Sidebar = () => {
       subItems: ["History", "New Analysis"],
     },
     {
+      id: "kanbanAnalysis",
+      icon: Kanban,
+      label: "Kanban Analysis",
+      subItems: ["New Kanban Analysis", "Kanban History"],
+    },
+    {
+      id: "cicdAnalysis",
+      icon: Workflow,
+      label: "CI/CD Analysis",
+      subItems: ["New CI/CD Analysis", "CI/CD History"],
+    },
+    {
       id: "settings",
       icon: Settings,
       label: "Settings",
@@ -102,6 +118,15 @@ const Sidebar = () => {
       case "Projects":
         navigate("/projects");
         break;
+      case "Manual Collect":
+        navigate("/collection/manual");
+        break;
+      case "Intelligent collect":
+        navigate("/collection/intelligent");
+        break;
+      case "Import dataset":
+        navigate("/collection/import");
+        break;
       case "Data Cleaning":
         navigate("/data-cleaning");
         break;
@@ -110,6 +135,18 @@ const Sidebar = () => {
         break;
       case "History":
         navigate("/analysis/history");
+        break;
+      case "New Kanban Analysis":
+        navigate("/kanban/new");
+        break;
+      case "Kanban History":
+        navigate("/kanban/history");
+        break;
+      case "New CI/CD Analysis":
+        navigate("/cicd/new");
+        break;
+      case "CI/CD History":
+        navigate("/cicd/history");
         break;
       case "Export collect results":
         navigate("/data-cleaning");

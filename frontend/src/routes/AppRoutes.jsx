@@ -16,6 +16,9 @@ import CleaningDetail from "../pages/collection/CleaningDetail";
 import DataCleaning from "../pages/collection/DataCleaning";
 import DataCleaningList from "../pages/collection/DataCleaningList";
 import ExternalCollectionDetail from "../pages/collection/ExternalCollectionDetail";
+import ManualCollectionLanding from "../pages/collection/ManualCollectionLanding";
+import IntelligentCollectionLanding from "../pages/collection/IntelligentCollectionLanding";
+import ImportDataset from "../pages/collection/ImportDataset";
 import {
   GitHubCallback,
   GitLabCallback,
@@ -40,6 +43,20 @@ import DatasetDetailPage from "../pages/Analysis/DatasetDetailPage";
 import CreateAnalysisPage from "../pages/Analysis/CreateAnalysisPage";
 import AnalysisResultsPage from "../pages/Analysis/AnalysisResultsPage";
 
+// DevOps: Kanban Pages
+import NewKanbanAnalysisPage from "../pages/Kanban/NewKanbanAnalysisPage";
+import KanbanSourceSelectionPage from "../pages/Kanban/KanbanSourceSelectionPage";
+import KanbanHistoryPage from "../pages/Kanban/KanbanHistoryPage";
+
+// DevOps: CI/CD Pages
+import NewCICDAnalysisPage from "../pages/CICD/NewCICDAnalysisPage";
+import CICDPipelineSelectionPage from "../pages/CICD/CICDPipelineSelectionPage";
+import CICDHistoryPage from "../pages/CICD/CICDHistoryPage";
+
+// Shared DevOps Pages
+import ComputeMetricsPage from "../pages/Devops/ComputeMetricsPage";
+import DevopsCollectionProgress from "../pages/Devops/DevopsCollectionProgress";
+
 const AppRoutes = () => {
   return (
     <Routes>
@@ -63,6 +80,9 @@ const AppRoutes = () => {
         <Route path="/workspaces" element={<Workspaces />} />
         <Route path="/workspaces/:id" element={<Projects />} />
         <Route path="/projects" element={<AllProjects />} />
+        <Route path="/collection/manual" element={<ManualCollectionLanding />} />
+        <Route path="/collection/intelligent" element={<IntelligentCollectionLanding />} />
+        <Route path="/collection/import" element={<ImportDataset />} />
         <Route path="/data-cleaning" element={<DataCleaningList />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="/help/get-started" element={<GetStarted />} />
@@ -110,6 +130,30 @@ const AppRoutes = () => {
         <Route path="/analysis/datasets/:datasetId" element={<DatasetDetailPage />} />
         <Route path="/analysis/datasets/:datasetId/analyze" element={<CreateAnalysisPage />} />
         <Route path="/analysis/datasets/:datasetId/results" element={<AnalysisResultsPage />} />
+
+        {/* DevOps: Kanban Analysis */}
+        <Route path="/kanban" element={<NewKanbanAnalysisPage />} />
+        <Route path="/kanban/new" element={<NewKanbanAnalysisPage />} />
+        <Route path="/kanban/new/live" element={<KanbanSourceSelectionPage />} />
+        <Route path="/kanban/new/csv" element={<DatasetSelectionPage />} />
+        <Route path="/kanban/history" element={<KanbanHistoryPage />} />
+        <Route path="/kanban/jobs/:jobId/progress" element={<DevopsCollectionProgress />} />
+        <Route path="/kanban/:datasetId/metrics" element={<MetricsSelectionPage />} />
+        <Route path="/kanban/:datasetId/collect-metrics" element={<ComputeMetricsPage />} />
+        <Route path="/kanban/:datasetId/dashboard" element={<AnalysisDashboardPage />} />
+        <Route path="/kanban/:datasetId/chart/:analysisId" element={<SingleChartPage />} />
+
+        {/* DevOps: CI/CD Analysis */}
+        <Route path="/cicd" element={<NewCICDAnalysisPage />} />
+        <Route path="/cicd/new" element={<NewCICDAnalysisPage />} />
+        <Route path="/cicd/new/live" element={<CICDPipelineSelectionPage />} />
+        <Route path="/cicd/new/csv" element={<DatasetSelectionPage />} />
+        <Route path="/cicd/history" element={<CICDHistoryPage />} />
+        <Route path="/cicd/jobs/:jobId/progress" element={<DevopsCollectionProgress />} />
+        <Route path="/cicd/:datasetId/metrics" element={<MetricsSelectionPage />} />
+        <Route path="/cicd/:datasetId/collect-metrics" element={<ComputeMetricsPage />} />
+        <Route path="/cicd/:datasetId/dashboard" element={<AnalysisDashboardPage />} />
+        <Route path="/cicd/:datasetId/chart/:analysisId" element={<SingleChartPage />} />
 
         <Route path="/profile" element={<Profile />} />
       </Route>

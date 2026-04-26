@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import {
   ArrowLeft,
   ArrowRight,
@@ -86,9 +86,22 @@ const getErrorMessage = (error, fallback) =>
   error?.message ||
   fallback;
 
+// Derive the section ("analysis" | "kanban" | "cicd") + source_type from the
+// current URL so the same page can serve all three DevOps domains.
+const SECTION_TO_SOURCE = { analysis: null, kanban: "kanban", cicd: "cicd" };
+const deriveSection = (pathname) => {
+  const first = (pathname || "").split("/").filter(Boolean)[0];
+  return SECTION_TO_SOURCE.hasOwnProperty(first) ? first : "analysis";
+};
+
 const MetricsSelectionPage = () => {
   const { datasetId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const section = deriveSection(location.pathname);
+  const sourceType = SECTION_TO_SOURCE[section];
+  const dashboardPath = `/${section}/${datasetId}/dashboard`;
+  const entryPath = `/${section}`;
 
   const [dataset, setDataset] = useState(null);
   const [allMetricsByCategory, setAllMetricsByCategory] = useState({});
@@ -114,7 +127,7 @@ const MetricsSelectionPage = () => {
       setLoading(true);
       const [datasetRes, allMetricsRes, availableRes] = await Promise.all([
         analyzeService.getDatasetById(datasetId),
-        analyzeService.getMetricsByCategory(),
+        analyzeService.getMetricsByCategory(sourceType),
         analyzeService.getAvailableMetrics(datasetId),
       ]);
 
@@ -137,7 +150,7 @@ const MetricsSelectionPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [datasetId]);
+  }, [datasetId, sourceType]);
 
   useEffect(() => {
     loadData();
@@ -236,7 +249,7 @@ const MetricsSelectionPage = () => {
       setCreatingMessage("Generating dashboards...");
       const results = await runAnalyses(analysesToRun);
 
-      navigate(`/analysis/${datasetId}/dashboard`, {
+      navigate(dashboardPath, {
         state: {
           results,
           dataset,
@@ -283,7 +296,7 @@ const MetricsSelectionPage = () => {
       <div className="max-w-6xl mx-auto px-6 py-8">
         <div className="mb-6">
           <button
-            onClick={() => navigate("/analysis")}
+            onClick={() => navigate(entryPath)}
             className="flex items-center gap-1.5 text-slate-500 hover:text-slate-700 text-sm mb-4 transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -761,7 +774,7 @@ const MetricsSelectionPage = () => {
 
         <div className="mt-8 flex justify-between">
           <button
-            onClick={() => navigate("/analysis")}
+            onClick={() => navigate(entryPath)}
             className="flex items-center gap-2 px-6 py-3 text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors font-medium"
           >
             <ArrowLeft className="w-4 h-4" />

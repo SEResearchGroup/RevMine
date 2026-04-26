@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import {
   Upload,
   Database,
@@ -19,8 +19,20 @@ import {
 } from "lucide-react";
 import { analyzeService } from "../../services/api";
 
+// Derive which DevOps section this dataset flow belongs to from the URL:
+// /analysis/... → code, /kanban/... → kanban, /cicd/... → cicd.
+// The dataset list/upload pages don't differ across sections today, but the
+// "continue" target and history back link must route to the correct section.
+const SECTIONS = { analysis: null, kanban: "kanban", cicd: "cicd" };
+const deriveSection = (pathname) => {
+  const first = (pathname || "").split("/").filter(Boolean)[0];
+  return SECTIONS.hasOwnProperty(first) ? first : "analysis";
+};
+
 const DatasetSelectionPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const section = deriveSection(location.pathname);
   const fileInputRef = useRef(null);
 
   const [datasets, setDatasets] = useState([]);
@@ -103,7 +115,7 @@ const DatasetSelectionPage = () => {
 
   const handleContinue = () => {
     if (selectedDataset) {
-      navigate(`/analysis/${selectedDataset.id}/metrics`);
+      navigate(`/${section}/${selectedDataset.id}/metrics`);
     }
   };
 

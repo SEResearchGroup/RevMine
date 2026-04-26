@@ -63,13 +63,16 @@ class DatasetListView(APIView):
     def get(self, request):
         workspace_id = request.query_params.get('workspace_id')
         repository_id = request.query_params.get('repository_id')
-        
+        source_type = request.query_params.get('source_type')
+
         queryset = Dataset.objects.all()
-        
+
         if workspace_id:
             queryset = queryset.filter(workspace_id=workspace_id)
         if repository_id:
             queryset = queryset.filter(repository_id=repository_id)
+        if source_type:
+            queryset = queryset.filter(source_type=source_type)
         
         queryset = queryset.order_by('-uploaded_at')
         serializer = DatasetSerializer(queryset, many=True)
@@ -257,10 +260,13 @@ class DatasetCompatibleAxesView(APIView):
 # ---------------------------------------------------------------------------
 
 class MetricListView(APIView):
-    """GET /metrics/ – full catalogue."""
+    """GET /metrics/?source_type=code|kanban|cicd – full catalogue."""
 
     def get(self, request):
         metrics = MetricDefinition.objects.filter(is_active=True)
+        source_type = request.query_params.get("source_type")
+        if source_type:
+            metrics = metrics.filter(source_type=source_type)
         serializer = MetricDefinitionSerializer(metrics, many=True)
         return Response({
             "count": metrics.count(),
@@ -289,9 +295,12 @@ class MetricByCategoryView(APIView):
 
     def get(self, request):
         category = request.query_params.get("category")
-        
+        source_type = request.query_params.get("source_type")
+
         metrics = MetricDefinition.objects.filter(is_active=True)
-        
+        if source_type:
+            metrics = metrics.filter(source_type=source_type)
+
         if category:
             metrics = metrics.filter(category=category)
             serializer = MetricDefinitionSerializer(metrics, many=True)

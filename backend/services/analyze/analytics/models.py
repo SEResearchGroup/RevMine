@@ -3,6 +3,13 @@ from django.contrib.postgres.fields import ArrayField
 import uuid
 
 
+SOURCE_TYPE_CHOICES = [
+    ("code", "Code / PR / MR"),
+    ("kanban", "Kanban board"),
+    ("cicd", "CI/CD pipeline"),
+]
+
+
 class Dataset(models.Model):
     """
     Model to store uploaded CSV datasets
@@ -12,6 +19,19 @@ class Dataset(models.Model):
     workspace_id = models.IntegerField(null=True, blank=True, db_index=True)
     repository_id = models.IntegerField(null=True, blank=True, db_index=True)
     platform = models.CharField(max_length=50, default="gitlab")
+
+    # Discriminator: which DevOps domain this dataset belongs to.
+    source_type = models.CharField(
+        max_length=20,
+        choices=SOURCE_TYPE_CHOICES,
+        default="code",
+        db_index=True,
+    )
+    # Free-form config for live-collected datasets so they can be refreshed:
+    # {provider, board_id, workflow_id, since, until, ...}
+    source_config = models.JSONField(default=dict, blank=True)
+    # Back-link to the Collection row that produced this dataset (if live).
+    collection_id = models.UUIDField(null=True, blank=True, db_index=True)
 
     filename = models.CharField(max_length=255)
     file_path = models.CharField(max_length=500)
@@ -37,6 +57,71 @@ class Dataset(models.Model):
 
     def __str__(self):
         return f"{self.filename} - {self.id}"
+
+
+class DevOpsCollectionJob(models.Model):
+    """
+    Async background job that collects a Kanban / CI-CD dataset from a
+    provider. Created by the *CollectView endpoints; updated by the worker
+    thread; polled by the frontend progress page; published as a notification
+    on completion.
+    """
+
+    STATUS_CHOICES = [
+        ("pending", "Pending"),
+        ("in_progress", "In progress"),
+        ("completed", "Completed"),
+        ("failed", "Failed"),
+    ]
+
+    SOURCE_CHOICES = [
+        ("kanban", "Kanban board"),
+        ("cicd", "CI/CD pipeline"),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user_id = models.IntegerField(null=True, blank=True, db_index=True)
+    workspace_id = models.IntegerField(null=True, blank=True, db_index=True)
+    repository_id = models.IntegerField(null=True, blank=True, db_index=True)
+
+    source_type = models.CharField(max_length=20, choices=SOURCE_CHOICES, db_index=True)
+    provider = models.CharField(max_length=50, blank=True, default="")
+    label = models.CharField(max_length=255, blank=True, default="")
+
+    # Captured for resume / debug. Tokens are NOT stored here.
+    request_payload = models.JSONField(default=dict, blank=True)
+
+    status = models.CharField(
+        max_length=20, choices=STATUS_CHOICES, default="pending", db_index=True
+    )
+    progress_message = models.CharField(max_length=255, blank=True, default="")
+    progress_percent = models.IntegerField(default=0)
+    collected_items = models.IntegerField(default=0)
+    total_items = models.IntegerField(default=0)
+    error_message = models.TextField(blank=True, default="")
+
+    dataset = models.ForeignKey(
+        Dataset,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="devops_jobs",
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    started_at = models.DateTimeField(null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = "devops_collection_jobs"
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["user_id", "-created_at"]),
+            models.Index(fields=["status"]),
+        ]
+
+    def __str__(self):
+        return f"DevOpsCollectionJob {self.id} ({self.source_type}/{self.status})"
 
 
 class MetricDefinition(models.Model):
@@ -68,7 +153,16 @@ class MetricDefinition(models.Model):
     code = models.CharField(max_length=100, unique=True, help_text="Unique code identifier")
     name = models.CharField(max_length=200)
     description = models.TextField()
-    
+
+    # Which DevOps domain this metric belongs to. Used by /metrics/by_category/
+    # to keep the code / kanban / cicd catalogs separate.
+    source_type = models.CharField(
+        max_length=20,
+        choices=SOURCE_TYPE_CHOICES,
+        default="code",
+        db_index=True,
+    )
+
     # Configuration de la métrique
     category = models.CharField(max_length=50, help_text="Category: timeseries, distribution, correlation, etc.")
     default_chart_type = models.CharField(max_length=50, choices=CHART_TYPE_CHOICES)

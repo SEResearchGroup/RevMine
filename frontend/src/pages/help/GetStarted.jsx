@@ -25,6 +25,11 @@ import {
   Clock,
   Layers,
   Lightbulb,
+  Kanban,
+  Workflow,
+  FileDown,
+  Cloud,
+  Zap,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import logo from "../../assets/images/logo_v1.png";
@@ -197,6 +202,113 @@ const collectionMetricGroups = [
   },
 ];
 
+/* ─── DevOps tracks (NEW) ─── */
+const devopsTracks = [
+  {
+    title: "Code Reviews",
+    icon: GitMerge,
+    color: "from-blue-500 to-blue-600",
+    bg: "bg-blue-50",
+    text: "text-blue-700",
+    description:
+      "The original RevMine flow: collection plans on a repository produce a cleaned MR/PR dataset for analysis.",
+    cta: "Open analysis",
+    route: "/analysis",
+  },
+  {
+    title: "Kanban Boards",
+    icon: Kanban,
+    color: "from-violet-500 to-indigo-600",
+    bg: "bg-violet-50",
+    text: "text-violet-700",
+    description:
+      "Pull live issues from a GitHub Projects v2 board or a GitLab Issue Board. Compute lead time, cycle time, throughput, WIP, CFD, and more.",
+    cta: "New Kanban analysis",
+    route: "/kanban/new",
+  },
+  {
+    title: "CI/CD Pipelines",
+    icon: Workflow,
+    color: "from-emerald-500 to-emerald-600",
+    bg: "bg-emerald-50",
+    text: "text-emerald-700",
+    description:
+      "Pull recent runs from GitHub Actions or GitLab CI. Compute success rate, build duration, MTTR, deploy frequency, queue time, flaky jobs.",
+    cta: "New CI/CD analysis",
+    route: "/cicd/new",
+  },
+];
+
+/* ─── DevOps flow (NEW) ─── */
+const devopsFlow = [
+  {
+    step: 1,
+    icon: Cloud,
+    title: "Pick a source",
+    description:
+      "From a connected workspace or with a manual access token, choose the Kanban board or CI/CD pipeline you want to ingest.",
+    color: "from-violet-500 to-indigo-600",
+  },
+  {
+    step: 2,
+    icon: Database,
+    title: "Collect the raw dataset",
+    description:
+      "RevMine fetches the issues / runs and saves them as a normalised dataset. Download the raw rows as CSV or JSON whenever you need them.",
+    color: "from-blue-500 to-blue-600",
+  },
+  {
+    step: 3,
+    icon: Zap,
+    title: "Collect metrics & download CSV",
+    description:
+      "Pick the DevOps metrics you care about, run them in one click, preview the results, then export a metrics CSV for spreadsheets, BI tools, or reports.",
+    color: "from-amber-500 to-amber-600",
+  },
+  {
+    step: 4,
+    icon: BarChart3,
+    title: "Continue to analysis",
+    description:
+      "Move into the analysis service to turn the same dataset into interactive charts and dashboards. The metric catalogue is filtered to the matching DevOps domain.",
+    color: "from-emerald-500 to-emerald-600",
+  },
+];
+
+/* ─── DevOps metric catalogues (NEW) ─── */
+const devopsMetricGroups = [
+  {
+    title: "Kanban metrics",
+    icon: Kanban,
+    color: "text-violet-600 bg-violet-50",
+    metrics: [
+      "Lead Time",
+      "Cycle Time",
+      "Throughput",
+      "Work In Progress (WIP)",
+      "Cumulative Flow Diagram",
+      "Time per Column",
+      "Blocked Ratio",
+      "Assignee Load",
+    ],
+  },
+  {
+    title: "CI/CD metrics",
+    icon: Workflow,
+    color: "text-emerald-600 bg-emerald-50",
+    metrics: [
+      "Success Rate",
+      "Build Duration",
+      "Failure Rate by Job",
+      "Mean Time To Recovery (MTTR)",
+      "Deploy Frequency",
+      "Queue Time",
+      "Runner Utilisation",
+      "Flaky Jobs",
+    ],
+  },
+];
+
 /* ─── Analysis metrics ─── */
 const analysisCategories = [
   {
@@ -317,7 +429,7 @@ const GetStarted = () => {
           <p className="text-gray-500 text-lg max-w-2xl mx-auto leading-relaxed">
             A software engineering analytics platform that transforms raw repository
             activity into actionable insights — from commits and merge requests to
-            contributor trends and effort estimations.
+            Kanban flow, CI/CD reliability, and contributor trends.
           </p>
 
           <div className="flex flex-wrap justify-center gap-3 mt-8">
@@ -444,6 +556,143 @@ const GetStarted = () => {
           </div>
         </section>
 
+        {/* ── DevOps tracks (NEW) ── */}
+        <section className="mb-14">
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center gap-2 px-3 py-1 bg-violet-50 text-violet-700 rounded-full text-xs font-semibold uppercase tracking-wide mb-3">
+              <Sparkles className="w-3.5 h-3.5" />
+              New
+            </div>
+            <h2 className="text-xl font-bold text-gray-900">Three analysis tracks</h2>
+            <p className="text-sm text-gray-500 mt-1">
+              Code reviews are joined by Kanban and CI/CD pipelines — each with its own
+              live collector and metric catalogue.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {devopsTracks.map((track) => {
+              const TIcon = track.icon;
+              return (
+                <button
+                  key={track.title}
+                  onClick={() => navigate(track.route)}
+                  className="text-left bg-white rounded-xl border border-gray-200 p-5 hover:shadow-md hover:border-gray-300 transition-all duration-200 flex flex-col"
+                >
+                  <div
+                    className={`w-11 h-11 rounded-xl bg-gradient-to-br ${track.color} flex items-center justify-center mb-3 shadow-sm`}
+                  >
+                    <TIcon className="w-5 h-5 text-white" />
+                  </div>
+                  <h3 className="font-semibold text-gray-800 text-sm mb-1.5">
+                    {track.title}
+                  </h3>
+                  <p className="text-xs text-gray-500 leading-relaxed flex-1">
+                    {track.description}
+                  </p>
+                  <span
+                    className={`mt-3 inline-flex items-center gap-1 text-xs font-medium ${track.text}`}
+                  >
+                    {track.cta}
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
+        {/* ── DevOps flow (NEW) ── */}
+        <section className="mb-14">
+          <div className="text-center mb-8">
+            <h2 className="text-xl font-bold text-gray-900">
+              DevOps flow: collect → metrics → analysis
+            </h2>
+            <p className="text-sm text-gray-500 mt-1">
+              The Kanban and CI/CD tracks share the same four-step pipeline.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {devopsFlow.map((s) => {
+              const Icon = s.icon;
+              return (
+                <div
+                  key={s.step}
+                  className="bg-white rounded-xl border border-gray-200 p-5 flex flex-col hover:shadow-md transition-all"
+                >
+                  <div
+                    className={`w-11 h-11 rounded-xl bg-gradient-to-br ${s.color} flex items-center justify-center mb-3 shadow-sm`}
+                  >
+                    <Icon className="w-5 h-5 text-white" />
+                  </div>
+                  <span className="text-[10px] font-bold tracking-widest text-gray-400 uppercase mb-1">
+                    Step {s.step}
+                  </span>
+                  <h3 className="font-semibold text-gray-800 text-sm mb-1">
+                    {s.title}
+                  </h3>
+                  <p className="text-xs text-gray-500 leading-relaxed">
+                    {s.description}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="mt-5 flex flex-col sm:flex-row items-start sm:items-center gap-3 bg-amber-50 border border-amber-100 rounded-xl px-4 py-3">
+            <FileDown className="w-4 h-4 text-amber-600 shrink-0" />
+            <p className="text-xs text-amber-800 leading-relaxed">
+              The "Collect metrics" step (new) flattens each metric's statistics into a
+              single CSV — handy for sharing summaries without exporting the whole raw
+              dataset.
+            </p>
+          </div>
+        </section>
+
+        {/* ── DevOps Metrics (NEW) ── */}
+        <section className="mb-14">
+          <div className="text-center mb-8">
+            <h2 className="text-xl font-bold text-gray-900">DevOps metrics</h2>
+            <p className="text-sm text-gray-500 mt-1">
+              Available in the metric picker for Kanban / CI/CD datasets.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {devopsMetricGroups.map((group) => {
+              const GIcon = group.icon;
+              return (
+                <div
+                  key={group.title}
+                  className="bg-white rounded-xl border border-gray-200 p-5 hover:shadow-md transition-all duration-200"
+                >
+                  <div className="flex items-center gap-2.5 mb-3">
+                    <div
+                      className={`w-8 h-8 rounded-lg flex items-center justify-center ${group.color}`}
+                    >
+                      <GIcon className="w-4 h-4" />
+                    </div>
+                    <h3 className="font-semibold text-gray-800 text-sm">
+                      {group.title}
+                    </h3>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {group.metrics.map((m) => (
+                      <span
+                        key={m}
+                        className="text-[11px] px-2 py-0.5 bg-gray-50 text-gray-600 rounded-md border border-gray-100"
+                      >
+                        {m}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+
         {/* ── Collection Metrics ── */}
         <section className="mb-14">
           <div className="text-center mb-8">
@@ -553,6 +802,8 @@ const GetStarted = () => {
                 "After collection, run data cleaning to filter reviewers, committers, and dates before analysis.",
                 "Use the Intelligent Assistant to skip manual metric selection — just describe your goal in plain language.",
                 "Export your cleaned dataset as CSV for use in external tools like Jupyter Notebook.",
+                "For Kanban or CI/CD analyses, use “Collect metrics & download CSV” after collection to get a flat statistics file you can drop straight into a spreadsheet.",
+                "Workspace-connected repos auto-resolve their stored OAuth token — no need to paste a personal token for every Kanban / CI/CD collection.",
               ].map((tip) => (
                 <li
                   key={tip}

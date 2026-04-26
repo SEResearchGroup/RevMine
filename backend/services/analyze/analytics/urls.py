@@ -1,4 +1,15 @@
 from django.urls import path
+from .devops_views import (
+    KanbanListBoardsView,
+    CICDListPipelinesView,
+    KanbanCollectView,
+    CICDCollectView,
+    DevOpsDatasetsView,
+    DevOpsDatasetDownloadView,
+    DevOpsComputeMetricsView,
+    DevOpsComputeMetricsCSVView,
+    DevOpsJobStatusView,
+)
 from .views import (
     # Datasets
     DatasetListView,
@@ -68,4 +79,17 @@ urlpatterns = [
     path('analyses/<uuid:pk>/retry/',                       AnalysisRetryView.as_view(),             name='analysis-retry'),
     # History – grouped by dataset for the panel page
     path('analyses/history/',                               AnalysisHistoryView.as_view(),           name='analysis-history'),
+
+    # ──────────────────────────────────────────
+    # DevOps live collection (Kanban + CI/CD)
+    # ──────────────────────────────────────────
+    path('devops/kanban/boards/',      KanbanListBoardsView.as_view(),   name='devops-kanban-boards'),
+    path('devops/kanban/collect/',     KanbanCollectView.as_view(),      name='devops-kanban-collect'),
+    path('devops/cicd/pipelines/',     CICDListPipelinesView.as_view(),  name='devops-cicd-pipelines'),
+    path('devops/cicd/collect/',       CICDCollectView.as_view(),        name='devops-cicd-collect'),
+    path('devops/jobs/<uuid:pk>/status/', DevOpsJobStatusView.as_view(), name='devops-job-status'),
+    path('devops/datasets/',                                DevOpsDatasetsView.as_view(),           name='devops-datasets'),
+    path('devops/datasets/<uuid:pk>/download/',             DevOpsDatasetDownloadView.as_view(),    name='devops-dataset-download'),
+    path('devops/datasets/<uuid:pk>/compute-metrics/',      DevOpsComputeMetricsView.as_view(),     name='devops-compute-metrics'),
+    path('devops/datasets/<uuid:pk>/compute-metrics/csv/',  DevOpsComputeMetricsCSVView.as_view(),  name='devops-compute-metrics-csv'),
 ]

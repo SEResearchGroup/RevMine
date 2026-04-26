@@ -99,6 +99,35 @@ const faqs = [
       },
     ],
   },
+  {
+    category: "DevOps (Kanban & CI/CD)",
+    items: [
+      {
+        q: "What is the Kanban analysis track?",
+        a: "Open Kanban → New analysis → Live from provider, then pick a GitHub Projects v2 board or a GitLab Issue Board. RevMine fetches the issues, normalises them into a dataset, and unlocks Kanban-specific metrics: lead time, cycle time, throughput, WIP, cumulative flow diagram, time per column, blocked ratio, and assignee load.",
+      },
+      {
+        q: "What is the CI/CD analysis track?",
+        a: "Open CI/CD → New analysis → Live from provider, then pick a GitHub Actions workflow or a GitLab CI project. RevMine pulls recent runs and computes success rate, build duration, failure rate by job, MTTR, deploy frequency, queue time, runner utilisation, and flaky-jobs detection.",
+      },
+      {
+        q: "Do I need a separate token for Kanban / CI/CD?",
+        a: "No. If the source repository is already imported under a workspace, RevMine resolves the stored OAuth token automatically. The “Manual token” tab is only needed for ad-hoc sources (for example, a self-hosted GitLab project that is not yet connected as a workspace).",
+      },
+      {
+        q: "What does “Collect metrics & download CSV” do?",
+        a: "After a Kanban or CI/CD collection finishes, the new “Collect metrics” step lets you tick the metrics you want, runs them in one shot against the collected dataset, previews the computed statistics, and gives you a metrics CSV (one row per metric × statistic). Use it for spreadsheets, BI tools, or sharing summaries without exporting the full raw dataset.",
+      },
+      {
+        q: "What is the difference between “Download raw CSV” and the metrics CSV?",
+        a: "The raw CSV contains every issue / pipeline run that was collected (one row per item). The metrics CSV contains the computed statistics for the metrics you picked (one row per metric × statistic), so it stays compact even when the raw dataset is large.",
+      },
+      {
+        q: "After generating metrics, where do I see the charts?",
+        a: "Click “Continue to analysis” from the metrics page. You land in the regular analysis service where the metric catalogue is filtered to the dataset's domain (Kanban or CI/CD), and you can build interactive dashboards.",
+      },
+    ],
+  },
 ];
 
 const FaqItem = ({ item }) => {

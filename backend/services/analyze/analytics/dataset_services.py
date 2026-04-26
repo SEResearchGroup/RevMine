@@ -175,21 +175,21 @@ class DatasetService:
         Create a dataset from uploaded CSV file
         """
         from .models import Dataset
-        
+
         # Generate unique filename
         file_id = str(uuid.uuid4())
         filename = f"{file_id}_{file.name}"
         file_path = os.path.join(self.storage_path, filename)
-        
+
         # Save file
         saved_path = default_storage.save(file_path, ContentFile(file.read()))
-        
+
         # Read CSV to get metadata (using robust reader)
         df = self._read_csv_safe(default_storage.open(saved_path))
-        
+
         # Get columns metadata
         columns_metadata = self._extract_columns_metadata(df)
-        
+
         # Create dataset record
         dataset = Dataset.objects.create(
             workspace_id=workspace_id,
@@ -201,7 +201,70 @@ class DatasetService:
             columns_count=len(df.columns),
             columns_metadata=columns_metadata
         )
-        
+
+        return dataset
+
+    @staticmethod
+    def sanitize_filename(name):
+        """
+        Produce a filename that is safe for both the filesystem and an HTTP
+        Content-Disposition header. We collapse every character outside
+        [A-Za-z0-9._-] to an underscore — this eliminates path separators,
+        non-ASCII/unicode, control chars, quoting, and anything else that
+        can trip up the browser's header parser or make default_storage
+        silently create subdirectories.
+        """
+        if not name:
+            return 'dataset'
+        cleaned = _re.sub(r'[^A-Za-z0-9._-]+', '_', name).strip('._ ') or 'dataset'
+        return cleaned[:180]
+
+    def create_dataset_from_dataframe(
+        self,
+        df,
+        filename,
+        source_type='code',
+        source_config=None,
+        collection_id=None,
+        workspace_id=None,
+        repository_id=None,
+        platform='github',
+    ):
+        """
+        Create a Dataset from an in-memory DataFrame by serialising it to CSV
+        and persisting via default_storage. Used by live DevOps collectors
+        (Kanban boards, CI/CD pipelines) that produce a normalised DataFrame
+        directly rather than receiving an uploaded file.
+        """
+        from .models import Dataset
+
+        file_id = str(uuid.uuid4())
+        clean_name = self.sanitize_filename(filename)
+        safe_name = clean_name if clean_name.endswith('.csv') else f'{clean_name}.csv'
+        stored_name = f'{file_id}_{safe_name}'
+        file_path = os.path.join(self.storage_path, stored_name)
+
+        buffer = StringIO()
+        df.to_csv(buffer, index=False)
+        saved_path = default_storage.save(
+            file_path, ContentFile(buffer.getvalue().encode('utf-8'))
+        )
+
+        columns_metadata = self._extract_columns_metadata(df)
+
+        dataset = Dataset.objects.create(
+            workspace_id=workspace_id,
+            repository_id=repository_id,
+            platform=platform,
+            source_type=source_type,
+            source_config=source_config or {},
+            collection_id=collection_id,
+            filename=safe_name,
+            file_path=saved_path,
+            rows_count=len(df),
+            columns_count=len(df.columns),
+            columns_metadata=columns_metadata,
+        )
         return dataset
     
     def _extract_columns_metadata(self, df):
@@ -317,25 +380,31 @@ class DatasetService:
     
     def get_available_metrics(self, dataset):
         """
-        Get list of available metrics based on dataset columns
+        Get list of available metrics based on dataset columns.
+        Only metrics matching the dataset's source_type are considered — this
+        keeps Kanban/CI-CD metrics out of code datasets' picker (and vice
+        versa) even when column names happen to overlap.
         """
         from .models import MetricDefinition
-        
+
         available_columns = set(self.get_columns(dataset))
-        all_metrics = MetricDefinition.objects.filter(is_active=True)
-        
+        all_metrics = MetricDefinition.objects.filter(
+            is_active=True,
+            source_type=getattr(dataset, 'source_type', 'code') or 'code',
+        )
+
         available_metrics = []
         missing_columns_by_metric = {}
-        
+
         for metric in all_metrics:
             required_cols = set(metric.required_columns)
             missing_cols = required_cols - available_columns
-            
+
             if not missing_cols:
                 available_metrics.append(metric)
             else:
                 missing_columns_by_metric[metric.code] = list(missing_cols)
-        
+
         return {
             'available_metrics': available_metrics,
             'missing_columns_by_metric': missing_columns_by_metric

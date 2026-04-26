@@ -538,16 +538,30 @@ class DownloadCollectionJSONView(UserIdRequiredMixin, APIView):
                 {"error": "No data file available"}, status=status.HTTP_404_NOT_FOUND
             )
 
-        json_data = CollectedDataService.get_raw_json(collection)
+        try:
+            json_data = CollectedDataService.get_raw_json(collection)
+        except Exception as e:
+            logger.exception(f"Error retrieving JSON for collection {collection_id}: {e}")
+            return Response(
+                {"error": "Storage unavailable", "detail": str(e)},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
 
         if json_data is None:
             return Response(
                 {"error": "File not found in storage"}, status=status.HTTP_404_NOT_FOUND
             )
 
-        response = HttpResponse(
-            json.dumps(json_data, indent=2), content_type="application/json"
-        )
+        try:
+            payload = json.dumps(json_data, indent=2)
+        except (TypeError, ValueError) as e:
+            logger.exception(f"Error serializing JSON for collection {collection_id}: {e}")
+            return Response(
+                {"error": "Failed to serialize JSON", "detail": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        response = HttpResponse(payload, content_type="application/json")
         response["Content-Disposition"] = (
             f'attachment; filename="{collection.raw_data_filename}"'
         )
@@ -693,9 +707,24 @@ class CreateCleanedDataView(UserIdRequiredMixin, APIView):
 
         except CollectionStateError as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-        except (StorageError, Exception) as e:
+        except StorageError as e:
             return Response(
-                {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                {"error": "Storage error", "detail": str(e)},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+        except Exception as e:
+            logger.exception(
+                "CreateCleanedDataView failed for collection %s", collection.id
+            )
+            return Response(
+                {
+                    "error": f"{type(e).__name__}: {e}",
+                    "detail": (
+                        "Cleaning failed while processing the raw data. "
+                        "Check the collection-service logs for the full traceback."
+                    ),
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
 
@@ -759,7 +788,18 @@ class DownloadCleanedDataCSVView(View):
             )
 
         try:
-            cleaned_data = CleanedData.objects.get(id=cleaned_data_id)
+            user_id_int = int(user_id)
+        except (TypeError, ValueError):
+            return HttpResponse(
+                '{"error": "Invalid user ID"}',
+                status=401,
+                content_type="application/json",
+            )
+
+        try:
+            cleaned_data = CleanedData.objects.select_related("collection").get(
+                id=cleaned_data_id
+            )
         except CleanedData.DoesNotExist:
             return HttpResponse(
                 '{"error": "Cleaned data not found"}',
@@ -767,10 +807,30 @@ class DownloadCleanedDataCSVView(View):
                 content_type="application/json",
             )
 
-        if cleaned_data.collection.user != int(user_id):
+        if cleaned_data.collection.user != user_id_int:
             return HttpResponse(
                 '{"error": "Permission denied"}',
                 status=403,
+                content_type="application/json",
+            )
+
+        if file_type not in ("structured", "statistics"):
+            return HttpResponse(
+                '{"error": "Invalid file type"}',
+                status=400,
+                content_type="application/json",
+            )
+
+        filename = (
+            cleaned_data.structured_csv_filename
+            if file_type == "structured"
+            else cleaned_data.statistics_csv_filename
+        )
+
+        if not filename:
+            return HttpResponse(
+                '{"error": "File not available for this cleaned dataset"}',
+                status=404,
                 content_type="application/json",
             )
 
@@ -782,6 +842,15 @@ class DownloadCleanedDataCSVView(View):
                 status=400,
                 content_type="application/json",
             )
+        except Exception as e:
+            logger.exception(
+                f"Error downloading CSV for cleaned_data {cleaned_data_id}: {e}"
+            )
+            return HttpResponse(
+                json.dumps({"error": "Storage unavailable", "detail": str(e)}),
+                status=503,
+                content_type="application/json",
+            )
 
         if csv_bytes is None:
             return HttpResponse(
@@ -789,12 +858,6 @@ class DownloadCleanedDataCSVView(View):
                 status=404,
                 content_type="application/json",
             )
-
-        filename = (
-            cleaned_data.structured_csv_filename
-            if file_type == "structured"
-            else cleaned_data.statistics_csv_filename
-        )
 
         file_like = io.BytesIO(csv_bytes)
         response = FileResponse(
