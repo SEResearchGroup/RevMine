@@ -29,8 +29,6 @@ const Workspaces = ({ openCreateModal }) => {
   const [stats] = useState({
     analysisThisMonth: 10,
     prsCollected: 45,
-    quotaUsed: 85,
-    activeWorkspaces: 4,
   });
 
   useEffect(() => {
@@ -122,7 +120,7 @@ const Workspaces = ({ openCreateModal }) => {
           <span className="text-blue-600">Data Sources</span> / Workspaces
         </h1>
 
-        <StatsCards stats={stats} />
+        <StatsCards stats={{ ...stats, activeWorkspaces: total }} />
 
         <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3 mb-3">
           <div className="relative flex-1 max-w-full sm:max-w-md">
