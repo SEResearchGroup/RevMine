@@ -119,20 +119,29 @@ const ResultsDisplay = ({ results = [], onExportAll, onExportSingle, exportLoadi
 
                 {/* Large Chart Display */}
                 <div className="p-6">
-                  <div className="bg-slate-50 rounded-lg p-6 h-96">
-                    {result.chart_data ? (
-                      <DynamicChart
-                        chartData={{ data: result.chart_data }}
-                        chartType={result.chart_type}
-                        height={384}
-                        showControls={false}
-                      />
-                    ) : (
-                      <div className="flex items-center justify-center h-full text-slate-400">
-                        Aucune donnée de graphique disponible
+                  {(() => {
+                    const isMulti = result.chart_data?.type === 'multi_chart';
+                    const containerCls = isMulti
+                      ? "bg-slate-50 rounded-lg p-6"
+                      : "bg-slate-50 rounded-lg p-6 h-96";
+                    const chartHeight = isMulti ? 700 : 384;
+                    return (
+                      <div className={containerCls} style={isMulti ? { minHeight: chartHeight } : {}}>
+                        {result.chart_data ? (
+                          <DynamicChart
+                            chartData={{ data: result.chart_data }}
+                            chartType={result.chart_type}
+                            height={chartHeight}
+                            showControls={false}
+                          />
+                        ) : (
+                          <div className="flex items-center justify-center h-full text-slate-400">
+                            Aucune donnée de graphique disponible
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
+                    );
+                  })()}
                 </div>
 
                 {/* Statistics Toggle Button & Content */}
@@ -224,6 +233,7 @@ const ResultsDisplay = ({ results = [], onExportAll, onExportSingle, exportLoadi
               <DynamicChart
                 chartData={{ data: fullscreenChart.chart_data }}
                 chartType={fullscreenChart.chart_type}
+                height={fullscreenChart.chart_data?.type === 'multi_chart' ? 700 : undefined}
                 showControls={true}
               />
             </div>

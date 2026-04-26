@@ -22,6 +22,12 @@ import {
   Bot,
 } from "lucide-react";
 import { analyzeService } from "../../services/api";
+import {
+  LLM_PROVIDERS,
+  OPENROUTER_MODELS,
+  DEFAULT_OLLAMA_MODEL,
+  DEFAULT_OPENROUTER_MODEL,
+} from "../../utils/llmConfig";
 
 const CATEGORY_META = {
   timeseries: { icon: LineChart, color: "blue", label: "Time Series" },
@@ -106,6 +112,8 @@ const MetricsSelectionPage = () => {
   const [selectedMetrics, setSelectedMetrics] = useState([]);
   const [llmPrompt, setLlmPrompt] = useState("");
   const [aiPreview, setAiPreview] = useState(null);
+  const [llmProvider, setLlmProvider] = useState(LLM_PROVIDERS.OPENROUTER);
+  const [llmModel, setLlmModel] = useState(DEFAULT_OPENROUTER_MODEL);
 
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -227,6 +235,8 @@ const MetricsSelectionPage = () => {
         preview = await analyzeService.previewAnalysisPrompt({
           dataset_id: datasetId,
           prompt: llmPrompt.trim(),
+          llm_provider: llmProvider,
+          model: llmModel,
         });
         setAiPreview(preview);
         analysesToRun = preview.analyses || [];
@@ -470,6 +480,65 @@ const MetricsSelectionPage = () => {
                   <p className="text-sm text-slate-500">
                     Example: "Show me commits over time for Alice in 2025 as a line chart."
                   </p>
+                </div>
+              </div>
+
+              {/* LLM Provider & Model */}
+              <div className="mb-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Provider</label>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLlmProvider(LLM_PROVIDERS.OPENROUTER);
+                        setLlmModel(DEFAULT_OPENROUTER_MODEL);
+                      }}
+                      className={`flex-1 rounded-xl border px-3 py-2 text-sm font-medium transition-all ${
+                        llmProvider === LLM_PROVIDERS.OPENROUTER
+                          ? "border-indigo-400 bg-indigo-600 text-white"
+                          : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100"
+                      }`}
+                    >
+                      OpenRouter
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLlmProvider(LLM_PROVIDERS.OLLAMA);
+                        setLlmModel(DEFAULT_OLLAMA_MODEL);
+                      }}
+                      className={`flex-1 rounded-xl border px-3 py-2 text-sm font-medium transition-all ${
+                        llmProvider === LLM_PROVIDERS.OLLAMA
+                          ? "border-indigo-400 bg-indigo-600 text-white"
+                          : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100"
+                      }`}
+                    >
+                      Ollama (local)
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Model</label>
+                  {llmProvider === LLM_PROVIDERS.OPENROUTER ? (
+                    <select
+                      value={llmModel}
+                      onChange={(e) => setLlmModel(e.target.value)}
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                      {OPENROUTER_MODELS.map((m) => (
+                        <option key={m.id} value={m.id}>{m.name}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      type="text"
+                      value={llmModel}
+                      onChange={(e) => setLlmModel(e.target.value)}
+                      placeholder="e.g. deepseek-r1, llama3.2"
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  )}
                 </div>
               </div>
 

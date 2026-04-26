@@ -68,6 +68,21 @@ class DataExtractor:
         """
         raise NotImplementedError
 
+    def get_first_formal_review_at(self, item: dict) -> Optional[str]:
+        """
+        Return ISO date string of the first formal review action.
+        For GitHub: first item in reviews[]. For GitLab: same as get_first_review_date.
+        Subclasses may override.
+        """
+        return self.get_first_review_date(item)
+
+    def get_approved_at(self, item: dict) -> Optional[str]:
+        """
+        Return ISO date string of the first approval event.
+        Subclasses must implement this.
+        """
+        raise NotImplementedError
+
     def count_human_comments(self, item: dict) -> int:
         """
         Count all human-written comments (excluding system/bot notes).
@@ -279,6 +294,24 @@ class GitHubDataExtractor(DataExtractor):
             if dt:
                 dates.append(dt)
         return min(dates) if dates else None
+
+    @staticmethod
+    def get_first_formal_review_at(item: dict) -> Optional[str]:
+        """Return ISO date of the first formal GitHub review (any state)."""
+        dates = []
+        for review in item.get('reviews', []):
+            dt = review.get('submitted_at')
+            if dt:
+                dates.append(dt)
+        return min(dates) if dates else None
+
+    @staticmethod
+    def get_approved_at(item: dict) -> Optional[str]:
+        """Return ISO date of the first APPROVED review."""
+        for review in item.get('reviews', []):
+            if review.get('state', '').upper() == 'APPROVED':
+                return review.get('submitted_at')
+        return None
 
     @staticmethod
     def count_human_comments(item: dict) -> int:
@@ -533,6 +566,39 @@ class GitLabDataExtractor(DataExtractor):
         return min(dates) if dates else None
 
     @staticmethod
+    def get_first_formal_review_at(item: dict) -> Optional[str]:
+        """For GitLab, formal review = first human note (same as get_first_review_date)."""
+        return GitLabDataExtractor.get_first_review_date(item)
+
+    @staticmethod
+    def get_approved_at(item: dict) -> Optional[str]:
+        """
+        Return ISO date of the first approval event on a GitLab MR.
+        Checks: MR details.approved_at, then approval-related system notes.
+        """
+        details = item.get('details', {})
+        if details.get('approved_at'):
+            return details['approved_at']
+        # Look for system notes containing 'approved'
+        dates = []
+        for discussion in item.get('discussions', []):
+            for note in discussion.get('notes', []):
+                if GitLabDataExtractor._is_system_note(note):
+                    body = str(note.get('body', '')).lower()
+                    if 'approved' in body:
+                        dt = note.get('created_at')
+                        if dt:
+                            dates.append(dt)
+        for note in item.get('notes', []):
+            if GitLabDataExtractor._is_system_note(note):
+                body = str(note.get('body', '')).lower()
+                if 'approved' in body:
+                    dt = note.get('created_at')
+                    if dt:
+                        dates.append(dt)
+        return min(dates) if dates else None
+
+    @staticmethod
     def count_human_comments(item: dict) -> int:
         """Count all non-system notes (human-written comments)."""
         count = 0
@@ -760,6 +826,19 @@ class MetricsCalculator:
             delta = created_at - epoch
         
         return round(delta.total_seconds() / 86400, 6)
+
+    @staticmethod
+    def calculate_time_diff_hours(
+        start_dt: Optional[datetime], end_dt: Optional[datetime]
+    ) -> Optional[float]:
+        """
+        Calculate difference in hours between two datetimes.
+        Returns None if either timestamp is missing or the result is negative.
+        """
+        if not start_dt or not end_dt:
+            return None
+        hours = (end_dt - start_dt).total_seconds() / 3600
+        return round(hours, 4) if hours >= 0 else None
 
     @staticmethod
     def calculate_rework_size(commits: List[dict], first_review_date: Optional[datetime],
@@ -1382,6 +1461,16 @@ class StatisticsCSVGenerator:
         "additions",
         "deletions",
         "comments",
+        # --- Code-review time metrics ---
+        "merged_at",
+        "first_review_at",
+        "first_comment_at",
+        "approved_at",
+        "pickup_time",
+        "time_to_first_review",
+        "review_duration",
+        "approval_time",
+        "cycle_time",
     ]
 
     def __init__(self, platform: str):
@@ -1524,10 +1613,17 @@ class StatisticsCSVGenerator:
         discussions_count = self.adapter.get_discussions_count(item)
         nb_comments = self.extractor.count_human_comments(item)
 
-        # --- First review date (rework boundary) -----------------------------
-        first_review_date = DataExtractor.parse_iso_date(
-            self.extractor.get_first_review_date(item)
-        )
+        # --- First review date (rework boundary / first comment) -------------
+        first_comment_at_str = self.extractor.get_first_review_date(item)
+        first_review_date = DataExtractor.parse_iso_date(first_comment_at_str)
+
+        # --- First formal review (pickup boundary) ---------------------------
+        first_formal_review_str = self.extractor.get_first_formal_review_at(item)
+        first_formal_review_date = DataExtractor.parse_iso_date(first_formal_review_str)
+
+        # --- Approval date ---------------------------------------------------
+        approved_at_str = self.extractor.get_approved_at(item)
+        approved_at_dt = DataExtractor.parse_iso_date(approved_at_str)
 
         # --- Commit dates ----------------------------------------------------
         commit_dates = [
@@ -1535,6 +1631,26 @@ class StatisticsCSVGenerator:
             for c in commits
         ]
         commit_dates = [d for d in commit_dates if d]
+
+        # --- Code-review time metrics ----------------------------------------
+        merged_at_str = self.extractor.get_merged_at(details)
+        merged_at_dt = DataExtractor.parse_iso_date(merged_at_str)
+
+        pickup_time = MetricsCalculator.calculate_time_diff_hours(
+            created_at, first_formal_review_date
+        )
+        time_to_first_review = MetricsCalculator.calculate_time_diff_hours(
+            created_at, first_review_date
+        )
+        review_duration = MetricsCalculator.calculate_time_diff_hours(
+            first_review_date, merged_at_dt
+        )
+        approval_time = MetricsCalculator.calculate_time_diff_hours(
+            first_formal_review_date, approved_at_dt
+        )
+        cycle_time = MetricsCalculator.calculate_time_diff_hours(
+            created_at, merged_at_dt
+        )
 
         # --- Metrics ---------------------------------------------------------
         lead_time = MetricsCalculator.calculate_lead_time(created_at, closed_at)
@@ -1587,7 +1703,7 @@ class StatisticsCSVGenerator:
             self.initial_size_column: initial_size,
             "hist_entropy": hist_entropy,
             "modified_files": len(files),
-            "filetypes": self._count_filetypes(files),
+            "filetypes": self._get_filetypes(files),
             "state": state,
             "rework_size": rework_size,
             "Author": author,
@@ -1599,6 +1715,16 @@ class StatisticsCSVGenerator:
             "additions": additions,
             "deletions": deletions,
             "comments": nb_comments,
+            # Code-review time metrics
+            "merged_at": merged_at_str or "",
+            "first_review_at": first_formal_review_str or "",
+            "first_comment_at": first_comment_at_str or "",
+            "approved_at": approved_at_str or "",
+            "pickup_time": pickup_time if pickup_time is not None else "",
+            "time_to_first_review": time_to_first_review if time_to_first_review is not None else "",
+            "review_duration": review_duration if review_duration is not None else "",
+            "approval_time": approval_time if approval_time is not None else "",
+            "cycle_time": cycle_time if cycle_time is not None else "",
         }
 
     # =========================================================================
@@ -1660,11 +1786,11 @@ class StatisticsCSVGenerator:
                 total += self.extractor.get_commit_deletions(commit)
         return total
 
-    def _count_filetypes(self, files: list) -> int:
-        """Count unique file extensions across all changed files."""
-        extensions = {
+    def _get_filetypes(self, files: list) -> str:
+        """Return a sorted comma-separated string of unique file extensions across all changed files."""
+        extensions = sorted({
             self.extractor.get_file_name(f).rsplit(".", 1)[-1].lower()
             for f in files
             if "." in self.extractor.get_file_name(f)
-        }
-        return len(extensions)
+        })
+        return ",".join(extensions)

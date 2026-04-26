@@ -1,5 +1,11 @@
 import { AlertTriangle, Bot, CheckCircle2, Loader2, Sparkles } from "lucide-react";
 import { FEATURE_LABELS, KEYWORD_FIELD_LABELS } from "./collectionFeatureConfig";
+import {
+  LLM_PROVIDERS,
+  OPENROUTER_MODELS,
+  DEFAULT_OLLAMA_MODEL,
+  DEFAULT_OPENROUTER_MODEL,
+} from "../../utils/llmConfig";
 
 function AutomaticCollectionReview({
   draft,
@@ -12,6 +18,10 @@ function AutomaticCollectionReview({
   onApprove,
   prompt,
   onPromptChange,
+  llmProvider,
+  onProviderChange,
+  llmModel,
+  onModelChange,
 }) {
   const keywordFilters = draft?.cleaning?.filters?.keyword_filters || [];
   const selectedFeatures = draft?.cleaning?.selected_features || [];
@@ -29,6 +39,65 @@ function AutomaticCollectionReview({
             <p className="text-sm text-sky-900/80">
             Describe what to collect and clean. We will generate a draft, show it for validation, then reuse the existing workflow after you approve it.
             </p>
+          </div>
+        </div>
+
+        {/* LLM Provider & Model selector */}
+        <div className="mb-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-medium text-sky-900 mb-1">Provider</label>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  onProviderChange(LLM_PROVIDERS.OPENROUTER);
+                  onModelChange(DEFAULT_OPENROUTER_MODEL);
+                }}
+                className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+                  llmProvider === LLM_PROVIDERS.OPENROUTER
+                    ? "border-sky-500 bg-sky-600 text-white"
+                    : "border-sky-200 bg-white text-sky-800 hover:bg-sky-50"
+                }`}
+              >
+                OpenRouter
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onProviderChange(LLM_PROVIDERS.OLLAMA);
+                  onModelChange(DEFAULT_OLLAMA_MODEL);
+                }}
+                className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+                  llmProvider === LLM_PROVIDERS.OLLAMA
+                    ? "border-sky-500 bg-sky-600 text-white"
+                    : "border-sky-200 bg-white text-sky-800 hover:bg-sky-50"
+                }`}
+              >
+                Ollama (local)
+              </button>
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-sky-900 mb-1">Model</label>
+            {llmProvider === LLM_PROVIDERS.OPENROUTER ? (
+              <select
+                value={llmModel}
+                onChange={(e) => onModelChange(e.target.value)}
+                className="w-full rounded-lg border border-sky-200 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-sky-500"
+              >
+                {OPENROUTER_MODELS.map((m) => (
+                  <option key={m.id} value={m.id}>{m.name}</option>
+                ))}
+              </select>
+            ) : (
+              <input
+                type="text"
+                value={llmModel}
+                onChange={(e) => onModelChange(e.target.value)}
+                placeholder="e.g. deepseek-r1, llama3.2"
+                className="w-full rounded-lg border border-sky-200 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-sky-500"
+              />
+            )}
           </div>
         </div>
 
