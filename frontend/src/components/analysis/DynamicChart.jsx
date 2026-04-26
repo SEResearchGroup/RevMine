@@ -621,6 +621,33 @@ const DynamicChart = forwardRef(({
     );
   }
 
+  // ---- MULTI-CHART: render each sub-chart in a vertical stack ----
+  if ((chartData.data || chartData)?.type === 'multi_chart' || chartData?.type === 'multi_chart') {
+    const raw = chartData.data || chartData;
+    const charts = raw.charts || chartData.charts || [];
+    const subHeight = Math.max(260, Math.floor(height / charts.length) - 24);
+    return (
+      <div className={`flex flex-col gap-6 ${className}`} style={{ height }}>
+        {charts.map((subChart, i) => (
+          <div key={i} className="flex flex-col flex-1 min-h-0">
+            {subChart.options?.title && (
+              <p className="text-xs font-semibold text-slate-600 mb-1 text-center">
+                {subChart.options.title}
+              </p>
+            )}
+            <DynamicChart
+              chartData={subChart}
+              chartType={subChart.type}
+              height={subHeight}
+              showControls={false}
+              colorIndex={i * 3}
+            />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   return (
     <div className={`flex flex-col ${className}`}>
       {/* Controls row */}

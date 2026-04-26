@@ -34,6 +34,8 @@ class AnalysisService:
             'comments_analysis': self.analyze_comments,
             'files_modified': self.analyze_files_modified,
             'filetypes_distribution': self.analyze_filetypes_distribution,
+            'filetypes_by_extension': self.analyze_filetypes_by_extension,
+            'filetypes_by_count': self.analyze_filetypes_by_count,
             'entropy_analysis': self.analyze_entropy,
             'state_distribution': self.analyze_state_distribution,
             'rework_analysis': self.analyze_rework,
@@ -43,6 +45,12 @@ class AnalysisService:
             'top_commiters': self.analyze_top_commiters,
             'top_authors': self.analyze_top_authors,
             'top_reviewers': self.analyze_top_reviewers,
+            # Code-review time metrics
+            'pickup_time': self.analyze_pickup_time,
+            'time_to_first_review': self.analyze_time_to_first_review,
+            'review_duration': self.analyze_review_duration,
+            'approval_time': self.analyze_approval_time,
+            'cycle_time': self.analyze_cycle_time,
             # Kanban (DevOps) metrics
             'kanban_lead_time': self.analyze_kanban_lead_time,
             'kanban_cycle_time': self.analyze_kanban_cycle_time,
@@ -1588,60 +1596,133 @@ class AnalysisService:
     
     def analyze_filetypes_distribution(self, df, analysis):
         """
-        Analyze distribution of file types in MRs
+        Analyze distribution of file types in MRs.
+
+        The 'filetypes' column contains comma-separated extension strings
+        (e.g. "py,java,js").  Two charts are produced:
+          1. MRs per file extension  – how many MRs touched each extension.
+          2. MRs by number of file types changed – distribution of unique-extension
+             counts per MR (e.g. 100 MRs changed 1 type, 20 changed 2, …).
         """
         config = analysis.config
         filetypes_col = config.get('x_axis') or 'filetypes'
-        
+
         df = self._apply_config(df, config)
-        
+
         if filetypes_col not in df.columns:
             raise ValueError(f"Column '{filetypes_col}' not found in dataset")
-        
+
         df_copy = df.copy()
-        df_copy[filetypes_col] = pd.to_numeric(df_copy[filetypes_col], errors='coerce').fillna(0).astype(int)
-        
-        filetypes_dist = df_copy[filetypes_col].value_counts().sort_index()
-        
-        if len(filetypes_dist) > 15:
-            filetypes_dist = filetypes_dist.head(15)
-        
-        chart_data = {
+        # Normalise: handle legacy int/float values as well as the new string format
+        df_copy[filetypes_col] = df_copy[filetypes_col].fillna('').astype(str)
+
+        # -------------------------------------------------------------------
+        # Chart 1 – MRs per extension
+        # -------------------------------------------------------------------
+        ext_mr_counts: dict = {}  # extension -> set of row indices
+        per_mr_ext_counts = []    # number of unique extensions per MR
+
+        for idx, raw in df_copy[filetypes_col].items():
+            raw = raw.strip()
+            if not raw or raw in ('0', 'nan', ''):
+                per_mr_ext_counts.append(0)
+                continue
+            # Support both comma-separated strings and legacy integer strings
+            if ',' in raw or not raw.isdigit():
+                exts = [e.strip() for e in raw.split(',') if e.strip()]
+            else:
+                # Legacy: numeric count – we can't recover the actual extensions
+                per_mr_ext_counts.append(int(raw))
+                continue
+            per_mr_ext_counts.append(len(exts))
+            for ext in exts:
+                ext_mr_counts.setdefault(ext, 0)
+                ext_mr_counts[ext] += 1
+
+        # Sort extensions by MR count descending, keep top 25
+        sorted_exts = sorted(ext_mr_counts.items(), key=lambda x: x[1], reverse=True)[:25]
+        ext_labels = [e for e, _ in sorted_exts]
+        ext_values = [c for _, c in sorted_exts]
+
+        chart1 = {
             'type': 'bar',
             'data': {
-                'labels': [str(x) for x in filetypes_dist.index.tolist()],
+                'labels': ext_labels,
                 'datasets': [{
                     'label': 'Number of MRs',
-                    'data': filetypes_dist.values.tolist(),
+                    'data': ext_values,
                 }]
             },
             'options': {
-                'title': 'Distribution of File Types per MR',
-                'xLabel': 'Number of File Types',
+                'title': 'MRs per file extension',
+                'xLabel': 'File extension',
                 'yLabel': 'Number of MRs',
             }
         }
-        
-        fig, ax = plt.subplots(figsize=(10, 6))
-        ax.bar(range(len(filetypes_dist)), filetypes_dist.values, color='steelblue')
-        ax.set_xlabel('Number of File Types')
-        ax.set_ylabel('Number of MRs')
-        ax.set_title('Distribution of File Types per MR')
-        ax.set_xticks(range(len(filetypes_dist)))
-        ax.set_xticklabels([str(x) for x in filetypes_dist.index])
-        ax.grid(axis='y', alpha=0.3)
-        plt.tight_layout()
-        
-        chart_image = self._generate_matplotlib_image(fig)
-        
-        stats = df_copy[filetypes_col].describe()
-        statistics = {
-            'count': int(stats['count']),
-            'mean': float(stats['mean']),
-            'median': float(stats['50%']),
-            'max': int(stats['max']),
+
+        # -------------------------------------------------------------------
+        # Chart 2 – MRs by number of file types changed
+        # -------------------------------------------------------------------
+        counts_series = pd.Series(per_mr_ext_counts, dtype=int)
+        dist = counts_series.value_counts().sort_index()
+        # Exclude 0 if present (MRs with no parseable extension info)
+        dist = dist[dist.index > 0]
+
+        chart2 = {
+            'type': 'bar',
+            'data': {
+                'labels': [str(x) for x in dist.index.tolist()],
+                'datasets': [{
+                    'label': 'Number of MRs',
+                    'data': dist.values.tolist(),
+                }]
+            },
+            'options': {
+                'title': 'MRs by number of file types changed',
+                'xLabel': 'Number of unique file types',
+                'yLabel': 'Number of MRs',
+            }
         }
-        
+
+        chart_data = {
+            'type': 'multi_chart',
+            'options': {'title': 'File Types Analysis'},
+            'charts': [chart1, chart2],
+        }
+
+        # -------------------------------------------------------------------
+        # Matplotlib image – two side-by-side subplots
+        # -------------------------------------------------------------------
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
+
+        # Subplot 1
+        ax1.bar(range(len(ext_labels)), ext_values, color='steelblue')
+        ax1.set_xlabel('File extension')
+        ax1.set_ylabel('Number of MRs')
+        ax1.set_title('MRs per file extension')
+        ax1.set_xticks(range(len(ext_labels)))
+        ax1.set_xticklabels(ext_labels, rotation=45, ha='right')
+        ax1.grid(axis='y', alpha=0.3)
+
+        # Subplot 2
+        ax2.bar(range(len(dist)), dist.values, color='teal')
+        ax2.set_xlabel('Number of unique file types')
+        ax2.set_ylabel('Number of MRs')
+        ax2.set_title('MRs by number of file types changed')
+        ax2.set_xticks(range(len(dist)))
+        ax2.set_xticklabels([str(x) for x in dist.index], rotation=0)
+        ax2.grid(axis='y', alpha=0.3)
+
+        plt.tight_layout()
+        chart_image = self._generate_matplotlib_image(fig)
+
+        statistics = {
+            'total_extensions': len(ext_mr_counts),
+            'top_extension': ext_labels[0] if ext_labels else None,
+            'top_extension_mrs': ext_values[0] if ext_values else 0,
+            'mean_types_per_mr': float(counts_series[counts_series > 0].mean()) if any(c > 0 for c in per_mr_ext_counts) else 0.0,
+        }
+
         return {
             'chart_data': chart_data,
             'chart_image': chart_image,
@@ -2210,6 +2291,279 @@ class AnalysisService:
             'chart_image': chart_image,
             'statistics': statistics
         }
+
+    # =========================================================================
+    # Filetype split helpers
+    # =========================================================================
+
+    def _parse_filetypes_col(self, df, filetypes_col):
+        """Parse filetypes column, return (ext_mr_counts, per_mr_ext_counts)."""
+        ext_mr_counts: dict = {}
+        per_mr_ext_counts = []
+        for idx, raw in df[filetypes_col].items():
+            raw = str(raw).strip()
+            if not raw or raw in ('0', 'nan', ''):
+                per_mr_ext_counts.append(0)
+                continue
+            if ',' in raw or not raw.isdigit():
+                exts = [e.strip() for e in raw.split(',') if e.strip()]
+            else:
+                per_mr_ext_counts.append(int(raw))
+                continue
+            per_mr_ext_counts.append(len(exts))
+            for ext in exts:
+                ext_mr_counts.setdefault(ext, 0)
+                ext_mr_counts[ext] += 1
+        return ext_mr_counts, per_mr_ext_counts
+
+    def analyze_filetypes_by_extension(self, df, analysis):
+        """Chart: number of MRs per file extension (top 25)."""
+        config = analysis.config
+        filetypes_col = config.get('x_axis') or 'filetypes'
+        df = self._apply_config(df, config)
+        if filetypes_col not in df.columns:
+            raise ValueError(f"Column '{filetypes_col}' not found in dataset")
+        df_copy = df.copy()
+        df_copy[filetypes_col] = df_copy[filetypes_col].fillna('').astype(str)
+        ext_mr_counts, _ = self._parse_filetypes_col(df_copy, filetypes_col)
+        sorted_exts = sorted(ext_mr_counts.items(), key=lambda x: x[1], reverse=True)[:25]
+        ext_labels = [e for e, _ in sorted_exts]
+        ext_values = [c for _, c in sorted_exts]
+        chart_data = {
+            'type': 'bar',
+            'data': {
+                'labels': ext_labels,
+                'datasets': [{'label': 'Number of MRs', 'data': ext_values}]
+            },
+            'options': {
+                'title': 'MRs per File Extension',
+                'xLabel': 'File extension',
+                'yLabel': 'Number of MRs',
+            }
+        }
+        fig, ax = plt.subplots(figsize=(12, 6))
+        ax.bar(range(len(ext_labels)), ext_values, color='steelblue')
+        ax.set_xlabel('File extension')
+        ax.set_ylabel('Number of MRs')
+        ax.set_title('MRs per File Extension')
+        ax.set_xticks(range(len(ext_labels)))
+        ax.set_xticklabels(ext_labels, rotation=45, ha='right')
+        ax.grid(axis='y', alpha=0.3)
+        plt.tight_layout()
+        chart_image = self._generate_matplotlib_image(fig)
+        statistics = {
+            'total_extensions': len(ext_mr_counts),
+            'top_extension': ext_labels[0] if ext_labels else None,
+            'top_extension_mrs': ext_values[0] if ext_values else 0,
+        }
+        return {'chart_data': chart_data, 'chart_image': chart_image, 'statistics': statistics}
+
+    def analyze_filetypes_by_count(self, df, analysis):
+        """Chart: distribution of MRs by number of unique file types touched."""
+        config = analysis.config
+        filetypes_col = config.get('x_axis') or 'filetypes'
+        df = self._apply_config(df, config)
+        if filetypes_col not in df.columns:
+            raise ValueError(f"Column '{filetypes_col}' not found in dataset")
+        df_copy = df.copy()
+        df_copy[filetypes_col] = df_copy[filetypes_col].fillna('').astype(str)
+        _, per_mr_ext_counts = self._parse_filetypes_col(df_copy, filetypes_col)
+        counts_series = pd.Series(per_mr_ext_counts, dtype=int)
+        dist = counts_series.value_counts().sort_index()
+        dist = dist[dist.index > 0]
+        chart_data = {
+            'type': 'bar',
+            'data': {
+                'labels': [str(x) for x in dist.index.tolist()],
+                'datasets': [{'label': 'Number of MRs', 'data': dist.values.tolist()}]
+            },
+            'options': {
+                'title': 'MRs by Number of File Types Changed',
+                'xLabel': 'Number of unique file types',
+                'yLabel': 'Number of MRs',
+            }
+        }
+        fig, ax = plt.subplots(figsize=(10, 6))
+        ax.bar(range(len(dist)), dist.values, color='teal')
+        ax.set_xlabel('Number of unique file types')
+        ax.set_ylabel('Number of MRs')
+        ax.set_title('MRs by Number of File Types Changed')
+        ax.set_xticks(range(len(dist)))
+        ax.set_xticklabels([str(x) for x in dist.index])
+        ax.grid(axis='y', alpha=0.3)
+        plt.tight_layout()
+        chart_image = self._generate_matplotlib_image(fig)
+        valid = counts_series[counts_series > 0]
+        statistics = {
+            'mean_types_per_mr': float(valid.mean()) if len(valid) else 0.0,
+            'max_types_in_mr': int(valid.max()) if len(valid) else 0,
+            'total_mrs': len(counts_series),
+        }
+        return {'chart_data': chart_data, 'chart_image': chart_image, 'statistics': statistics}
+
+    # =========================================================================
+    # Code-review time metrics
+    # =========================================================================
+
+    def _analyze_time_histogram(self, df, analysis, col_name, title, xlabel):
+        """
+        Reusable histogram builder for any time-in-hours column.
+        Applies adaptive Freedman-Diaconis binning (same approach as lead_time).
+        Rows with missing or negative values are excluded.
+        """
+        config = analysis.config
+        time_col = config.get('x_axis') or col_name
+        df = self._apply_config(df, config)
+        df_f = df.copy()
+
+        if time_col not in df_f.columns:
+            raise ValueError(
+                f"Column '{time_col}' not found in dataset. "
+                f"Re-collect your data to include code-review time metrics."
+            )
+
+        df_f[time_col] = pd.to_numeric(df_f[time_col], errors='coerce')
+        df_f = df_f.dropna(subset=[time_col])
+        df_f = df_f[df_f[time_col] >= 0]
+
+        if len(df_f) == 0:
+            empty_chart = {
+                'type': 'bar',
+                'data': {'labels': ['No data'], 'datasets': [{'label': 'Number of MRs', 'data': [0]}]},
+                'options': {'title': title, 'xLabel': xlabel, 'yLabel': 'Number of MRs',
+                            'isHistogram': True,
+                            'histogram': {'raw_values': [], 'data_min': 0, 'data_max': 0, 'filtered_count': 0}},
+            }
+            fig, ax = plt.subplots(figsize=(12, 6))
+            ax.set_title(f'{title} – no data available')
+            ax.grid(axis='y', alpha=0.3)
+            plt.tight_layout()
+            return {
+                'chart_data': empty_chart,
+                'chart_image': self._generate_matplotlib_image(fig),
+                'statistics': {'count': 0, 'mean': 0, 'median': 0, 'p75': 0, 'max': 0},
+            }
+
+        values = df_f[time_col].values
+        n = len(values)
+        data_min, data_max = float(values.min()), float(values.max())
+        data_range = data_max - data_min
+
+        q75, q25 = np.percentile(values, [75, 25])
+        iqr = q75 - q25
+        if iqr > 0 and data_range > 0:
+            raw_width = 2.0 * iqr * (n ** (-1.0 / 3.0))
+            magnitude = 10 ** np.floor(np.log10(raw_width))
+            bin_width = np.ceil(raw_width / magnitude) * magnitude
+            num_bins = max(10, min(80, int(np.ceil(data_range / bin_width))))
+        else:
+            num_bins = max(10, min(50, int(np.ceil(np.log2(n) + 1))))
+
+        hist_counts, edges = np.histogram(values, bins=num_bins, range=(data_min, data_max))
+
+        def _fmt(lo, hi):
+            span = hi - lo
+            dec = 2 if span < 1 else (1 if span < 10 else 0)
+            return f"{lo:.{dec}f}–{hi:.{dec}f}"
+
+        bin_labels = [_fmt(edges[i], edges[i + 1]) for i in range(num_bins)]
+
+        chart_data = {
+            'type': 'bar',
+            'data': {'labels': bin_labels, 'datasets': [{'label': 'Number of MRs', 'data': hist_counts.tolist()}]},
+            'options': {
+                'title': title, 'xLabel': xlabel, 'yLabel': 'Number of MRs',
+                'isHistogram': True,
+                'histogram': {'raw_values': values.tolist(), 'data_min': data_min,
+                              'data_max': data_max, 'filtered_count': int(n)},
+            },
+        }
+
+        fig, ax = plt.subplots(figsize=(12, 6))
+        ax.bar(range(num_bins), hist_counts, width=1, edgecolor='white', color='steelblue')
+        step = max(1, num_bins // 10)
+        ax.set_xticks(range(0, num_bins, step))
+        ax.set_xticklabels(bin_labels[::step], rotation=45, ha='right')
+        ax.set_xlabel(xlabel)
+        ax.set_ylabel('Number of MRs')
+        ax.set_title(title)
+        ax.grid(axis='y', alpha=0.3)
+        plt.tight_layout()
+        chart_image = self._generate_matplotlib_image(fig)
+
+        stats = df_f[time_col].describe()
+        statistics = {
+            'count': int(stats['count']),
+            'mean': float(stats['mean']),
+            'std': float(stats['std']),
+            'min': float(stats['min']),
+            'p25': float(stats['25%']),
+            'median': float(stats['50%']),
+            'p75': float(stats['75%']),
+            'max': float(stats['max']),
+        }
+        return {'chart_data': chart_data, 'chart_image': chart_image, 'statistics': statistics}
+
+    def analyze_pickup_time(self, df, analysis):
+        """
+        Pickup Time – hours from PR creation to first formal review action.
+        Requires column: pickup_time (computed during data collection).
+        Only merged/closed MRs that received at least one review are included.
+        """
+        return self._analyze_time_histogram(
+            df, analysis,
+            col_name='pickup_time',
+            title='Pickup Time Distribution',
+            xlabel='Pickup Time (hours)',
+        )
+
+    def analyze_time_to_first_review(self, df, analysis):
+        """
+        Time to First Review – hours from PR creation to first comment/feedback.
+        Requires column: time_to_first_review.
+        """
+        return self._analyze_time_histogram(
+            df, analysis,
+            col_name='time_to_first_review',
+            title='Time to First Review Distribution',
+            xlabel='Time to First Review (hours)',
+        )
+
+    def analyze_review_duration(self, df, analysis):
+        """
+        Review Duration – hours from first feedback to merge.
+        Requires column: review_duration.
+        """
+        return self._analyze_time_histogram(
+            df, analysis,
+            col_name='review_duration',
+            title='Review Duration Distribution',
+            xlabel='Review Duration (hours)',
+        )
+
+    def analyze_approval_time(self, df, analysis):
+        """
+        Approval Time – hours from first review to final approval.
+        Requires column: approval_time.
+        """
+        return self._analyze_time_histogram(
+            df, analysis,
+            col_name='approval_time',
+            title='Approval Time Distribution',
+            xlabel='Approval Time (hours)',
+        )
+
+    def analyze_cycle_time(self, df, analysis):
+        """
+        Cycle Time – hours from PR creation to merge.
+        Requires column: cycle_time.
+        """
+        return self._analyze_time_histogram(
+            df, analysis,
+            col_name='cycle_time',
+            title='Cycle Time Distribution',
+            xlabel='Cycle Time (hours)',
+        )
 
     # ==================== DevOps helpers ====================
 

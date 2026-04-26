@@ -27,6 +27,17 @@ export const COLLECTION_FEATURES_CONFIG = [
   { id: "additions", label: "Total Additions", description: "Total lines added in the PR/MR", category: "Code Metrics" },
   { id: "deletions", label: "Total Deletions", description: "Total lines deleted in the PR/MR", category: "Code Metrics" },
   { id: "comments", label: "Comments Count", description: "Total number of comments", category: "Collaboration" },
+  // --- Dates ---
+  { id: "merged_at", label: "Merged At", description: "Date and time the PR/MR was merged", category: "Basic Info" },
+  // --- Code-review time metrics ---
+  { id: "first_review_at", label: "First Formal Review At", description: "Date of the first formal review action (submit/approve)", category: "Time Metrics" },
+  { id: "first_comment_at", label: "First Comment At", description: "Date of the first review comment or feedback", category: "Time Metrics" },
+  { id: "approved_at", label: "Approved At", description: "Date the PR/MR received its final approval", category: "Time Metrics" },
+  { id: "pickup_time", label: "Pickup Time (h)", description: "Hours from PR creation to first formal review action", category: "Time Metrics" },
+  { id: "time_to_first_review", label: "Time to First Review (h)", description: "Hours from PR creation to first comment or feedback", category: "Time Metrics" },
+  { id: "review_duration", label: "Review Duration (h)", description: "Hours from first feedback to merge", category: "Time Metrics" },
+  { id: "approval_time", label: "Approval Time (h)", description: "Hours from first review to final approval", category: "Time Metrics" },
+  { id: "cycle_time", label: "Cycle Time (h)", description: "Total hours from PR creation to merge", category: "Time Metrics" },
 ];
 
 export const FEATURE_LABELS = Object.fromEntries(

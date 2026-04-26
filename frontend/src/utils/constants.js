@@ -65,9 +65,14 @@ const AVAILABLE_METRICS = [
     description: "Files changed in MRs",
   },
   {
-    id: "filetypes_distribution",
-    label: "File Types Distribution",
-    description: "Distribution of file types",
+    id: "filetypes_by_extension",
+    label: "File Types by Extension",
+    description: "Number of MRs per file extension (top 25)",
+  },
+  {
+    id: "filetypes_by_count",
+    label: "File Types by Count",
+    description: "Distribution of MRs by number of unique file types changed",
   },
   {
     id: "entropy_analysis",
@@ -98,6 +103,31 @@ const AVAILABLE_METRICS = [
     id: "project_comparison",
     label: "Project Comparison",
     description: "Compare multiple projects",
+  },
+  {
+    id: "pickup_time",
+    label: "Pickup Time",
+    description: "Time from PR creation to first review action (hours)",
+  },
+  {
+    id: "time_to_first_review",
+    label: "Time to First Review (TTFR)",
+    description: "Time from PR creation to first comment or feedback (hours)",
+  },
+  {
+    id: "review_duration",
+    label: "Review Duration",
+    description: "Time from first feedback to merge (hours)",
+  },
+  {
+    id: "approval_time",
+    label: "Approval Time",
+    description: "Time from first review to final approval (hours)",
+  },
+  {
+    id: "cycle_time",
+    label: "Cycle Time",
+    description: "Total time from PR creation to merge (hours)",
   },
 ];
 

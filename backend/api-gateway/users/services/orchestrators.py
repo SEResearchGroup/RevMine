@@ -27,6 +27,21 @@ from .service_clients import (
 
 logger = logging.getLogger(__name__)
 
+OLLAMA_DEFAULT_MODEL = "deepseek-r1"
+
+
+def _resolve_provider_and_model(body_data, openrouter_default):
+    """Pick the LLM provider, downstream endpoint, and a provider-aware default model."""
+    llm_provider = body_data.get("llm_provider") or "openrouter"
+    if llm_provider == "ollama":
+        endpoint = "ollama"
+        default_model = OLLAMA_DEFAULT_MODEL
+    else:
+        endpoint = "openrouter"
+        default_model = openrouter_default
+    model = body_data.get("model") or default_model
+    return llm_provider, endpoint, model
+
 
 class CollectionOrchestrator:
     def __init__(self, config_client, collection_client, llm_client):
@@ -128,7 +143,9 @@ class CollectionOrchestrator:
 
         repository_id = body_data.get("repository_id")
         workspace_id = body_data.get("workspace_id")
-        model = body_data.get("model") or DEFAULT_LLM_MODEL
+        llm_provider, endpoint, model = _resolve_provider_and_model(
+            body_data, DEFAULT_LLM_MODEL
+        )
 
         try:
             prompt = sanitize_user_prompt(body_data.get("prompt"))
@@ -142,9 +159,10 @@ class CollectionOrchestrator:
             )
 
         logger.info(
-            "Generating automatic collection draft for repository=%s workspace=%s model=%s prompt_length=%s",
+            "Generating automatic collection draft for repository=%s workspace=%s provider=%s model=%s prompt_length=%s",
             repository_id,
             workspace_id,
+            llm_provider,
             model,
             len(prompt),
         )
@@ -158,6 +176,7 @@ class CollectionOrchestrator:
             llm_response, llm_status = self.llm_client.generate_collection_draft(
                 prompt=llm_prompt,
                 model=model,
+                endpoint=endpoint,
             )
 
             if llm_status >= 400:
@@ -254,7 +273,9 @@ class AnalysisOrchestrator:
             return error_response
 
         dataset_id = body_data.get("dataset_id")
-        model = body_data.get("model") or DEFAULT_ANALYSIS_LLM_MODEL
+        llm_provider, endpoint, model = _resolve_provider_and_model(
+            body_data, DEFAULT_ANALYSIS_LLM_MODEL
+        )
 
         try:
             prompt = sanitize_analysis_prompt(body_data.get("prompt"))
@@ -265,8 +286,9 @@ class AnalysisOrchestrator:
             return JsonResponse({"error": "dataset_id is required"}, status=400)
 
         logger.info(
-            "Generating automatic analysis draft for dataset=%s model=%s prompt_length=%s",
+            "Generating automatic analysis draft for dataset=%s provider=%s model=%s prompt_length=%s",
             dataset_id,
+            llm_provider,
             model,
             len(prompt),
         )
@@ -297,6 +319,7 @@ class AnalysisOrchestrator:
             llm_response, llm_status = self.llm_client.generate_analysis_draft(
                 prompt=llm_prompt,
                 model=model,
+                endpoint=endpoint,
             )
 
             if llm_status >= 400:
