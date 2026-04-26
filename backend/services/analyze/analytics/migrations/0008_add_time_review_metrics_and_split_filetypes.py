@@ -130,7 +130,7 @@ def reverse_migration(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('analytics', '0004_add_top_charts_remove_custom'),
+        ('analytics', '0007_devops_collection_job'),
     ]
 
     operations = [
