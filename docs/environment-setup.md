@@ -1,53 +1,61 @@
 # Environment Setup
 
-RevMine's backend services read their secrets from per-service `.env` files. These files are gitignored — you must create them locally before starting the stack for the first time.
-
-Each service that requires secrets ships with a `.env.example` next to its code. The recommended flow is to copy each example to `.env` in the same folder, then fill in the values.
+RevMine reads its configuration from a **single `.env` file at the repository root**. It is gitignored — copy `.env.example` once and fill in your values.
 
 ```bash
-cp backend/api-gateway/.env.example            backend/api-gateway/.env
-cp backend/services/configuration/.env.example backend/services/configuration/.env
-cp backend/services/collection/.env.example    backend/services/collection/.env
-cp backend/services/analyze/.env.example       backend/services/analyze/.env
-# LLM service has no .env.example — create it manually
-touch backend/services/llm/.env
+cp .env.example .env
+$EDITOR .env
 ```
 
-## Per-service guides
+The defaults boot a working dev stack out of the box. The only values you must change before first run:
 
-Follow each guide below to fill in the required values and learn where to obtain each secret:
-
-| Service | File | Guide |
+| Variable | Why | How |
 |---|---|---|
-| API Gateway | `backend/api-gateway/.env` | [env/api-gateway.md](env/api-gateway.md) |
-| Configuration | `backend/services/configuration/.env` | [env/configuration.md](env/configuration.md) |
-| Collection | `backend/services/collection/.env` | [env/collection.md](env/collection.md) |
-| Analyze | `backend/services/analyze/.env` | [env/analyze.md](env/analyze.md) |
-| LLM | `backend/services/llm/.env` | [env/llm.md](env/llm.md) |
-| Notification | — | No `.env` needed; configured directly in [docker-compose.yaml](../docker-compose.yaml) |
+| `SECRET_KEY` | Django secret used by every service | `python -c "import secrets; print(secrets.token_urlsafe(50))"` |
+| `ENCRYPTION_KEY` | Fernet key shared by configuration / collection / analyze for token encryption | `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` |
+| `GITHUB_*` / `GITLAB_*` / `GOOGLE_*` | OAuth client IDs (only the providers you want to enable) | See [provider setup](#oauth-provider-setup) below |
 
-## Shared secrets you will generate once
+Everything else (Postgres, MinIO, Ollama, OpenRouter site URL) ships with sane defaults that just work for local dev.
 
-Some values are reused across several services. Generate them once and paste them in everywhere they're referenced.
+## OAuth provider setup
 
-### Django `SECRET_KEY`
+### GitHub
 
-Any long random string. Each service can use its own, but it must be set.
+1. https://github.com/settings/developers → **New OAuth App**
+2. Set:
+   - Homepage URL: `http://localhost:5173`
+   - Authorization callback URL: `http://localhost:5173/auth/github/callback`
+3. Copy the **Client ID** and generate a **Client Secret** → paste into `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET`.
+
+### GitLab
+
+1. https://gitlab.com/-/user_settings/applications → **Add new application**
+2. Set:
+   - Redirect URI: `http://localhost:5173/auth/gitlab/callback`
+   - Scopes: `read_user`, `read_api`, `read_repository`, `api`
+3. Copy the Application ID / Secret → paste into `GITLAB_CLIENT_ID` / `GITLAB_CLIENT_SECRET`.
+
+### Google
+
+1. https://console.cloud.google.com/apis/credentials → **Create Credentials → OAuth client ID** (Web application)
+2. Authorized redirect URI: `http://localhost:5173/auth/google/callback`
+3. Copy the Client ID / Secret → paste into `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`.
+
+## Optional: OpenRouter (LLM)
+
+Default LLM routing uses the local Ollama container — no key required.
+
+To use OpenRouter-hosted models instead, get a key at https://openrouter.ai/keys and set `OPENROUTER_API_KEY`.
+
+After the stack is up, pull the default Ollama model (one-time):
 
 ```bash
-python -c "import secrets; print(secrets.token_urlsafe(50))"
-```
-
-### `ENCRYPTION_KEY` (Fernet key)
-
-Used to encrypt provider tokens. The **configuration**, **collection**, and **analyze** services must all share the *same* key.
-
-```bash
-python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+docker exec -it ollama-service ollama pull deepseek-r1
 ```
 
 ## Common pitfalls
 
-- **`ENCRYPTION_KEY` mismatch** across configuration / collection / analyze will cause token decryption to fail.
+- **`ENCRYPTION_KEY` mismatch** across services will cause token decryption to fail. The single root `.env` setup avoids this — every service reads the same value.
 - **OAuth redirect URI** must match the URI registered with the provider exactly (scheme, host, port, path).
 - **`MINIO_ROOT_PASSWORD`** must be at least 8 characters or MinIO refuses to start.
+- **Changing `POSTGRES_PASSWORD` after the first boot** won't update existing Postgres volumes — either start with the password you want, or `docker compose down -v` to reset (deletes data).
