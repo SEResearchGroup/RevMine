@@ -1,9 +1,11 @@
-# collection_service/kafka_handlers.py
-import logging
-from kafka_utils.client import KafkaClient
-from kafka_utils.topics import Topics
+"""Backward-compatibility shim.
 
-logger = logging.getLogger(__name__)
+Canonical location: ``collectors.infrastructure.messaging.kafka_handlers``
+"""
+from collectors.infrastructure.messaging.kafka_handlers import start_kafka_consumers  # noqa: F401
+
+__all__ = ["start_kafka_consumers"]
+
 
 
 def start_kafka_consumers():

@@ -2,10 +2,9 @@ import threading
 from datetime import datetime, date
 from django.utils import timezone
 from .models import Collection
-from .github_collector import GitHubCollector
-from .gitlab_collector import GitLabCollector
-from .metrics_config import get_required_endpoints
-from .minio_client import MinIOClient
+from collectors.factories.fetcher_factory import FetcherFactory
+from collectors.domain.entities.metrics_config import get_required_endpoints
+from collectors.infrastructure.storage.minio_client import MinIOClient
 from kafka_utils.client import KafkaClient
 from kafka_utils.topics import Topics
 import logging
@@ -125,22 +124,15 @@ def execute_collection_task(plan_id, resume=False):
         logger.info(f"Selected metrics: {selected_metrics}")
         logger.info(f"Required endpoints: {required_endpoints}")
 
-        # Initialize collector with resume capability
-        if collection.platform == "github":
-            collector = GitHubCollector(
-                token=collection.token_encrypted,
-                repo_full_name=collection.repository_full_name,
-                branch_name=collection.branch_name,
-                selected_metrics=selected_metrics
-            )
-        else:
-            collector = GitLabCollector(
-                token=collection.token_encrypted,
-                repo_full_name=collection.repository_full_name,
-                branch_name=collection.branch_name,
-                project_id=collection.external_id,  
-                selected_metrics=selected_metrics
-            )
+        # Initialize collector via factory (decouples task from concrete types)
+        collector = FetcherFactory.create(
+            platform=collection.platform,
+            token=collection.token_encrypted,
+            repo_full_name=collection.repository_full_name,
+            branch_name=collection.branch_name,
+            selected_metrics=selected_metrics,
+            project_id=collection.external_id,
+        )
         collector.required_endpoints = required_endpoints
         
         # Progress callback with batched saving

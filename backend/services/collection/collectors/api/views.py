@@ -1,41 +1,6 @@
-"""Backward-compatibility shim.
+"""Collection Views - HTTP orchestration layer."""
 
-The canonical API layer lives at::
-
-    collectors.api.views
-
-This module re-exports every view class so that any remaining code that
-imports from ``collectors.views`` continues to work without modification.
-"""
-from collectors.api.views import *  # noqa: F401, F403
-from collectors.api.views import (
-    UserIdRequiredMixin,
-    GetAvailableMetricsView,
-    GetBranchesForRepositoryView,
-    GetBranchesView,
-    StartCollectionView,
-    ConfigureMetricsView,
-    ValidateCollectionPlanView,
-    ExecuteCollectionView,
-    CollectionStatusView,
-    ResumeCollectionView,
-    PauseCollectionView,
-    CollectionPlanListView,
-    CollectionHistoryView,
-    DeleteCollectionView,
-    CollectedDataView,
-    DownloadCollectionJSONView,
-    DataCleaningConfigView,
-    ApplyFiltersAndCreateCSVView,
-    CollectionCleanedDataListView,
-    CreateCleanedDataView,
-    CleanedDataDetailView,
-    DownloadCleanedDataCSVView,
-    UserDatasetsView,
-    UploadExternalCollectionView,
-    CleanedCollectionsForAnalysisView,
-)
-
+from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework import status
@@ -46,15 +11,15 @@ from django.views import View
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 
-from .serializers import (
+from collectors.api.serializers import (
     StartCollectionSerializer,
     MetricsFilterSerializer,
     CollectionSerializer,
     CleanedDataSerializer,
     CreateCleanedDataSerializer,
 )
-from .models import Collection, CleanedData
-from .services import (
+from collectors.models import Collection, CleanedData
+from collectors.services import (
     MetricsService,
     BranchService,
     resolve_workspace_token,
@@ -68,7 +33,7 @@ from .services import (
     StorageError,
     UserDatasetsService,
 )
-from .schema import (
+from collectors.schema import (
     available_metrics_schema,
     branches_for_repository_schema,
     collection_branches_schema,
