@@ -111,7 +111,7 @@ services:
       - "9000:9000"
       - "9001:9001"
     env_file:
-      - ./backend/services/collection/.env
+      - ./.env
     volumes:
       - minio_data:/data
     command: server /data --console-address ":9001"
@@ -130,14 +130,14 @@ services:
     container_name: gateway-db
     environment:
       POSTGRES_DB: gateway_db
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
     ports:
       - "5432:5432"
     volumes:
       - gateway_postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -150,14 +150,14 @@ services:
     container_name: configuration-db
     environment:
       POSTGRES_DB: configuration_db
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
     ports:
       - "5433:5432"
     volumes:
       - configuration_postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -170,14 +170,14 @@ services:
     container_name: collection-db
     environment:
       POSTGRES_DB: collection_db
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
     ports:
       - "5434:5432"
     volumes:
       - collection_postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -190,14 +190,14 @@ services:
     container_name: analyze-db
     environment:
       POSTGRES_DB: analyze_db
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
     ports:
       - "5435:5432"
     volumes:
       - analyze_postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -210,14 +210,14 @@ services:
     container_name: notification-db
     environment:
       POSTGRES_DB: notification_db
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
     ports:
       - "5436:5432"
     volumes:
       - notification_postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -246,12 +246,12 @@ services:
     ports:
       - "8000:8000"
     env_file:
-      - ./backend/api-gateway/.env
+      - ./.env
     environment:
       DATABASE_HOST: gateway-db
       DATABASE_NAME: gateway_db
-      DATABASE_USER: postgres
-      DATABASE_PASSWORD: postgres
+      DATABASE_USER: ${POSTGRES_USER:-postgres}
+      DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       DATABASE_PORT: 5432
       CONFIGURATION_SERVICE_URL: http://configuration-service:8001/api/workspaces
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
@@ -280,12 +280,12 @@ services:
     ports:
       - "8001:8001"
     env_file:
-      - ./backend/services/configuration/.env
+      - ./.env
     environment:
       DATABASE_HOST: configuration-db
       DATABASE_NAME: configuration_db
-      DATABASE_USER: postgres
-      DATABASE_PASSWORD: postgres
+      DATABASE_USER: ${POSTGRES_USER:-postgres}
+      DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       DATABASE_PORT: 5432
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
     depends_on:
@@ -311,12 +311,12 @@ services:
     ports:
       - "8002:8002"
     env_file:
-      - ./backend/services/collection/.env
+      - ./.env
     environment:
       DATABASE_HOST: collection-db
       DATABASE_NAME: collection_db
-      DATABASE_USER: postgres
-      DATABASE_PASSWORD: postgres
+      DATABASE_USER: ${POSTGRES_USER:-postgres}
+      DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       DATABASE_PORT: 5432
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       LLM_SERVICE_URL: http://llm-service:8004
@@ -345,12 +345,12 @@ services:
     ports:
       - "8003:8003"
     env_file:
-      - ./backend/services/analyze/.env
+      - ./.env
     environment:
       DATABASE_HOST: analyze-db
       DATABASE_NAME: analyze_db
-      DATABASE_USER: postgres
-      DATABASE_PASSWORD: postgres
+      DATABASE_USER: ${POSTGRES_USER:-postgres}
+      DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       DATABASE_PORT: 5432
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       LLM_SERVICE_URL: http://llm-service:8004
@@ -377,12 +377,12 @@ services:
     container_name: celery-worker
     hostname: celery-worker
     env_file:
-      - ./backend/services/analyze/.env
+      - ./.env
     environment:
       DATABASE_HOST: analyze-db
       DATABASE_NAME: analyze_db
-      DATABASE_USER: postgres
-      DATABASE_PASSWORD: postgres
+      DATABASE_USER: ${POSTGRES_USER:-postgres}
+      DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       DATABASE_PORT: 5432
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/0
@@ -424,9 +424,8 @@ services:
     ports:
       - "8004:8004"
     env_file:
-      - ./backend/services/llm/.env
+      - ./.env
     environment:
-      OLLAMA_DEFAULT_MODEL: deepseek-r1
       OLLAMA_HOST: http://ollama-service:11434
     depends_on:
       - ollama-service
@@ -447,7 +446,7 @@ services:
       - "8005:8005"
     environment:
       PORT: "8005"
-      DATABASE_URL: "postgres://postgres:postgres@notification-db:5432/notification_db?sslmode=disable"
+      DATABASE_URL: "postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@notification-db:5432/notification_db?sslmode=disable"
       KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
       KAFKA_GROUP_ID: "notification-service"
     depends_on:

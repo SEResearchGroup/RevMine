@@ -36,17 +36,19 @@ If you use RevMine in your research, please cite our paper:
 
 ## Quick Start
 
-The entire stack — frontend, backend microservices, databases, Kafka, MinIO, Redis, Ollama, and observability — runs through Docker Compose with a single command:
+The entire stack — frontend, backend microservices, databases, Kafka, MinIO, Redis, Ollama, and observability — runs through Docker Compose. Three steps:
 
 ```bash
-docker compose up --build -d
+cp .env.example .env            # 1. one config file for the whole stack
+$EDITOR .env                    # 2. fill in SECRET_KEY, ENCRYPTION_KEY, OAuth creds
+docker compose up --build -d    # 3. start everything
 ```
 
 Once the containers are healthy, open the app at:
 
 **http://localhost:5173/**
 
-> ⚠️ **Before the first run**, you need to create the `.env` files for each backend service. They are gitignored and must be filled in locally with your own secrets (OAuth credentials, encryption keys, MinIO credentials, etc.). See **[docs/environment-setup.md](docs/environment-setup.md)** for the variables and where to obtain each value.
+> See **[docs/environment-setup.md](docs/environment-setup.md)** for what each variable means and where to obtain each value.
 
 After the stack is up, pull the default LLM model (one-time):
 
