@@ -33,6 +33,10 @@ staticfiles/
 *.swp
 *.swo
 
+# AI assistant local config
+.claude/
+.codex
+
 # Docker
 docker-compose.override.yaml
 postgres_data/
