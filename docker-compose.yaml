@@ -354,6 +354,8 @@ services:
       DATABASE_PORT: 5432
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       LLM_SERVICE_URL: http://llm-service:8004
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
     depends_on:
       analyze-db:
         condition: service_healthy
@@ -363,6 +365,8 @@ services:
         condition: service_healthy
       llm-service:
         condition: service_started
+      redis:
+        condition: service_healthy
     volumes:
       - ./backend/services/analyze:/app
     networks:
