@@ -1,27 +1,35 @@
-# SHIM: content moved to workspaces.api.views — re-exported for backward compatibility.
-from workspaces.api.views import (
-    WorkspaceListCreateView,
-    WorkspaceDetailView,
-    WorkspaceTokenView,
-    WorkspaceTestConnectionView,
-    WorkspaceRepositoriesView,
-    RepositoryImportView,
-    RepositoryListView,
-    RepositoryDetailView,
-    AllRepositoriesView,
-)
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from django.shortcuts import get_object_or_404
+from django.db.models import Q
+from django.core.paginator import Paginator
 
-__all__ = [
-    "WorkspaceListCreateView",
-    "WorkspaceDetailView",
-    "WorkspaceTokenView",
-    "WorkspaceTestConnectionView",
-    "WorkspaceRepositoriesView",
-    "RepositoryImportView",
-    "RepositoryListView",
-    "RepositoryDetailView",
-    "AllRepositoriesView",
-]
+from workspaces.models import Workspace, Repository
+from workspaces.api.serializers import (
+    WorkspaceSerializer,
+    WorkspaceListSerializer,
+    TestConnectionSerializer,
+    RepositorySerializer,
+)
+from workspaces.services.workspace_service import WorkspaceService
+from workspaces.services.repository_service import RepositoryService
+from workspaces.infrastructure.git.connection_service import ConnectionService
+from workspaces.api.schema import (
+    workspace_list_schema,
+    workspace_create_schema,
+    workspace_detail_retrieve_schema,
+    workspace_update_put_schema,
+    workspace_update_patch_schema,
+    workspace_delete_schema,
+    workspace_token_schema,
+    workspace_test_connection_schema,
+    workspace_repositories_schema,
+    repository_import_schema,
+    repository_list_schema,
+    repository_detail_schema,
+    repository_delete_schema,
+)
 
 
 class WorkspaceListCreateView(APIView):
@@ -38,12 +46,10 @@ class WorkspaceListCreateView(APIView):
 
         queryset = Workspace.objects.filter(user=request.user_id)
 
-        # Filter by platform
         platform = request.query_params.get("platform")
         if platform:
             queryset = queryset.filter(platform=platform)
 
-        # Filter by date range
         date_from = request.query_params.get("date_from")
         if date_from:
             queryset = queryset.filter(created_at__date__gte=date_from)
@@ -52,28 +58,28 @@ class WorkspaceListCreateView(APIView):
         if date_to:
             queryset = queryset.filter(created_at__date__lte=date_to)
 
-        # Search by name
         search = request.query_params.get("search")
         if search:
             queryset = queryset.filter(name__icontains=search)
 
         total = queryset.count()
 
-        # Pagination
         page_size = int(request.query_params.get("page_size", 20))
         page = int(request.query_params.get("page", 1))
         paginator = Paginator(queryset, page_size)
         page_obj = paginator.get_page(page)
 
         serializer = WorkspaceListSerializer(page_obj.object_list, many=True)
-        return Response({
-            "results": serializer.data,
-            "total": total,
-            "page": page,
-            "page_size": page_size,
-            "num_pages": paginator.num_pages,
-            "has_next": page_obj.has_next(),
-        })
+        return Response(
+            {
+                "results": serializer.data,
+                "total": total,
+                "page": page,
+                "page_size": page_size,
+                "num_pages": paginator.num_pages,
+                "has_next": page_obj.has_next(),
+            }
+        )
 
     @workspace_create_schema
     def post(self, request):
@@ -92,7 +98,6 @@ class WorkspaceListCreateView(APIView):
             workspace, connection_result = WorkspaceService.create_workspace(
                 request.user_id, serializer.validated_data
             )
-
             return Response(
                 {
                     "workspace": WorkspaceSerializer(workspace).data,
@@ -111,11 +116,9 @@ class WorkspaceDetailView(APIView):
     """Retrieve, update, and delete a specific workspace."""
 
     def _get_workspace(self, request, workspace_id):
-        """Retrieve the workspace if the user is the owner."""
         return get_object_or_404(Workspace, id=workspace_id, user=request.user_id)
 
     def _check_auth(self, request):
-        """Check authentication."""
         if not request.user_id:
             return Response(
                 {"error": "Authentication required"},
@@ -129,10 +132,8 @@ class WorkspaceDetailView(APIView):
         auth_error = self._check_auth(request)
         if auth_error:
             return auth_error
-
         workspace = self._get_workspace(request, workspace_id)
-        serializer = WorkspaceSerializer(workspace)
-        return Response(serializer.data)
+        return Response(WorkspaceSerializer(workspace).data)
 
     @workspace_update_put_schema
     def put(self, request, workspace_id):
@@ -145,7 +146,6 @@ class WorkspaceDetailView(APIView):
         return self._update(request, workspace_id, partial=True)
 
     def _update(self, request, workspace_id, partial=False):
-        """Common logic for PUT and PATCH."""
         auth_error = self._check_auth(request)
         if auth_error:
             return auth_error
@@ -175,7 +175,6 @@ class WorkspaceDetailView(APIView):
         auth_error = self._check_auth(request)
         if auth_error:
             return auth_error
-
         workspace = self._get_workspace(request, workspace_id)
         workspace.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -192,9 +191,7 @@ class WorkspaceTokenView(APIView):
                 {"error": "Authentication required"},
                 status=status.HTTP_401_UNAUTHORIZED,
             )
-
         workspace = get_object_or_404(Workspace, id=workspace_id, user=request.user_id)
-
         return Response(
             {
                 "token": workspace.get_token(),
@@ -217,7 +214,6 @@ class WorkspaceTestConnectionView(APIView):
             )
 
         if workspace_id:
-            # Test an existing workspace
             workspace = get_object_or_404(
                 Workspace, id=workspace_id, user=request.user_id
             )
@@ -225,17 +221,14 @@ class WorkspaceTestConnectionView(APIView):
             platform = workspace.platform
             url = workspace.url
         else:
-            # Test before creation
             serializer = TestConnectionSerializer(data=request.data)
             if not serializer.is_valid():
                 return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
             platform = serializer.validated_data["platform"]
             token = serializer.validated_data["token"]
             url = serializer.validated_data.get("url")
 
         result = ConnectionService.test_connection(platform, token, url)
-
         response_status = (
             status.HTTP_200_OK if result["success"] else status.HTTP_400_BAD_REQUEST
         )
@@ -258,7 +251,8 @@ class WorkspaceRepositoriesView(APIView):
 
         if not workspace.is_active:
             return Response(
-                {"error": "Workspace is not active"}, status=status.HTTP_400_BAD_REQUEST
+                {"error": "Workspace is not active"},
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
         result = RepositoryService.fetch_repositories(
@@ -277,11 +271,10 @@ class WorkspaceRepositoriesView(APIView):
                 },
                 status=status.HTTP_200_OK,
             )
-        else:
-            return Response(
-                {"error": "Failed to fetch repositories", "message": result["message"]},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        return Response(
+            {"error": "Failed to fetch repositories", "message": result["message"]},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
 
 
 class RepositoryImportView(APIView):
@@ -295,14 +288,14 @@ class RepositoryImportView(APIView):
 
         if not repository_ids:
             return Response(
-                {"error": "No repository selected"}, status=status.HTTP_400_BAD_REQUEST
+                {"error": "No repository selected"},
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
         try:
             imported_repos, errors = RepositoryService.import_repositories(
                 workspace, repository_ids
             )
-
             return Response(
                 {
                     "success": True,
@@ -314,7 +307,6 @@ class RepositoryImportView(APIView):
                 },
                 status=status.HTTP_201_CREATED,
             )
-
         except ValueError as e:
             return Response({"error": str(e)}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
@@ -325,30 +317,27 @@ class RepositoryImportView(APIView):
 
 
 class RepositoryListView(APIView):
-    """List imported repositories."""
+    """List imported repositories for a workspace."""
 
     @repository_list_schema
     def get(self, request, workspace_id):
         """List all imported repositories with optional filtering."""
         queryset = Repository.objects.filter(workspace_id=workspace_id)
 
-        # Filter by active status
         is_active = request.query_params.get("is_active")
         if is_active is not None:
-            if is_active.lower() in ["true", "1"]:
+            if is_active.lower() in ("true", "1"):
                 queryset = queryset.filter(is_active=True)
-            elif is_active.lower() in ["false", "0"]:
+            elif is_active.lower() in ("false", "0"):
                 queryset = queryset.filter(is_active=False)
 
-        # Recherche par nom
         search = request.query_params.get("search")
         if search:
             queryset = queryset.filter(
                 Q(name__icontains=search) | Q(full_name__icontains=search)
             )
 
-        serializer = RepositorySerializer(queryset, many=True)
-        return Response(serializer.data)
+        return Response(RepositorySerializer(queryset, many=True).data)
 
 
 class RepositoryDetailView(APIView):
@@ -360,26 +349,20 @@ class RepositoryDetailView(APIView):
         repository = get_object_or_404(
             Repository, id=repository_id, workspace_id=workspace_id
         )
-        serializer = RepositorySerializer(repository)
-        return Response(serializer.data)
+        return Response(RepositorySerializer(repository).data)
 
     @repository_detail_schema
     def patch(self, request, workspace_id, repository_id):
-        """Update certain fields of a repository."""
+        """Update allowed fields of a repository (is_active, description)."""
         repository = get_object_or_404(
             Repository, id=repository_id, workspace_id=workspace_id
         )
-
-        # Allowed fields for update
         allowed_fields = ["is_active", "description"]
-        update_data = {k: v for k, v in request.data.items() if k in allowed_fields}
-
-        for key, value in update_data.items():
-            setattr(repository, key, value)
-
+        for key, value in request.data.items():
+            if key in allowed_fields:
+                setattr(repository, key, value)
         repository.save()
-        serializer = RepositorySerializer(repository)
-        return Response(serializer.data)
+        return Response(RepositorySerializer(repository).data)
 
     @repository_delete_schema
     def delete(self, request, workspace_id, repository_id):
@@ -401,19 +384,18 @@ class AllRepositoriesView(APIView):
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 
-        queryset = Repository.objects.filter(workspace__user=request.user_id).select_related("workspace")
+        queryset = Repository.objects.filter(
+            workspace__user=request.user_id
+        ).select_related("workspace")
 
-        # Filter by platform (via workspace)
         platform = request.query_params.get("platform")
         if platform:
             queryset = queryset.filter(workspace__platform=platform)
 
-        # Filter by workspace
         workspace_id = request.query_params.get("workspace_id")
         if workspace_id:
             queryset = queryset.filter(workspace_id=workspace_id)
 
-        # Search by name
         search = request.query_params.get("search")
         if search:
             queryset = queryset.filter(
@@ -421,18 +403,19 @@ class AllRepositoriesView(APIView):
             )
 
         total = queryset.count()
-
         page_size = int(request.query_params.get("page_size", 20))
         page = int(request.query_params.get("page", 1))
         paginator = Paginator(queryset, page_size)
         page_obj = paginator.get_page(page)
 
         serializer = RepositorySerializer(page_obj.object_list, many=True)
-        return Response({
-            "results": serializer.data,
-            "total": total,
-            "page": page,
-            "page_size": page_size,
-            "num_pages": paginator.num_pages,
-            "has_next": page_obj.has_next(),
-        })
+        return Response(
+            {
+                "results": serializer.data,
+                "total": total,
+                "page": page,
+                "page_size": page_size,
+                "num_pages": paginator.num_pages,
+                "has_next": page_obj.has_next(),
+            }
+        )
