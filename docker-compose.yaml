@@ -248,11 +248,11 @@ services:
     env_file:
       - ./.env
     environment:
-      DATABASE_HOST: gateway-db
-      DATABASE_NAME: gateway_db
+      APIGATEWAY_DATABASE_HOST: gateway-db
+      APIGATEWAY_DATABASE_NAME: gateway_db
       DATABASE_USER: ${POSTGRES_USER:-postgres}
       DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      DATABASE_PORT: 5432
+      APIGATEWAY_DATABASE_PORT: 5432
       CONFIGURATION_SERVICE_URL: http://configuration-service:8001/api/workspaces
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       LLM_SERVICE_URL: http://llm-service:8004
@@ -282,11 +282,11 @@ services:
     env_file:
       - ./.env
     environment:
-      DATABASE_HOST: configuration-db
-      DATABASE_NAME: configuration_db
+      CONFIGURATION_DATABASE_HOST: configuration-db
+      CONFIGURATION_DATABASE_NAME: configuration_db
       DATABASE_USER: ${POSTGRES_USER:-postgres}
       DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      DATABASE_PORT: 5432
+      CONFIGURATION_DATABASE_PORT: 5432
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
     depends_on:
       configuration-db:
@@ -313,11 +313,11 @@ services:
     env_file:
       - ./.env
     environment:
-      DATABASE_HOST: collection-db
-      DATABASE_NAME: collection_db
+      COLLECTION_DATABASE_HOST: collection-db
+      COLLECTION_DATABASE_NAME: collection_db
       DATABASE_USER: ${POSTGRES_USER:-postgres}
       DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      DATABASE_PORT: 5432
+      COLLECTION_DATABASE_PORT: 5432
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       LLM_SERVICE_URL: http://llm-service:8004
     depends_on:
@@ -347,11 +347,11 @@ services:
     env_file:
       - ./.env
     environment:
-      DATABASE_HOST: analyze-db
-      DATABASE_NAME: analyze_db
+      ANALYZE_DATABASE_HOST: analyze-db
+      ANALYZE_DATABASE_NAME: analyze_db
       DATABASE_USER: ${POSTGRES_USER:-postgres}
       DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      DATABASE_PORT: 5432
+      ANALYZE_DATABASE_PORT: 5432
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       LLM_SERVICE_URL: http://llm-service:8004
       CELERY_BROKER_URL: redis://redis:6379/0
@@ -383,11 +383,11 @@ services:
     env_file:
       - ./.env
     environment:
-      DATABASE_HOST: analyze-db
-      DATABASE_NAME: analyze_db
+      ANALYZE_DATABASE_HOST: analyze-db
+      ANALYZE_DATABASE_NAME: analyze_db
       DATABASE_USER: ${POSTGRES_USER:-postgres}
       DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      DATABASE_PORT: 5432
+      ANALYZE_DATABASE_PORT: 5432
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/0
     depends_on:

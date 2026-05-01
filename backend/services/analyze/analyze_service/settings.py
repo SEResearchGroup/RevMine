@@ -112,11 +112,11 @@ WSGI_APPLICATION = "analyze_service.wsgi.application"
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": config("DATABASE_NAME"),
+        "NAME": config("ANALYZE_DATABASE_NAME"),
         "USER": config("DATABASE_USER"),
         "PASSWORD": config("DATABASE_PASSWORD"),
-        "HOST": config("DATABASE_HOST"),
-        "PORT": config("DATABASE_PORT", default="5432"),
+        "HOST": config("ANALYZE_DATABASE_HOST"),
+        "PORT": config("ANALYZE_DATABASE_PORT", default="5435"),
     }
 }
 

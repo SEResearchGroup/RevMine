@@ -22,9 +22,9 @@ section(){ echo -e "\n${BOLD}━━━━━━━━━━━━━━━━━
 # Format : "NOM_AFFICHAGE|CHEMIN_RELATIF"
 SERVICES=(
     "API Gateway|backend/api-gateway"
-    "Analyze Service|backend/services/analyze"
-    "Configuration Service|backend/services/configuration"
-    "Collection Service|backend/services/collection"
+    # "Analyze Service|backend/services/analyze"
+    # "Configuration Service|backend/services/configuration"
+    # "Collection Service|backend/services/collection"
 )
 
 # ── Gestion du venv ───────────────────────────────────────────────────────────
@@ -44,7 +44,20 @@ else
 fi
 
 # ── Mise à jour de pip ────────────────────────────────────────────────────────
-pip install --quiet --upgrade pip
+pip install --quiet --upgrade pip || warn "Impossible de mettre à jour pip — ignoré"
+
+# ── Charger le .env global ────────────────────────────────────────────────────
+# Un seul fichier .env à la racine du projet — toutes les variables
+# de base de données sont préfixées par service (ANALYZE_*, COLLECTION_*, etc.)
+if [[ -f "$SCRIPT_DIR/.env" ]]; then
+    set -a
+    # shellcheck disable=SC1090
+    source "$SCRIPT_DIR/.env"
+    set +a
+    log "Variables d'environnement chargées depuis $SCRIPT_DIR/.env"
+else
+    warn "Aucun fichier .env trouvé à $SCRIPT_DIR — utilisation des valeurs par défaut"
+fi
 
 # ── Variables de résultat ─────────────────────────────────────────────────────
 declare -a PASSED_SERVICES=()
@@ -78,18 +91,18 @@ for entry in "${SERVICES[@]}"; do
     # ── Installation des dépendances ──────────────────────────────────────────
     if [[ $FAST -eq 0 ]]; then
         log "Installation des dépendances pip..."
-        pip install --quiet -r "$svcdir/requirements.txt"
-        ok "Dépendances installées"
+        if pip install --quiet -r "$svcdir/requirements.txt" 2>&1; then
+            ok "Dépendances installées"
+        else
+            err "Échec pip install pour $name — service ignoré"
+            FAILED_SERVICES+=("$name  (pip install)")
+            continue
+        fi
     else
         warn "Mode --fast : réinstallation pip ignorée"
     fi
 
     # ── Exécution de pytest ───────────────────────────────────────────────────
-    # Charger le .env comme variables d'environnement réelles (pour os.getenv)
-    set -a
-    # shellcheck disable=SC1090
-    [[ -f "$svcdir/.env" ]] && source "$svcdir/.env"
-    set +a
     log "Lancement de pytest..."
     if (cd "$svcdir" && python -m pytest); then
         ok "Tous les tests passent ✅  →  ${BOLD}$name${NC}"

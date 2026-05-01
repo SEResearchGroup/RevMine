@@ -55,11 +55,11 @@ WSGI_APPLICATION = "collect.wsgi.application"
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": config("DATABASE_NAME"),
+        "NAME": config("COLLECTION_DATABASE_NAME"),
         "USER": config("DATABASE_USER"),
         "PASSWORD": config("DATABASE_PASSWORD"),
-        "HOST": config("DATABASE_HOST"),
-        "PORT": config("DATABASE_PORT", default="5434"),
+        "HOST": config("COLLECTION_DATABASE_HOST"),
+        "PORT": config("COLLECTION_DATABASE_PORT", default="5434"),
     }
 }
 
