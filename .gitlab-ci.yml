@@ -53,10 +53,47 @@ test:all:
     - PGPASSWORD=postgres psql -h postgres -U postgres -c "CREATE DATABASE analyze_db;" postgres
     - PGPASSWORD=postgres psql -h postgres -U postgres -c "CREATE DATABASE configuration_db;" postgres
     - PGPASSWORD=postgres psql -h postgres -U postgres -c "CREATE DATABASE collection_db;" postgres
-    - printf 'SECRET_KEY=ci-gw\nDEBUG=True\nALLOWED_HOSTS=localhost,127.0.0.1\nDATABASE_NAME=gateway_db\nDATABASE_USER=postgres\nDATABASE_PASSWORD=postgres\nDATABASE_HOST=postgres\nDATABASE_PORT=5432\nCONFIGURATION_SERVICE_URL=http://localhost:8001/api/workspaces\nLLM_SERVICE_URL=http://localhost:8004\nCOLLECTION_SERVICE_URL=http://localhost:8002/api/collections\nGITHUB_CLIENT_ID=ci\nGITHUB_CLIENT_SECRET=ci\nGITHUB_REDIRECT_URI=http://localhost:5173/auth/github/callback\nGITLAB_CLIENT_ID=ci\nGITLAB_CLIENT_SECRET=ci\nGITLAB_REDIRECT_URI=http://localhost:5173/auth/gitlab/callback\nGOOGLE_CLIENT_ID=ci\nGOOGLE_CLIENT_SECRET=ci\nGOOGLE_REDIRECT_URI=http://localhost:5173/auth/google/callback\nFRONTEND_URL=http://localhost:5173\n' > backend/api-gateway/.env
-    - printf 'SECRET_KEY=ci-analyze\nDEBUG=True\nALLOWED_HOSTS=localhost,127.0.0.1\nDATABASE_NAME=analyze_db\nDATABASE_USER=postgres\nDATABASE_PASSWORD=postgres\nDATABASE_HOST=postgres\nDATABASE_PORT=5432\nCELERY_BROKER_URL=memory://\nCELERY_RESULT_BACKEND=cache+memory://\nKAFKA_BOOTSTRAP_SERVERS=localhost:9092\nMINIO_ENDPOINT=localhost:9000\nMINIO_ACCESS_KEY=minioadmin\nMINIO_SECRET_KEY=minioadmin\nMINIO_BUCKET_NAME=revmine-analyze\n' > backend/services/analyze/.env
-    - printf 'SECRET_KEY=ci-config\nDEBUG=True\nALLOWED_HOSTS=localhost,127.0.0.1\nDATABASE_NAME=configuration_db\nDATABASE_USER=postgres\nDATABASE_PASSWORD=postgres\nDATABASE_HOST=postgres\nDATABASE_PORT=5432\nKAFKA_BOOTSTRAP_SERVERS=localhost:9092\nENCRYPTION_KEY=dGVzdC1lbmNyeXB0aW9uLWtleS0zMi1ieXRlcy10ZXN0\nJWT_SECRET_KEY=ci-jwt\nMINIO_ENDPOINT=localhost:9000\nMINIO_ACCESS_KEY=minioadmin\nMINIO_SECRET_KEY=minioadmin\n' > backend/services/configuration/.env
-    - printf 'SECRET_KEY=ci-collection\nDEBUG=True\nALLOWED_HOSTS=localhost,127.0.0.1\nDATABASE_NAME=collection_db\nDATABASE_USER=postgres\nDATABASE_PASSWORD=postgres\nDATABASE_HOST=postgres\nDATABASE_PORT=5432\nKAFKA_BOOTSTRAP_SERVERS=localhost:9092\nMINIO_ENDPOINT=localhost:9000\nMINIO_ACCESS_KEY=minioadmin\nMINIO_SECRET_KEY=minioadmin\nMINIO_BUCKET_NAME=revmine-collections\n' > backend/services/collection/.env
+    - |
+      printf '%s\n' \
+        'SECRET_KEY=ci-secret-key-not-for-production' \
+        'DEBUG=True' \
+        'ALLOWED_HOSTS=localhost,127.0.0.1' \
+        'CORS_ALLOWED_ORIGINS=http://localhost:5173' \
+        'FRONTEND_URL=http://localhost:5173' \
+        'DATABASE_USER=postgres' \
+        'DATABASE_PASSWORD=postgres' \
+        'APIGATEWAY_DATABASE_NAME=gateway_db' \
+        'APIGATEWAY_DATABASE_HOST=postgres' \
+        'APIGATEWAY_DATABASE_PORT=5432' \
+        'ANALYZE_DATABASE_NAME=analyze_db' \
+        'ANALYZE_DATABASE_HOST=postgres' \
+        'ANALYZE_DATABASE_PORT=5432' \
+        'CONFIGURATION_DATABASE_NAME=configuration_db' \
+        'CONFIGURATION_DATABASE_HOST=postgres' \
+        'CONFIGURATION_DATABASE_PORT=5432' \
+        'COLLECTION_DATABASE_NAME=collection_db' \
+        'COLLECTION_DATABASE_HOST=postgres' \
+        'COLLECTION_DATABASE_PORT=5432' \
+        'CELERY_BROKER_URL=memory://' \
+        'CELERY_RESULT_BACKEND=cache+memory://' \
+        'KAFKA_BOOTSTRAP_SERVERS=localhost:9092' \
+        'ENCRYPTION_KEY=dGVzdC1lbmNyeXB0aW9uLWtleS0zMi1ieXRlcy10ZXN0' \
+        'MINIO_ENDPOINT=localhost:9000' \
+        'MINIO_ACCESS_KEY=minioadmin' \
+        'MINIO_SECRET_KEY=minioadmin' \
+        'MINIO_BUCKET_NAME=revmine-collections' \
+        'MINIO_SECURE=False' \
+        'COLLECTION_LOG_FILE=/dev/null' \
+        'GITHUB_CLIENT_ID=ci' \
+        'GITHUB_CLIENT_SECRET=ci' \
+        'GITHUB_REDIRECT_URI=http://localhost:5173/auth/github/callback' \
+        'GITLAB_CLIENT_ID=ci' \
+        'GITLAB_CLIENT_SECRET=ci' \
+        'GITLAB_REDIRECT_URI=http://localhost:5173/auth/gitlab/callback' \
+        'GOOGLE_CLIENT_ID=ci' \
+        'GOOGLE_CLIENT_SECRET=ci' \
+        'GOOGLE_REDIRECT_URI=http://localhost:5173/auth/google/callback' \
+        > .env
   script:
     - bash run_tests.sh
   artifacts:
