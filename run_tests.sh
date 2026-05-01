@@ -22,9 +22,9 @@ section(){ echo -e "\n${BOLD}━━━━━━━━━━━━━━━━━
 # Format : "NOM_AFFICHAGE|CHEMIN_RELATIF"
 SERVICES=(
     "API Gateway|backend/api-gateway"
-    # "Analyze Service|backend/services/analyze"
-    # "Configuration Service|backend/services/configuration"
-    # "Collection Service|backend/services/collection"
+    "Analyze Service|backend/services/analyze"
+    "Configuration Service|backend/services/configuration"
+    "Collection Service|backend/services/collection"
 )
 
 # ── Gestion du venv ───────────────────────────────────────────────────────────
@@ -92,6 +92,14 @@ for entry in "${SERVICES[@]}"; do
     if [[ $FAST -eq 0 ]]; then
         log "Installation des dépendances pip..."
         if pip install --quiet -r "$svcdir/requirements.txt" 2>&1; then
+            # kafka-python et kafka-python-ng partagent le même namespace 'kafka'.
+            # Si les deux sont présents, réinstaller kafka-python-ng pour garantir
+            # un état cohérent.
+            if pip show kafka-python &>/dev/null && pip show kafka-python-ng &>/dev/null; then
+                warn "kafka-python et kafka-python-ng coexistent — suppression de kafka-python"
+                pip uninstall -y kafka-python &>/dev/null || true
+                pip install --quiet --force-reinstall kafka-python-ng &>/dev/null || true
+            fi
             ok "Dépendances installées"
         else
             err "Échec pip install pour $name — service ignoré"

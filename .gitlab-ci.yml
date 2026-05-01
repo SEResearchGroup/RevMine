@@ -83,7 +83,6 @@ test:all:
         'MINIO_SECRET_KEY=minioadmin' \
         'MINIO_BUCKET_NAME=revmine-collections' \
         'MINIO_SECURE=False' \
-        'COLLECTION_LOG_FILE=/dev/null' \
         'GITHUB_CLIENT_ID=ci' \
         'GITHUB_CLIENT_SECRET=ci' \
         'GITHUB_REDIRECT_URI=http://localhost:5173/auth/github/callback' \

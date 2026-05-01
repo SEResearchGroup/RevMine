@@ -4,6 +4,8 @@ import os
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+_CI_MODE = os.getenv("CI", "").lower() in ("true", "1", "yes")
+
 SECRET_KEY = config('SECRET_KEY')
 DEBUG = config('DEBUG', default=False, cast=bool)
 ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='').split(',')
@@ -146,6 +148,8 @@ FILE_UPLOAD_HANDLERS = [
     'django.core.files.uploadhandler.TemporaryFileUploadHandler',
 ]
 # Logging Configuration 
+_LOG_HANDLERS = ["console"] if _CI_MODE else ["console", "file"]
+
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
@@ -160,24 +164,26 @@ LOGGING = {
             "class": "logging.StreamHandler",
             "formatter": "verbose",
         },
-        "file": {
-            "class": "logging.FileHandler",
-            "filename": os.getenv("COLLECTION_LOG_FILE", str(BASE_DIR / "collection.log")),
-            "formatter": "verbose",
-        },
+        **({} if _CI_MODE else {
+            "file": {
+                "class": "logging.FileHandler",
+                "filename": os.getenv("COLLECTION_LOG_FILE", str(BASE_DIR / "collection.log")),
+                "formatter": "verbose",
+            },
+        }),
     },
     "root": {
-        "handlers": ["console", "file"],
+        "handlers": _LOG_HANDLERS,
         "level": "INFO",
     },
     "loggers": {
         "django": {
-            "handlers": ["console", "file"],
+            "handlers": _LOG_HANDLERS,
             "level": os.getenv("DJANGO_LOG_LEVEL", "INFO"),
             "propagate": False,
         },
         "collectors": {
-            "handlers": ["console", "file"],
+            "handlers": _LOG_HANDLERS,
             "level": "INFO",
             "propagate": False,
         },
