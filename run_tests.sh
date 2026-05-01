@@ -111,7 +111,11 @@ for entry in "${SERVICES[@]}"; do
     fi
 
     # ── Exécution de pytest ───────────────────────────────────────────────────
-    log "Lancement de pytest..."
+    log "Lancement de pytest (avec couverture)..."
+    # Les options --cov et --cov-report=xml sont définies dans pytest.ini.
+    # Les coverage.xml générés ici ont des chemins locaux absolus (usage local).
+    # Pour SonarQube, les coverage.xml sont regénérés avec les bons chemins
+    # (/usr/src/...) par le service test-runner dans docker-compose.sonar.yml.
     if (cd "$svcdir" && python -m pytest); then
         ok "Tous les tests passent ✅  →  ${BOLD}$name${NC}"
         PASSED_SERVICES+=("$name")
