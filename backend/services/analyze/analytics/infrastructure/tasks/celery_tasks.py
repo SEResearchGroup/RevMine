@@ -13,6 +13,9 @@ from datetime import timedelta
 from celery import shared_task
 from django.utils import timezone
 
+from analytics.models import Analysis, AnalysisBatch
+from analytics.services.analysis_service import AnalysisService
+
 logger = logging.getLogger(__name__)
 
 
@@ -22,9 +25,6 @@ def process_analysis(analysis_id: str) -> dict:
     Process a single analysis asynchronously.
     Delegates to AnalysisService for all business logic.
     """
-    from analytics.models import Analysis
-    from analytics.services.analysis_service import AnalysisService
-
     try:
         analysis = Analysis.objects.get(id=analysis_id)
         service = AnalysisService()
@@ -55,32 +55,14 @@ def process_batch(batch_id: str) -> dict:
     Process all analyses in a batch, tracking per-analysis progress.
     Delegates each analysis to AnalysisService.
     """
-    from analytics.models import AnalysisBatch
-    from analytics.services.analysis_service import AnalysisService
-
     try:
         batch = AnalysisBatch.objects.get(id=batch_id)
         batch.status = "processing"
         batch.save()
 
-        for batch_analysis in batch.batch_analyses.all():
+        for batch_analysis in batch.batch_analyses.select_related("analysis").order_by("id"):
             analysis = batch_analysis.analysis
-            try:
-                service = AnalysisService()
-                service.process_analysis(analysis)
-                batch.completed_analyses += 1
-            except Exception as exc:
-                logger.warning("Batch %s: analysis %s failed: %s", batch_id, analysis.id, exc)
-                batch.failed_analyses += 1
-            batch.save()
-
-        # Determine final batch status
-        if batch.failed_analyses == 0:
-            batch.status = "completed"
-        elif batch.completed_analyses > 0:
-            batch.status = "partial"
-        else:
-            batch.status = "failed"
+            process_analysis.delay(str(analysis.id))
 
         batch.completed_at = timezone.now()
         batch.save()
@@ -112,8 +94,6 @@ def cleanup_old_analyses(days: int = 30) -> dict:
     Periodic maintenance task: delete completed/failed analyses older than
     ``days`` days.
     """
-    from analytics.models import Analysis
-
     cutoff_date = timezone.now() - timedelta(days=days)
     deleted_count, _ = Analysis.objects.filter(
         created_at__lt=cutoff_date,

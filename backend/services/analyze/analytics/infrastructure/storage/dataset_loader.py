@@ -55,7 +55,15 @@ class DatasetLoader:
         n_data = len(sample_rows[0]) if sample_rows else n_header
 
         if n_data <= n_header:
-            return pd.read_csv(StringIO(content))
+            df = pd.read_csv(StringIO(content))
+            # Drop any leading/trailing unnamed or empty-name columns
+            cols_to_drop = [
+                c for c in df.columns
+                if str(c).startswith("Unnamed:") or str(c).strip() == ""
+            ]
+            if cols_to_drop:
+                df = df.drop(columns=cols_to_drop)
+            return df
 
         extra_count = n_data - n_header
 

@@ -103,30 +103,28 @@ class AnalysisServiceProcessTests(TestCase):
         df["Creation_Date"] = pd.to_datetime(df["Creation_Date"])
         svc_instance.load_dataframe.return_value = df
 
-        # MetricDefinition mock
+        # MetricDefinition mock - return analysis_function name
         metric = MagicMock()
-        metric.required_columns = ["Lead_Time"]
+        metric.analysis_function = "lead_time_distribution"
         MockMetricDefinition.objects.get.return_value = metric
 
         # Mock the engine function
         fake_chart = {"type": "histogram", "data": {"labels": [], "datasets": []}}
         fake_stats = {"mean": 12.0}
-        fake_engine_fn = MagicMock(return_value=(fake_chart, fake_stats, None))
+        fake_result = {"chart_data": fake_chart, "statistics": fake_stats, "chart_image": None}
+        fake_engine_fn = MagicMock(return_value=fake_result)
 
         # analysis.save mock
         analysis.save = MagicMock()
 
         result_instance = MagicMock()
-        MockAnalysisResult.objects.update_or_create.return_value = (result_instance, True)
+        MockAnalysisResult.objects.create.return_value = result_instance
 
         # Patch the engine's function_mapping
-        with patch.object(
-            AnalysisService,
-            "function_mapping",
-            new_callable=lambda: property(lambda self: {"lead_time_distribution": fake_engine_fn}),
-        ):
-            service = AnalysisService()
-            service.process_analysis(analysis)
+        service = AnalysisService()
+        service._engine.function_mapping["lead_time_distribution"] = fake_engine_fn
+        service.function_mapping["lead_time_distribution"] = fake_engine_fn
+        service.process_analysis(analysis)
 
         analysis.save.assert_called()
         # analysis status should be completed

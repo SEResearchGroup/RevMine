@@ -50,7 +50,7 @@ def log_header(msg):
     print(f"{'='*60}{Colors.RESET}\n")
 
 
-def test_endpoint(method, url, data=None, files=None, expected_status=200, description="", token="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzcyMTQ3NjExLCJpYXQiOjE3NzIxNDQwMTEsImp0aSI6IjRlMzBhNGU4MDVmZDRlZTI4NDVhNDQ3M2FiZjc4YWQ0IiwidXNlcl9pZCI6IjEifQ.4Bg-AUGnm6iVQVRLhjiIR1MwHR2xTUGvGfN2w07F8kw):"):
+def call_endpoint(method, url, data=None, files=None, expected_status=200, description="", token="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzcyMTQ3NjExLCJpYXQiOjE3NzIxNDQwMTEsImp0aSI6IjRlMzBhNGU4MDVmZDRlZTI4NDVhNDQ3M2FiZjc4YWQ0IiwidXNlcl9pZCI6IjEifQ.4Bg-AUGnm6iVQVRLhjiIR1MwHR2xTUGvGfN2w07F8kw):"):
     """Test a single endpoint and return the response"""
     headers = {"Content-Type": "application/json"}
     if token:
@@ -98,7 +98,7 @@ def run_tests():
     # =========================================================================
 
     # List all metrics
-    result = test_endpoint(
+    result = call_endpoint(
         "GET", f"{BASE_URL}/metrics/",
         description="List all metrics"
     )
@@ -106,7 +106,7 @@ def run_tests():
         log_info(f"   Found {result.get('count', 0)} metrics")
 
     # Get metric categories
-    result = test_endpoint(
+    result = call_endpoint(
         "GET", f"{BASE_URL}/metrics/categories/",
         description="Get metric categories"
     )
@@ -114,19 +114,19 @@ def run_tests():
         log_info(f"   Categories: {result.get('categories', [])}")
 
     # Get metrics by category
-    test_endpoint(
+    call_endpoint(
         "GET", f"{BASE_URL}/metrics/by_category/",
         description="Get metrics grouped by category"
     )
 
     # Get metrics filtered by category
-    test_endpoint(
+    call_endpoint(
         "GET", f"{BASE_URL}/metrics/by_category/?category=timeseries",
         description="Get timeseries metrics"
     )
 
     # Get single metric
-    test_endpoint(
+    call_endpoint(
         "GET", f"{BASE_URL}/metrics/commits_over_time/",
         description="Get commits_over_time metric detail"
     )
@@ -136,7 +136,7 @@ def run_tests():
     # =========================================================================
 
     # List datasets (should be empty or have existing data)
-    test_endpoint(
+    call_endpoint(
         "GET", f"{BASE_URL}/datasets/",
         description="List all datasets"
     )
@@ -144,7 +144,7 @@ def run_tests():
     # Upload a dataset
     if SAMPLE_DATA_PATH.exists():
         with open(SAMPLE_DATA_PATH, 'rb') as f:
-            result = test_endpoint(
+            result = call_endpoint(
                 "POST", f"{BASE_URL}/datasets/upload/",
                 data={"workspace_id": "1", "platform": "gitlab"},
                 files={"file": ("sample_data.csv", f, "text/csv")},
@@ -163,13 +163,13 @@ def run_tests():
         return
 
     # Get dataset detail
-    test_endpoint(
+    call_endpoint(
         "GET", f"{BASE_URL}/datasets/{dataset_id}/",
         description="Get dataset detail"
     )
 
     # Get dataset columns
-    result = test_endpoint(
+    result = call_endpoint(
         "GET", f"{BASE_URL}/datasets/{dataset_id}/columns/",
         description="Get dataset columns"
     )
@@ -178,7 +178,7 @@ def run_tests():
         log_info(f"   Columns: {columns}")
 
     # Get dataset preview
-    result = test_endpoint(
+    result = call_endpoint(
         "GET", f"{BASE_URL}/datasets/{dataset_id}/preview/?rows=5",
         description="Get dataset preview (5 rows)"
     )
@@ -186,7 +186,7 @@ def run_tests():
         log_info(f"   Preview rows: {result.get('preview_rows', 0)} of {result.get('total_rows', 0)}")
 
     # Get available metrics
-    result = test_endpoint(
+    result = call_endpoint(
         "GET", f"{BASE_URL}/datasets/{dataset_id}/available_metrics/",
         description="Get available metrics for dataset"
     )
@@ -197,7 +197,7 @@ def run_tests():
             log_info(f"   Metrics with missing columns: {list(missing.keys())}")
 
     # Get compatible axes
-    result = test_endpoint(
+    result = call_endpoint(
         "GET", f"{BASE_URL}/datasets/{dataset_id}/compatible_axes/",
         description="Get compatible axes for custom charts"
     )
@@ -212,7 +212,7 @@ def run_tests():
     # =========================================================================
 
     # Generate chart - Mode A: Predefined metric
-    result = test_endpoint(
+    result = call_endpoint(
         "POST", f"{BASE_URL}/generate/",
         data={
             "dataset_id": dataset_id,
@@ -236,7 +236,7 @@ def run_tests():
             log_info(f"   Statistics: total={stats.get('total')}, mean={stats.get('mean'):.2f}")
 
     # Generate chart - MR Creation Timeline
-    test_endpoint(
+    call_endpoint(
         "POST", f"{BASE_URL}/generate/",
         data={
             "dataset_id": dataset_id,
@@ -249,7 +249,7 @@ def run_tests():
     )
 
     # Generate chart - State Distribution (Pie)
-    test_endpoint(
+    call_endpoint(
         "POST", f"{BASE_URL}/generate/",
         data={
             "dataset_id": dataset_id,
@@ -261,7 +261,7 @@ def run_tests():
     )
 
     # Generate chart - Lead Time Distribution
-    test_endpoint(
+    call_endpoint(
         "POST", f"{BASE_URL}/generate/",
         data={
             "dataset_id": dataset_id,
@@ -273,7 +273,7 @@ def run_tests():
     )
 
     # Generate chart - Mode B: Custom axes
-    test_endpoint(
+    call_endpoint(
         "POST", f"{BASE_URL}/generate/",
         data={
             "dataset_id": dataset_id,
@@ -287,7 +287,7 @@ def run_tests():
     )
 
     # Generate chart - Custom scatter
-    test_endpoint(
+    call_endpoint(
         "POST", f"{BASE_URL}/generate/",
         data={
             "dataset_id": dataset_id,
@@ -300,14 +300,14 @@ def run_tests():
     )
 
     # Error cases
-    test_endpoint(
+    call_endpoint(
         "POST", f"{BASE_URL}/generate/",
         data={"metric_code": "commits_over_time"},
         expected_status=400,
         description="Error: Missing dataset_id"
     )
 
-    test_endpoint(
+    call_endpoint(
         "POST", f"{BASE_URL}/generate/",
         data={"dataset_id": dataset_id, "metric_code": "invalid_metric"},
         expected_status=404,
@@ -319,7 +319,7 @@ def run_tests():
     # =========================================================================
 
     # List all analyses
-    result = test_endpoint(
+    result = call_endpoint(
         "GET", f"{BASE_URL}/analyses/",
         description="List all analyses"
     )
@@ -327,13 +327,13 @@ def run_tests():
         log_info(f"   Total analyses: {result.get('count', 0)}")
 
     # List analyses filtered by dataset
-    result = test_endpoint(
+    result = call_endpoint(
         "GET", f"{BASE_URL}/analyses/?dataset_id={dataset_id}",
         description="List analyses for dataset"
     )
 
     # Bulk create analyses
-    result = test_endpoint(
+    result = call_endpoint(
         "POST", f"{BASE_URL}/analyses/bulk_create/",
         data={
             "dataset_id": dataset_id,
@@ -353,13 +353,13 @@ def run_tests():
 
     if analysis_id:
         # Get analysis detail
-        test_endpoint(
+        call_endpoint(
             "GET", f"{BASE_URL}/analyses/{analysis_id}/",
             description="Get analysis detail"
         )
 
         # Get analysis result
-        result = test_endpoint(
+        result = call_endpoint(
             "GET", f"{BASE_URL}/analyses/{analysis_id}/result/",
             description="Get analysis result"
         )
@@ -368,7 +368,7 @@ def run_tests():
             log_info(f"   Has image: {'Yes' if result.get('image_base64') else 'No'}")
 
         # Retry analysis
-        test_endpoint(
+        call_endpoint(
             "POST", f"{BASE_URL}/analyses/{analysis_id}/retry/",
             description="Retry analysis"
         )
@@ -378,7 +378,7 @@ def run_tests():
     # =========================================================================
 
     # Delete the test dataset (also deletes associated analyses)
-    test_endpoint(
+    call_endpoint(
         "DELETE", f"{BASE_URL}/datasets/{dataset_id}/",
         expected_status=204,
         description="Delete test dataset"

@@ -6,9 +6,10 @@ from analytics.api.serializers import (  # noqa: F401
     AnalysisSerializer,
     AnalysisListSerializer,
     AnalysisResultSerializer,
-    BatchAnalysisSerializer,
     AnalysisBatchSerializer,
 )
+# Alias for old callers that used BatchAnalysisSerializer
+BatchAnalysisSerializer = AnalysisBatchSerializer  # noqa: F401
 __all__ = [
     "DatasetSerializer",
     "DatasetUploadSerializer",

@@ -94,16 +94,29 @@ class DatasetLoaderReadCsvSafeTests(TestCase):
 class DatasetLoaderDetectExtraColTests(TestCase):
 
     def test_detects_leading_unnamed_col(self):
-        df = pd.DataFrame({"Unnamed: 0": [0, 1], "Col": ["a", "b"]})
-        pos = DatasetLoader._detect_extra_col_position(df)
-        self.assertEqual(pos, "leading")
+        """Extra column at position 0 (leading) should return index 0."""
+        # Header has 4 cols, data has 5 cols with extra at position 0
+        header_fields = ["Creation_Date", "Lead_Time", "#Commits", "state"]
+        sample_rows = [
+            ["0", "2023-10-01", "10.5", "3", "merged"],
+            ["1", "2023-10-02", "5.2", "1", "opened"],
+        ]
+        pos = DatasetLoader._detect_extra_col_position(header_fields, sample_rows)
+        self.assertEqual(pos, 0)
 
     def test_detects_trailing_empty_col(self):
-        df = pd.DataFrame({"Col": ["a", "b"], "": ["", ""]})
-        pos = DatasetLoader._detect_extra_col_position(df)
-        self.assertEqual(pos, "trailing")
+        """Extra column at trailing position should return last index."""
+        header_fields = ["Creation_Date", "Lead_Time", "#Commits", "state"]
+        sample_rows = [
+            ["2023-10-01", "10.5", "3", "merged", ""],
+            ["2023-10-02", "5.2", "1", "opened", ""],
+        ]
+        pos = DatasetLoader._detect_extra_col_position(header_fields, sample_rows)
+        self.assertEqual(pos, len(header_fields))
 
-    def test_no_extra_col(self):
-        df = pd.DataFrame({"Creation_Date": ["2023-01-01"], "Lead_Time": [10.5]})
-        pos = DatasetLoader._detect_extra_col_position(df)
-        self.assertIsNone(pos)
+    def test_returns_integer_position(self):
+        """_detect_extra_col_position must always return an integer."""
+        header_fields = ["Creation_Date", "Lead_Time"]
+        sample_rows = [["2023-10-01", "10.5", "extra"]]
+        pos = DatasetLoader._detect_extra_col_position(header_fields, sample_rows)
+        self.assertIsInstance(pos, int)

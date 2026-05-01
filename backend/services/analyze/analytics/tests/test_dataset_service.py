@@ -137,7 +137,11 @@ class DatasetServiceIntrospectionTests(TestCase):
         )
 
     def test_get_columns_from_metadata(self):
-        meta = {"Creation_Date": "datetime", "Lead_Time": "float64", "state": "object"}
+        meta = {
+            "Creation_Date": {"type": "datetime", "dtype": "datetime64[ns]"},
+            "Lead_Time": {"type": "numeric", "dtype": "float64"},
+            "state": {"type": "categorical", "dtype": "object"},
+        }
         dataset = self._make_dataset_with_metadata(meta)
         svc = DatasetService()
         cols = svc.get_columns(dataset)
@@ -145,10 +149,10 @@ class DatasetServiceIntrospectionTests(TestCase):
 
     def test_get_numeric_columns(self):
         meta = {
-            "Lead_Time": "float64",
-            "#Commits": "int64",
-            "state": "object",
-            "Creation_Date": "datetime64[ns]",
+            "Lead_Time": {"type": "numeric", "dtype": "float64"},
+            "#Commits": {"type": "numeric", "dtype": "int64"},
+            "state": {"type": "categorical", "dtype": "object"},
+            "Creation_Date": {"type": "datetime", "dtype": "datetime64[ns]"},
         }
         dataset = self._make_dataset_with_metadata(meta)
         svc = DatasetService()
@@ -159,8 +163,8 @@ class DatasetServiceIntrospectionTests(TestCase):
 
     def test_get_datetime_columns(self):
         meta = {
-            "Lead_Time": "float64",
-            "Creation_Date": "datetime64[ns]",
+            "Lead_Time": {"type": "numeric", "dtype": "float64"},
+            "Creation_Date": {"type": "datetime", "dtype": "datetime64[ns]"},
         }
         dataset = self._make_dataset_with_metadata(meta)
         svc = DatasetService()
@@ -170,8 +174,8 @@ class DatasetServiceIntrospectionTests(TestCase):
 
     def test_get_categorical_columns(self):
         meta = {
-            "state": "object",
-            "Lead_Time": "float64",
+            "state": {"type": "categorical", "dtype": "object"},
+            "Lead_Time": {"type": "numeric", "dtype": "float64"},
         }
         dataset = self._make_dataset_with_metadata(meta)
         svc = DatasetService()

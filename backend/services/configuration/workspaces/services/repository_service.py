@@ -73,7 +73,7 @@ class RepositoryService:
         )
 
         # Fetch the workspace's full repository listing once
-        fetch_result = RepositoryFetcher.fetch_all(
+        fetch_result = RepositoryService.fetch_repositories(
             workspace.platform, workspace.get_token(), workspace.url
         )
         if not fetch_result["success"]:
@@ -97,7 +97,7 @@ class RepositoryService:
         # Fall back to direct lookup for IDs not in the listing
         errors: List[Dict] = []
         for rid in missing_ids:
-            result = RepositoryFetcher.fetch_by_id(
+            result = RepositoryService.fetch_repository_by_id(
                 workspace.platform, workspace.get_token(), rid, workspace.url
             )
             if result["success"] and result.get("repository"):

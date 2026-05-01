@@ -84,6 +84,7 @@ class MetricsEngine:
             'cicd_queue_time': self.analyze_cicd_queue_time,
             'cicd_runner_utilization': self.analyze_cicd_runner_utilization,
             'cicd_flaky_jobs': self.analyze_cicd_flaky_jobs,
+            'custom_chart': self.analyze_custom_chart,
         }
     
     def _apply_config(self, df, config):

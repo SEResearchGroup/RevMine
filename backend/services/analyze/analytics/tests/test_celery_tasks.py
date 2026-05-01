@@ -43,6 +43,7 @@ class ProcessAnalysisTaskTests(TestCase):
     @patch("analytics.infrastructure.tasks.celery_tasks.Analysis")
     def test_process_analysis_missing_id_does_not_raise(self, MockAnalysis):
         from analytics.models import Analysis as RealAnalysis
+        MockAnalysis.DoesNotExist = RealAnalysis.DoesNotExist
         MockAnalysis.objects.get.side_effect = RealAnalysis.DoesNotExist
         # Should not propagate the exception
         process_analysis(str(uuid.uuid4()))
@@ -57,6 +58,8 @@ class ProcessBatchTaskTests(TestCase):
         batch = MagicMock()
         batch.status = "pending"
         batch.total_analyses = 3
+        batch.completed_analyses = 0
+        batch.failed_analyses = 0
 
         a1, a2, a3 = MagicMock(), MagicMock(), MagicMock()
         a1.id, a2.id, a3.id = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
@@ -76,6 +79,7 @@ class ProcessBatchTaskTests(TestCase):
     @patch("analytics.infrastructure.tasks.celery_tasks.AnalysisBatch")
     def test_process_batch_missing_id_does_not_raise(self, MockBatch):
         from analytics.models import AnalysisBatch as RealBatch
+        MockBatch.DoesNotExist = RealBatch.DoesNotExist
         MockBatch.objects.get.side_effect = RealBatch.DoesNotExist
         process_batch(str(uuid.uuid4()))
 
@@ -86,6 +90,7 @@ class CleanupOldAnalysesTests(TestCase):
     def test_cleanup_deletes_old_completed(self, MockAnalysis):
         qs = MagicMock()
         qs.count.return_value = 5
+        qs.delete.return_value = (5, {})
         MockAnalysis.objects.filter.return_value = qs
 
         cleanup_old_analyses()

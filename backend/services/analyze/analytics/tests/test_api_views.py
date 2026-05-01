@@ -114,14 +114,16 @@ class GenerateChartViewTests(TestCase):
     def setUp(self):
         self.client = _auth_client()
         # Seed a MetricDefinition and Dataset so the view can find them
-        self.metric = MetricDefinition.objects.create(
+        self.metric, _ = MetricDefinition.objects.get_or_create(
             code="lead_time_distribution",
-            name="Lead Time Distribution",
-            category="process",
-            source_type="gitlab",
-            default_chart_type="histogram",
-            supported_chart_types=["histogram", "bar"],
-            required_columns=["Lead_Time"],
+            defaults={
+                "name": "Lead Time Distribution",
+                "category": "process",
+                "source_type": "gitlab",
+                "default_chart_type": "histogram",
+                "supported_chart_types": ["histogram", "bar"],
+                "required_columns": ["Lead_Time"],
+            },
         )
         self.dataset = Dataset.objects.create(
             workspace_id=1,
@@ -150,7 +152,19 @@ class GenerateChartViewTests(TestCase):
         as_instance.function_mapping = {
             "lead_time_distribution": MagicMock(return_value=(fake_chart, fake_stats, None))
         }
-        as_instance.process_analysis = MagicMock()
+
+        def fake_process_analysis(analysis):
+            result = AnalysisResult.objects.create(
+                analysis=analysis,
+                chart_data=fake_chart,
+                statistics=fake_stats,
+                chart_image=None,
+            )
+            analysis.status = 'completed'
+            analysis.result = result
+            analysis.save()
+
+        as_instance.process_analysis.side_effect = fake_process_analysis
 
         payload = {
             "dataset_id": str(self.dataset.id),
@@ -185,14 +199,16 @@ class AnalysisViewTests(TestCase):
 
     def setUp(self):
         self.client = _auth_client()
-        self.metric = MetricDefinition.objects.create(
+        self.metric, _ = MetricDefinition.objects.get_or_create(
             code="lead_time_distribution",
-            name="Lead Time Distribution",
-            category="process",
-            source_type="gitlab",
-            default_chart_type="histogram",
-            supported_chart_types=["histogram"],
-            required_columns=["Lead_Time"],
+            defaults={
+                "name": "Lead Time Distribution",
+                "category": "process",
+                "source_type": "gitlab",
+                "default_chart_type": "histogram",
+                "supported_chart_types": ["histogram"],
+                "required_columns": ["Lead_Time"],
+            },
         )
         self.dataset = Dataset.objects.create(
             workspace_id=1,

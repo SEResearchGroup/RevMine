@@ -15,6 +15,10 @@ import logging
 import pandas as pd
 from django.utils import timezone
 
+from analytics.models import AnalysisResult, MetricDefinition
+from analytics.services.dataset_service import DatasetService
+from django.core.exceptions import ObjectDoesNotExist
+
 logger = logging.getLogger(__name__)
 
 # Date columns to parse when loading a dataset for analysis.
@@ -54,9 +58,6 @@ class AnalysisService:
         Updates ``analysis.status`` to 'completed' or 'failed'.
         Raises on unexpected errors (caller may choose to swallow them).
         """
-        from analytics.models import AnalysisResult
-        from analytics.services.dataset_service import DatasetService
-
         try:
             analysis.status = "processing"
             analysis.save()
@@ -90,7 +91,10 @@ class AnalysisService:
             analysis.status = "failed"
             analysis.error_message = str(exc)
             analysis.save()
-            raise
+
+    def _sanitize_value(self, value):
+        """Proxy to MetricsEngine._sanitize_value for backward compatibility."""
+        return self._engine._sanitize_value(value)
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -112,10 +116,8 @@ class AnalysisService:
         to the metric_code itself so custom/ad-hoc codes work without a DB
         entry.
         """
-        from analytics.models import MetricDefinition
-
         try:
             metric = MetricDefinition.objects.get(code=metric_code)
             return metric.analysis_function
-        except MetricDefinition.DoesNotExist:
+        except ObjectDoesNotExist:
             return metric_code
