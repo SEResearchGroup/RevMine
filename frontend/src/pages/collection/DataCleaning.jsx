@@ -469,7 +469,7 @@ function DataCleaning() {
             {/* Filter 3: Keywords */}
             <div className="bg-white rounded-xl border border-gray-200 p-6 md:col-span-2">
               <div className="flex items-center gap-3 mb-4">
-                <Search className="w-5 h-5 text-purple-600" />
+                <Search className="w-5 h-5 text-blue-600" />
                 <h3 className="text-lg font-semibold">Filter by Keywords</h3>
               </div>
               <p className="text-sm text-gray-600 mb-4">
@@ -486,12 +486,12 @@ function DataCleaning() {
                     {keywordFilters.map((filter) => (
                       <div
                         key={filter.field}
-                        className="bg-purple-50 border border-purple-200 rounded-lg p-3 flex items-start gap-3"
+                        className="bg-blue-50 border border-purple-200 rounded-lg p-3 flex items-start gap-3"
                       >
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-1">
-                            <Tag className="w-4 h-4 text-purple-600" />
-                            <span className="font-medium text-purple-900">
+                            <Tag className="w-4 h-4 text-blue-600" />
+                            <span className="font-medium text-blue-900">
                               {getFieldLabel(filter.field)}
                             </span>
                           </div>
@@ -499,7 +499,7 @@ function DataCleaning() {
                             {filter.keywords.map((keyword, idx) => (
                               <span
                                 key={idx}
-                                className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded text-sm"
+                                className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-sm"
                               >
                                 {keyword}
                               </span>
@@ -508,7 +508,7 @@ function DataCleaning() {
                         </div>
                         <button
                           onClick={() => handleRemoveKeywordFilter(filter.field)}
-                          className="text-purple-400 hover:text-purple-600 transition-colors"
+                          className="text-blue-400 hover:text-blue-600 transition-colors"
                         >
                           <X className="w-5 h-5" />
                         </button>
@@ -532,7 +532,7 @@ function DataCleaning() {
                           onClick={() => setCurrentKeywordField(field)}
                           className={`px-4 py-2 rounded-lg border transition-colors ${
                             currentKeywordField === field
-                              ? "bg-purple-100 border-purple-300 text-purple-700"
+                              ? "bg-blue-100 border-purple-300 text-blue-700"
                               : "bg-gray-50 border-gray-300 text-gray-700 hover:bg-gray-100"
                           }`}
                         >
@@ -564,7 +564,7 @@ function DataCleaning() {
                         {currentKeywords.trim() && (
                           <button
                             onClick={handleAddKeywordFilter}
-                            className="px-4 py-2.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2"
+                            className="px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
                           >
                             <Plus className="w-4 h-4" />
                             Apply
@@ -589,7 +589,7 @@ function DataCleaning() {
         <div className="mb-6">
           <div className="bg-white rounded-xl border border-gray-200 p-6">
             <div className="flex items-center gap-3 mb-4">
-              <BarChart3 className="w-5 h-5 text-indigo-600" />
+              <BarChart3 className="w-5 h-5 text-blue-600" />
               <h3 className="text-lg font-semibold">Feature Selection</h3>
               <span className="ml-auto text-sm text-gray-500">
                 {selectedFeatures.length} of {FEATURES_CONFIG.length} selected
@@ -608,7 +608,7 @@ function DataCleaning() {
                   value={featureSearchQuery}
                   onChange={(e) => setFeatureSearchQuery(e.target.value)}
                   placeholder="Search features..."
-                  className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
               <button
@@ -616,10 +616,10 @@ function DataCleaning() {
                 className="flex items-center gap-2 px-4 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
               >
                 {isAllSelected ? (
-                  <CheckSquare className="w-5 h-5 text-indigo-600" />
+                  <CheckSquare className="w-5 h-5 text-blue-600" />
                 ) : isSomeSelected ? (
-                  <div className="w-5 h-5 border-2 border-indigo-600 rounded flex items-center justify-center">
-                    <div className="w-2 h-0.5 bg-indigo-600" />
+                  <div className="w-5 h-5 border-2 border-blue-600 rounded flex items-center justify-center">
+                    <div className="w-2 h-0.5 bg-blue-600" />
                   </div>
                 ) : (
                   <Square className="w-5 h-5 text-gray-400" />
@@ -649,14 +649,14 @@ function DataCleaning() {
                         onClick={() => toggleFeature(feature.id)}
                         className={`cursor-pointer transition-colors ${
                           selectedFeatures.includes(feature.id)
-                            ? "bg-indigo-50 hover:bg-indigo-100"
+                            ? "bg-blue-50 hover:bg-blue-100"
                             : "hover:bg-gray-50"
                         }`}
                       >
                         <td className="px-4 py-3">
                           <div className="flex items-center justify-center">
                             {selectedFeatures.includes(feature.id) ? (
-                              <CheckSquare className="w-5 h-5 text-indigo-600" />
+                              <CheckSquare className="w-5 h-5 text-blue-600" />
                             ) : (
                               <Square className="w-5 h-5 text-gray-300" />
                             )}
@@ -665,7 +665,7 @@ function DataCleaning() {
                         <td className="px-4 py-3">
                           <span className={`text-sm font-medium ${
                             selectedFeatures.includes(feature.id)
-                              ? "text-indigo-900"
+                              ? "text-blue-900"
                               : "text-gray-900"
                           }`}>
                             {feature.label}
@@ -681,7 +681,7 @@ function DataCleaning() {
                           <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
                             feature.category === 'Time Metrics' ? 'bg-blue-100 text-blue-700' :
                             feature.category === 'Code Metrics' ? 'bg-green-100 text-green-700' :
-                            feature.category === 'Collaboration' ? 'bg-purple-100 text-purple-700' :
+                            feature.category === 'Collaboration' ? 'bg-blue-100 text-blue-700' :
                             'bg-gray-100 text-gray-700'
                           }`}>
                             {feature.category}

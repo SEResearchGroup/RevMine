@@ -155,37 +155,37 @@ const CreateAnalysisPage = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-linear-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="w-12 h-12 animate-spin text-indigo-600 mx-auto mb-4" />
-          <p className="text-slate-600">Loading metrics...</p>
+          <Loader2 className="w-12 h-12 animate-spin text-blue-600 mx-auto mb-4" />
+          <p className="text-gray-600">Loading metrics...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-slate-50 via-blue-50 to-indigo-50">
+    <div className="min-h-screen bg-gray-50">
       <div className="max-w-6xl mx-auto px-6 py-8">
         {/* Header */}
         <div className="mb-6">
           <button
             onClick={() => navigate(`/analysis/datasets/${datasetId}`)}
-            className="flex items-center gap-2 text-slate-600 hover:text-slate-800 mb-4 transition-colors"
+            className="flex items-center gap-2 text-gray-600 hover:text-gray-800 mb-4 transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to dataset
           </button>
 
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-6">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200/60 p-6">
             <div className="flex items-center gap-4">
-              <div className="w-14 h-14 bg-linear-to-br from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-purple-200">
+              <div className="w-14 h-14 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-purple-200">
                 <BarChart3 className="w-7 h-7 text-white" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-slate-800">Create Analysis</h1>
-                <p className="text-slate-500 mt-1">
-                  <span className="font-medium text-slate-700">{dataset?.name || dataset?.original_filename}</span>
+                <h1 className="text-2xl font-bold text-gray-800">Create Analysis</h1>
+                <p className="text-gray-500 mt-1">
+                  <span className="font-medium text-gray-700">{dataset?.name || dataset?.original_filename}</span>
                   {" · "}
                   Select metrics to analyze
                 </p>
@@ -195,18 +195,18 @@ const CreateAnalysisPage = () => {
         </div>
 
         {/* Selection Summary */}
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-4 mb-6 sticky top-4 z-10">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200/60 p-4 mb-6 sticky top-4 z-10">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
-                <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
-                  <CheckSquare className="w-5 h-5 text-indigo-600" />
+                <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                  <CheckSquare className="w-5 h-5 text-blue-600" />
                 </div>
                 <div>
-                  <p className="text-sm text-slate-500">Selected</p>
-                  <p className="text-xl font-bold text-slate-800">
+                  <p className="text-sm text-gray-500">Selected</p>
+                  <p className="text-xl font-bold text-gray-800">
                     {selectedMetrics.length}{" "}
-                    <span className="text-sm font-normal text-slate-500">
+                    <span className="text-sm font-normal text-gray-500">
                       / {availableMetrics.length}
                     </span>
                   </p>
@@ -214,7 +214,7 @@ const CreateAnalysisPage = () => {
               </div>
               <button
                 onClick={selectAll}
-                className="text-sm text-indigo-600 hover:text-indigo-700 font-medium"
+                className="text-sm text-blue-600 hover:text-blue-700 font-medium"
               >
                 {selectedMetrics.length === availableMetrics.length
                   ? "Deselect all"
@@ -224,7 +224,7 @@ const CreateAnalysisPage = () => {
             <button
               onClick={handleCreateAnalysis}
               disabled={selectedMetrics.length === 0 || creating}
-              className="flex items-center justify-center gap-2 px-6 py-3 bg-linear-to-r from-indigo-600 to-blue-600 text-white rounded-xl hover:from-indigo-700 hover:to-blue-700 disabled:from-slate-300 disabled:to-slate-400 disabled:cursor-not-allowed transition-all shadow-lg shadow-indigo-200 font-medium"
+              className="flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-all shadow-lg shadow-blue-200 font-medium"
             >
               {creating ? (
                 <>
@@ -249,15 +249,15 @@ const CreateAnalysisPage = () => {
         </div>
 
         {/* Search */}
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-4 mb-6">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200/60 p-4 mb-6">
           <div className="relative">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
             <input
               type="text"
               placeholder="Search for a metric..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-12 pr-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all bg-slate-50/50"
+              className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-gray-50/50"
             />
           </div>
         </div>
@@ -265,9 +265,9 @@ const CreateAnalysisPage = () => {
         {/* Metrics by Category */}
         <div className="space-y-4">
           {Object.entries(filteredMetricsByCategory).length === 0 ? (
-            <div className="bg-white rounded-2xl border border-slate-200/60 p-12 text-center">
-              <BarChart3 className="w-12 h-12 mx-auto mb-4 text-slate-400" />
-              <p className="text-slate-600">
+            <div className="bg-white rounded-xl border border-gray-200/60 p-12 text-center">
+              <BarChart3 className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+              <p className="text-gray-600">
                 {searchTerm
                   ? "No metrics match your search"
                   : "No metrics available for this dataset"}
@@ -284,19 +284,19 @@ const CreateAnalysisPage = () => {
               return (
                 <div
                   key={category}
-                  className="bg-white rounded-2xl shadow-sm border border-slate-200/60 overflow-hidden"
+                  className="bg-white rounded-xl shadow-sm border border-gray-200/60 overflow-hidden"
                 >
                   <div
                     onClick={() => toggleCategory(category)}
-                    className="flex items-center justify-between p-5 cursor-pointer hover:bg-slate-50 transition-colors"
+                    className="flex items-center justify-between p-5 cursor-pointer hover:bg-gray-50 transition-colors"
                   >
                     <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 bg-linear-to-br from-indigo-100 to-blue-100 rounded-lg flex items-center justify-center">
-                        <BarChart3 className="w-5 h-5 text-indigo-600" />
+                      <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
+                        <BarChart3 className="w-5 h-5 text-blue-600" />
                       </div>
                       <div>
-                        <h3 className="font-semibold text-slate-800">{category}</h3>
-                        <p className="text-sm text-slate-500">
+                        <h3 className="font-semibold text-gray-800">{category}</h3>
+                        <p className="text-sm text-gray-500">
                           {selectedInCategory}/{metrics.length} selected
                         </p>
                       </div>
@@ -307,20 +307,20 @@ const CreateAnalysisPage = () => {
                           e.stopPropagation();
                           selectAllInCategory(category);
                         }}
-                        className="text-sm text-indigo-600 hover:text-indigo-700 font-medium px-3 py-1 rounded-lg hover:bg-indigo-50 transition-colors"
+                        className="text-sm text-blue-600 hover:text-blue-700 font-medium px-3 py-1 rounded-lg hover:bg-blue-50 transition-colors"
                       >
                         {selectedInCategory === metrics.length ? "Deselect" : "All"}
                       </button>
                       {isExpanded ? (
-                        <ChevronUp className="w-5 h-5 text-slate-400" />
+                        <ChevronUp className="w-5 h-5 text-gray-400" />
                       ) : (
-                        <ChevronDown className="w-5 h-5 text-slate-400" />
+                        <ChevronDown className="w-5 h-5 text-gray-400" />
                       )}
                     </div>
                   </div>
 
                   {isExpanded && (
-                    <div className="border-t border-slate-100 p-4">
+                    <div className="border-t border-gray-100 p-4">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         {metrics.map((metric) => {
                           const metricCode = metric.code;
@@ -332,28 +332,28 @@ const CreateAnalysisPage = () => {
                               onClick={() => toggleMetric(metricCode)}
                               className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${
                                 isSelected
-                                  ? "border-indigo-500 bg-indigo-50/50"
-                                  : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+                                  ? "border-blue-500 bg-blue-50/50"
+                                  : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
                               }`}
                             >
                               <div className="flex items-start gap-3">
                                 <div className="mt-0.5">
                                   {isSelected ? (
-                                    <CheckSquare className="w-5 h-5 text-indigo-600" />
+                                    <CheckSquare className="w-5 h-5 text-blue-600" />
                                   ) : (
-                                    <Square className="w-5 h-5 text-slate-400" />
+                                    <Square className="w-5 h-5 text-gray-400" />
                                   )}
                                 </div>
                                 <div className="flex-1">
-                                  <h4 className="font-medium text-slate-800">
+                                  <h4 className="font-medium text-gray-800">
                                     {metric.name}
                                   </h4>
                                   {metric.description && (
-                                    <p className="text-sm text-slate-500 mt-1">
+                                    <p className="text-sm text-gray-500 mt-1">
                                       {metric.description}
                                     </p>
                                   )}
-                                  <span className="inline-block mt-2 px-2 py-0.5 bg-slate-100 text-slate-600 text-xs rounded">
+                                  <span className="inline-block mt-2 px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded">
                                     {metric.default_chart_type}
                                   </span>
                                 </div>

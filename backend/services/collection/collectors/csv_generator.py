@@ -1,12 +1,37 @@
-import csv
-import io
-import math
-import traceback
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Tuple, Set
-import logging
+"""Backward-compatibility shim.
 
-logger = logging.getLogger(__name__)
+Canonical location: ``collectors.infrastructure.exporters.csv_generator``
+"""
+from collectors.infrastructure.exporters.csv_generator import (  # noqa: F401
+    _dig,
+    DataExtractor,
+    GitHubDataExtractor,
+    GitLabDataExtractor,
+    get_data_extractor,
+    MetricsCalculator,
+    CSVGenerator,
+    PlatformAdapter,
+    GitHubAdapter,
+    GitLabAdapter,
+    get_platform_adapter,
+    StatisticsCSVGenerator,
+)
+
+__all__ = [
+    "_dig",
+    "DataExtractor",
+    "GitHubDataExtractor",
+    "GitLabDataExtractor",
+    "get_data_extractor",
+    "MetricsCalculator",
+    "CSVGenerator",
+    "PlatformAdapter",
+    "GitHubAdapter",
+    "GitLabAdapter",
+    "get_platform_adapter",
+    "StatisticsCSVGenerator",
+]
+
 
 
 def _dig(d: Any, *keys, default: Any = None) -> Any:

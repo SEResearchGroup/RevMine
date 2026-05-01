@@ -54,13 +54,13 @@ const ResultsDisplay = ({ results = [], onExportAll, onExportSingle, exportLoadi
       <div className="space-y-6">
         {/* Header with Export Button */}
         <div className="flex justify-between items-center">
-          <h2 className="text-2xl font-bold text-slate-800">
+          <h2 className="text-2xl font-bold text-gray-800">
             Résultats d'Analyse ({results.length})
           </h2>
           <button
             onClick={onExportAll}
             disabled={exportLoading}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:bg-slate-400"
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:bg-gray-400"
           >
             {exportLoading ? (
               <>
@@ -87,29 +87,29 @@ const ResultsDisplay = ({ results = [], onExportAll, onExportSingle, exportLoadi
             return (
               <div
                 key={result.id}
-                className="bg-white rounded-lg border border-slate-200 overflow-hidden hover:shadow-lg transition-shadow"
+                className="bg-white rounded-lg border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow"
               >
                 {/* Chart Header */}
-                <div className="flex justify-between items-start p-6 pb-4 border-b border-slate-100">
+                <div className="flex justify-between items-start p-6 pb-4 border-b border-gray-100">
                   <div className="flex-1">
-                    <h3 className="text-xl font-semibold text-slate-800">
+                    <h3 className="text-xl font-semibold text-gray-800">
                       {metric?.label || result.chart_type}
                     </h3>
-                    <p className="text-sm text-slate-600 mt-1">
+                    <p className="text-sm text-gray-600 mt-1">
                       {metric?.description}
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => openFullscreen(result, index)}
-                      className="p-2 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                      className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                       title="Voir en plein écran"
                     >
                       <Maximize2 className="w-5 h-5" />
                     </button>
                     <button
                       onClick={() => onExportSingle(result)}
-                      className="p-2 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                      className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                       title="Exporter ce graphique"
                     >
                       <Download className="w-5 h-5" />
@@ -122,8 +122,8 @@ const ResultsDisplay = ({ results = [], onExportAll, onExportSingle, exportLoadi
                   {(() => {
                     const isMulti = result.chart_data?.type === 'multi_chart';
                     const containerCls = isMulti
-                      ? "bg-slate-50 rounded-lg p-6"
-                      : "bg-slate-50 rounded-lg p-6 h-96";
+                      ? "bg-gray-50 rounded-lg p-6"
+                      : "bg-gray-50 rounded-lg p-6 h-96";
                     const chartHeight = isMulti ? 700 : 384;
                     return (
                       <div className={containerCls} style={isMulti ? { minHeight: chartHeight } : {}}>
@@ -135,7 +135,7 @@ const ResultsDisplay = ({ results = [], onExportAll, onExportSingle, exportLoadi
                             showControls={false}
                           />
                         ) : (
-                          <div className="flex items-center justify-center h-full text-slate-400">
+                          <div className="flex items-center justify-center h-full text-gray-400">
                             Aucune donnée de graphique disponible
                           </div>
                         )}
@@ -146,18 +146,18 @@ const ResultsDisplay = ({ results = [], onExportAll, onExportSingle, exportLoadi
 
                 {/* Statistics Toggle Button & Content */}
                 {result.chart_data?.stats && (
-                  <div className="border-t border-slate-100">
+                  <div className="border-t border-gray-100">
                     <button
                       onClick={() => toggleStats(result.id)}
-                      className="w-full px-6 py-3 flex items-center justify-between hover:bg-slate-50 transition-colors"
+                      className="w-full px-6 py-3 flex items-center justify-between hover:bg-gray-50 transition-colors"
                     >
-                      <span className="text-sm font-semibold text-slate-700">
+                      <span className="text-sm font-semibold text-gray-700">
                         Statistiques détaillées
                       </span>
                       {isStatsExpanded ? (
-                        <ChevronUp className="w-5 h-5 text-slate-600" />
+                        <ChevronUp className="w-5 h-5 text-gray-600" />
                       ) : (
-                        <ChevronDown className="w-5 h-5 text-slate-600" />
+                        <ChevronDown className="w-5 h-5 text-gray-600" />
                       )}
                     </button>
 
@@ -166,10 +166,10 @@ const ResultsDisplay = ({ results = [], onExportAll, onExportSingle, exportLoadi
                         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                           {Object.entries(result.chart_data.stats).map(([key, value]) => (
                             <div key={key} className="p-3 bg-blue-50 rounded-lg">
-                              <div className="text-xs text-slate-600 capitalize mb-1">
+                              <div className="text-xs text-gray-600 capitalize mb-1">
                                 {key.replace('_', ' ')}
                               </div>
-                              <div className="text-lg font-bold text-slate-800">
+                              <div className="text-lg font-bold text-gray-800">
                                 {typeof value === "number"
                                   ? value.toFixed(2)
                                   : value}
@@ -192,10 +192,10 @@ const ResultsDisplay = ({ results = [], onExportAll, onExportSingle, exportLoadi
         <div className="fixed inset-0 bg-black bg-opacity-95 z-50 flex items-center justify-center">
           <button
             onClick={closeFullscreen}
-            className="absolute top-4 right-4 p-2 bg-white rounded-full hover:bg-slate-100 transition-colors z-10"
+            className="absolute top-4 right-4 p-2 bg-white rounded-full hover:bg-gray-100 transition-colors z-10"
             title="Fermer"
           >
-            <X className="w-6 h-6 text-slate-800" />
+            <X className="w-6 h-6 text-gray-800" />
           </button>
 
           {/* Navigation Arrows */}
@@ -203,17 +203,17 @@ const ResultsDisplay = ({ results = [], onExportAll, onExportSingle, exportLoadi
             <>
               <button
                 onClick={goToPrevious}
-                className="absolute left-4 p-3 bg-white rounded-full hover:bg-slate-100 transition-colors z-10"
+                className="absolute left-4 p-3 bg-white rounded-full hover:bg-gray-100 transition-colors z-10"
                 title="Précédent"
               >
-                <ChevronLeft className="w-6 h-6 text-slate-800" />
+                <ChevronLeft className="w-6 h-6 text-gray-800" />
               </button>
               <button
                 onClick={goToNext}
-                className="absolute right-4 p-3 bg-white rounded-full hover:bg-slate-100 transition-colors z-10"
+                className="absolute right-4 p-3 bg-white rounded-full hover:bg-gray-100 transition-colors z-10"
                 title="Suivant"
               >
-                <ChevronRight className="w-6 h-6 text-slate-800" />
+                <ChevronRight className="w-6 h-6 text-gray-800" />
               </button>
             </>
           )}
@@ -221,10 +221,10 @@ const ResultsDisplay = ({ results = [], onExportAll, onExportSingle, exportLoadi
           {/* Fullscreen Chart */}
           <div className="w-full h-full max-w-7xl max-h-[90vh] p-8 flex flex-col">
             <div className="bg-white rounded-lg p-6 mb-4">
-              <h2 className="text-2xl font-bold text-slate-800">
+              <h2 className="text-2xl font-bold text-gray-800">
                 {AVAILABLE_METRICS.find((m) => m.id === fullscreenChart.chart_type)?.label || fullscreenChart.chart_type}
               </h2>
-              <p className="text-slate-600 mt-1">
+              <p className="text-gray-600 mt-1">
                 {AVAILABLE_METRICS.find((m) => m.id === fullscreenChart.chart_type)?.description}
               </p>
             </div>
@@ -240,16 +240,16 @@ const ResultsDisplay = ({ results = [], onExportAll, onExportSingle, exportLoadi
 
             {/* {fullscreenChart.chart_data?.stats && (
               <div className="bg-white rounded-lg p-6 mt-4">
-                <h3 className="text-lg font-semibold text-slate-800 mb-3">
+                <h3 className="text-lg font-semibold text-gray-800 mb-3">
                   Statistiques Détaillées
                 </h3>
                 <div className="grid grid-cols-3 gap-4">
                   {Object.entries(fullscreenChart.chart_data.stats).map(([key, value]) => (
                     <div key={key} className="p-3 bg-blue-50 rounded-lg">
-                      <div className="text-sm text-slate-600 capitalize mb-1">
+                      <div className="text-sm text-gray-600 capitalize mb-1">
                         {key.replace('_', ' ')}
                       </div>
-                      <div className="text-xl font-bold text-slate-800">
+                      <div className="text-xl font-bold text-gray-800">
                         {typeof value === "number" ? value.toFixed(2) : value}
                       </div>
                     </div>
@@ -261,7 +261,7 @@ const ResultsDisplay = ({ results = [], onExportAll, onExportSingle, exportLoadi
 
           {/* Chart Counter */}
           <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-white px-4 py-2 rounded-full">
-            <span className="text-sm font-medium text-slate-800">
+            <span className="text-sm font-medium text-gray-800">
               {currentIndex + 1} / {results.length}
             </span>
           </div>

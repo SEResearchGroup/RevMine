@@ -1,8 +1,14 @@
-"""Streaming JSON metadata extractor using ijson.
+"""Backward-compatibility shim.
 
-Extracts authors, file extensions, and item count from large JSON files
-without loading the entire file into memory.
+Canonical location: ``collectors.domain.processors.metadata_extractor``
 """
+from collectors.domain.processors.metadata_extractor import (  # noqa: F401
+    extract_cleaning_metadata,
+    _ReplayStream,
+)
+
+__all__ = ["extract_cleaning_metadata", "_ReplayStream"]
+
 import ijson
 import logging
 

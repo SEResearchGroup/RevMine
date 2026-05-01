@@ -22,18 +22,18 @@ const deriveSection = (pathname) => {
 const STATUS_PALETTE = {
   pending: {
     label: "Queued",
-    bar: "bg-slate-400",
-    chip: "bg-slate-100 text-slate-600",
+    bar: "bg-gray-400",
+    chip: "bg-gray-100 text-gray-600",
   },
   in_progress: {
     label: "In progress",
-    bar: "bg-violet-500",
-    chip: "bg-violet-100 text-violet-700",
+    bar: "bg-blue-500",
+    chip: "bg-blue-100 text-blue-700",
   },
   completed: {
     label: "Completed",
-    bar: "bg-emerald-500",
-    chip: "bg-emerald-100 text-emerald-700",
+    bar: "bg-green-500",
+    chip: "bg-green-100 text-green-700",
   },
   failed: {
     label: "Failed",
@@ -94,24 +94,24 @@ export default function DevopsCollectionProgress() {
   const isTerminal = status === "completed" || status === "failed";
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-gray-50">
       <div className="max-w-3xl mx-auto px-6 py-10">
         <button
           onClick={() => navigate(`/${section}/history`)}
-          className="flex items-center gap-1.5 text-slate-500 hover:text-slate-700 text-sm mb-6"
+          className="flex items-center gap-1.5 text-gray-500 hover:text-gray-700 text-sm mb-6"
         >
           <ArrowLeft className="w-4 h-4" /> Back to {section} history
         </button>
 
-        <div className="bg-white border border-slate-200 rounded-2xl p-8">
+        <div className="bg-white border border-gray-200 rounded-xl p-8">
           <div className="flex items-center gap-3 mb-6">
             <div
               className={`w-12 h-12 rounded-xl flex items-center justify-center ${
                 status === "completed"
-                  ? "bg-emerald-50 text-emerald-600"
+                  ? "bg-green-50 text-green-600"
                   : status === "failed"
                   ? "bg-red-50 text-red-600"
-                  : "bg-violet-50 text-violet-600"
+                  : "bg-blue-50 text-blue-600"
               }`}
             >
               {status === "completed" ? (
@@ -123,10 +123,10 @@ export default function DevopsCollectionProgress() {
               )}
             </div>
             <div className="flex-1">
-              <h1 className="text-xl font-bold text-slate-800">
+              <h1 className="text-xl font-bold text-gray-800">
                 {section === "cicd" ? "CI/CD" : "Kanban"} collection
               </h1>
-              <p className="text-sm text-slate-500">
+              <p className="text-sm text-gray-500">
                 {job?.label || job?.provider || jobId}
               </p>
             </div>
@@ -138,10 +138,10 @@ export default function DevopsCollectionProgress() {
           </div>
 
           <div className="mb-2 flex items-center justify-between text-sm">
-            <span className="text-slate-600">{message}</span>
-            <span className="text-slate-500 font-medium">{percent}%</span>
+            <span className="text-gray-600">{message}</span>
+            <span className="text-gray-500 font-medium">{percent}%</span>
           </div>
-          <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
+          <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
             <div
               className={`h-full transition-all duration-500 ${palette.bar}`}
               style={{ width: `${percent}%` }}
@@ -200,14 +200,14 @@ export default function DevopsCollectionProgress() {
                 onClick={() =>
                   navigate(`/${section}/${job.dataset.id}/collect-metrics`)
                 }
-                className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg bg-violet-600 text-white font-medium hover:bg-violet-700"
+                className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700"
               >
                 Continue to metrics <ArrowRight className="w-4 h-4" />
               </button>
             ) : status === "failed" ? (
               <button
                 onClick={() => navigate(`/${section}/new/live`)}
-                className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg bg-violet-600 text-white font-medium hover:bg-violet-700"
+                className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700"
               >
                 Try another collection
               </button>
@@ -215,13 +215,13 @@ export default function DevopsCollectionProgress() {
               <>
                 <button
                   onClick={() => navigate(`/${section}/history`)}
-                  className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg border border-slate-200 text-slate-700 font-medium hover:bg-slate-50"
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg border border-gray-200 text-gray-700 font-medium hover:bg-gray-50"
                 >
                   Browse {section} history
                 </button>
                 <button
                   onClick={() => navigate("/workspaces")}
-                  className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg border border-slate-200 text-slate-700 font-medium hover:bg-slate-50"
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg border border-gray-200 text-gray-700 font-medium hover:bg-gray-50"
                 >
                   Back to workspaces
                 </button>
@@ -230,7 +230,7 @@ export default function DevopsCollectionProgress() {
           </div>
 
           {!isTerminal && (
-            <div className="mt-4 flex items-center justify-center gap-2 text-xs text-slate-400">
+            <div className="mt-4 flex items-center justify-center gap-2 text-xs text-gray-400">
               <Loader2 className="w-3.5 h-3.5 animate-spin" />
               Polling every {POLL_INTERVAL_MS / 1000}s
             </div>
@@ -243,11 +243,11 @@ export default function DevopsCollectionProgress() {
 
 function Stat({ label, value }) {
   return (
-    <div className="rounded-xl border border-slate-100 bg-slate-50/60 px-3 py-2">
-      <p className="text-[10px] uppercase tracking-wide text-slate-400 font-medium">
+    <div className="rounded-xl border border-gray-100 bg-gray-50/60 px-3 py-2">
+      <p className="text-[10px] uppercase tracking-wide text-gray-400 font-medium">
         {label}
       </p>
-      <p className="text-sm text-slate-700 font-medium mt-0.5 truncate">
+      <p className="text-sm text-gray-700 font-medium mt-0.5 truncate">
         {value}
       </p>
     </div>

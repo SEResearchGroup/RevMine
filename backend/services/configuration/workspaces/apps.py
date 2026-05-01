@@ -10,6 +10,8 @@ class WorkspacesConfig(AppConfig):
         if any(cmd in sys.argv for cmd in ['migrate', 'makemigrations', 'collectstatic', 'shell', 'test']):
             return
 
-        # Importe ici pour éviter les imports circulaires
-        from .kafka_handlers import start_kafka_consumers
+        # Import lazily to avoid circular imports at module load time.
+        from workspaces.infrastructure.messaging.kafka_handlers import (
+            start_kafka_consumers,
+        )
         start_kafka_consumers()

@@ -1,5 +1,5 @@
 import React from "react";
-import { BarChart3, GitPullRequest, Package, Layers } from "lucide-react";
+import { BarChart3, GitPullRequest, Layers } from "lucide-react";
 
 const StatsCards = ({ stats }) => {
   const statsConfig = [
@@ -7,34 +7,27 @@ const StatsCards = ({ stats }) => {
       label: "Analysis this month",
       value: stats.analysisThisMonth,
       icon: BarChart3,
-      bgColor: "bg-purple-100",
-      iconColor: "text-purple-600",
+      bgColor: "bg-blue-100",
+      iconColor: "text-blue-600",
     },
     {
       label: "PRs/MRs collected",
       value: stats.prsCollected,
       icon: GitPullRequest,
-      bgColor: "bg-red-100",
-      iconColor: "text-red-600",
-    },
-    {
-      label: "Quota API used",
-      value: `${stats.quotaUsed}%`,
-      icon: Package,
-      bgColor: "bg-teal-100",
-      iconColor: "text-teal-600",
+      bgColor: "bg-blue-50",
+      iconColor: "text-blue-500",
     },
     {
       label: "Active Workspaces",
       value: stats.activeWorkspaces,
       icon: Layers,
-      bgColor: "bg-orange-100",
-      iconColor: "text-orange-600",
+      bgColor: "bg-gray-100",
+      iconColor: "text-gray-600",
     },
   ];
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-6 sm:mb-8">
       {statsConfig.map((stat, index) => (
         <div
           key={index}

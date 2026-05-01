@@ -1,13 +1,19 @@
-import requests
-from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
-from datetime import datetime
-import logging
-import urllib3
+"""Backward-compatibility shim.
 
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+The canonical implementation lives at::
 
-logger = logging.getLogger(__name__)
+    collectors.infrastructure.providers.gitlab_fetcher
+
+This module re-exports every public name so that existing imports like
+``from collectors.gitlab_collector import GitLabCollector`` continue to work.
+"""
+from collectors.infrastructure.providers.gitlab_fetcher import (
+    GitLabCollector,
+    _create_session,
+)
+
+__all__ = ["GitLabCollector", "_create_session"]
+
 
 
 def _create_session(headers, verify=True, max_retries=5, backoff_factor=1):

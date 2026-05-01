@@ -3,6 +3,23 @@ Pytest configuration and fixtures for Collection Service tests.
 """
 import pytest
 from rest_framework.test import APIClient
+
+
+def pytest_configure(config):
+    """Patch logging before Django is set up to avoid root-owned log file issues."""
+    import importlib
+    try:
+        settings_module = importlib.import_module("collect.settings")
+        log_handlers = settings_module.LOGGING.get("handlers", {})
+        log_handlers.pop("file", None)
+        for logger in settings_module.LOGGING.get("loggers", {}).values():
+            if "file" in logger.get("handlers", []):
+                logger["handlers"].remove("file")
+        root = settings_module.LOGGING.get("root", {})
+        if "file" in root.get("handlers", []):
+            root["handlers"].remove("file")
+    except Exception:
+        pass
 from unittest.mock import Mock, patch, MagicMock
 from collectors.models import Collection, CleanedData
 from datetime import datetime

@@ -282,36 +282,36 @@ const MetricsSelectionPage = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-linear-to-br from-slate-50 via-blue-50/30 to-indigo-50/40 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="w-10 h-10 animate-spin text-indigo-500 mx-auto mb-3" />
-          <p className="text-slate-500">Loading metrics catalogue...</p>
+          <Loader2 className="w-10 h-10 animate-spin text-blue-500 mx-auto mb-3" />
+          <p className="text-gray-500">Loading metrics catalogue...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-slate-50 via-blue-50/30 to-indigo-50/40">
+    <div className="min-h-screen bg-gray-50">
       <div className="max-w-6xl mx-auto px-6 py-8">
         <div className="mb-6">
           <button
             onClick={() => navigate(entryPath)}
-            className="flex items-center gap-1.5 text-slate-500 hover:text-slate-700 text-sm mb-4 transition-colors"
+            className="flex items-center gap-1.5 text-gray-500 hover:text-gray-700 text-sm mb-4 transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to datasets
           </button>
 
           <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 bg-linear-to-br from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-purple-200/50">
+            <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-purple-200/50">
               <BarChart3 className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-slate-800">Select Metrics</h1>
-              <p className="text-sm text-slate-500">
+              <h1 className="text-2xl font-bold text-gray-800">Select Metrics</h1>
+              <p className="text-sm text-gray-500">
                 Step 2 — Choose what to analyze on{" "}
-                <span className="font-medium text-slate-700">
+                <span className="font-medium text-gray-700">
                   {dataset?.name || dataset?.original_filename || dataset?.filename}
                 </span>
               </p>
@@ -329,10 +329,10 @@ const MetricsSelectionPage = () => {
               <div
                 className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all ${
                   step.active
-                    ? "bg-indigo-600 text-white shadow-lg shadow-indigo-200"
+                    ? "bg-blue-600 text-white shadow-lg shadow-blue-200"
                     : step.done
-                    ? "bg-emerald-100 text-emerald-700 border border-emerald-200"
-                    : "bg-white text-slate-400 border border-slate-200"
+                    ? "bg-green-100 text-green-700 border border-green-200"
+                    : "bg-white text-gray-400 border border-gray-200"
                 }`}
               >
                 <span
@@ -340,20 +340,20 @@ const MetricsSelectionPage = () => {
                     step.active
                       ? "bg-white/20 text-white"
                       : step.done
-                      ? "bg-emerald-200 text-emerald-700"
-                      : "bg-slate-100 text-slate-400"
+                      ? "bg-green-200 text-green-700"
+                      : "bg-gray-100 text-gray-400"
                   }`}
                 >
                   {step.done ? "✓" : step.n}
                 </span>
                 {step.label}
               </div>
-              {index < 2 && <div className="w-8 h-px bg-slate-200" />}
+              {index < 2 && <div className="w-8 h-px bg-gray-200" />}
             </div>
           ))}
         </div>
 
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-4 mb-6">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200/60 p-4 mb-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {Object.entries(MODE_META).map(([mode, meta]) => {
               const Icon = meta.icon;
@@ -366,23 +366,23 @@ const MetricsSelectionPage = () => {
                     setSelectionMode(mode);
                     setError(null);
                   }}
-                  className={`text-left rounded-2xl border p-4 transition-all ${
+                  className={`text-left rounded-xl border p-4 transition-all ${
                     isActive
-                      ? "border-indigo-300 bg-indigo-50/70 shadow-sm"
-                      : "border-slate-200 hover:border-slate-300 hover:bg-slate-50/70"
+                      ? "border-blue-300 bg-blue-50/70 shadow-sm"
+                      : "border-gray-200 hover:border-gray-300 hover:bg-gray-50/70"
                   }`}
                 >
                   <div className="flex items-start gap-3">
                     <div
                       className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                        isActive ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-500"
+                        isActive ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-500"
                       }`}
                     >
                       <Icon className="w-5 h-5" />
                     </div>
                     <div>
-                      <p className="font-semibold text-slate-800">{meta.label}</p>
-                      <p className="text-sm text-slate-500 mt-1">{meta.description}</p>
+                      <p className="font-semibold text-gray-800">{meta.label}</p>
+                      <p className="text-sm text-gray-500 mt-1">{meta.description}</p>
                     </div>
                   </div>
                 </button>
@@ -391,24 +391,24 @@ const MetricsSelectionPage = () => {
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-4 mb-6 sticky top-2 z-20">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200/60 p-4 mb-6 sticky top-2 z-20">
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
-                <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
+                <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
                   {selectionMode === "manual" ? (
-                    <CheckSquare className="w-5 h-5 text-indigo-600" />
+                    <CheckSquare className="w-5 h-5 text-blue-600" />
                   ) : (
-                    <Bot className="w-5 h-5 text-indigo-600" />
+                    <Bot className="w-5 h-5 text-blue-600" />
                   )}
                 </div>
                 <div>
-                  <p className="text-xs text-slate-400">
+                  <p className="text-xs text-gray-400">
                     {selectionMode === "manual" ? "Selected" : "Resolved"}
                   </p>
-                  <p className="text-xl font-bold text-slate-800">
+                  <p className="text-xl font-bold text-gray-800">
                     {totalSelected}
-                    <span className="text-sm font-normal text-slate-400 ml-1">
+                    <span className="text-sm font-normal text-gray-400 ml-1">
                       chart{totalSelected !== 1 ? "s" : ""}
                     </span>
                   </p>
@@ -418,7 +418,7 @@ const MetricsSelectionPage = () => {
               {selectionMode === "manual" ? (
                 <button
                   onClick={selectAllAvailable}
-                  className="text-sm text-indigo-600 hover:text-indigo-700 font-medium"
+                  className="text-sm text-blue-600 hover:text-blue-700 font-medium"
                 >
                   {selectedMetrics.length === [...availableCodes].length
                     ? "Deselect all"
@@ -429,7 +429,7 @@ const MetricsSelectionPage = () => {
                   {aiPreview.warnings.length} warning{aiPreview.warnings.length !== 1 ? "s" : ""}
                 </p>
               ) : (
-                <p className="text-xs text-slate-400">
+                <p className="text-xs text-gray-400">
                   The prompt will be validated before charts run.
                 </p>
               )}
@@ -442,7 +442,7 @@ const MetricsSelectionPage = () => {
                 (selectionMode === "manual" && totalSelected === 0) ||
                 (selectionMode === "ai" && !llmPrompt.trim())
               }
-              className="flex items-center gap-2 px-6 py-3 bg-linear-to-r from-indigo-600 to-blue-600 text-white rounded-xl font-medium shadow-lg shadow-indigo-200/50 hover:from-indigo-700 hover:to-blue-700 disabled:from-slate-300 disabled:to-slate-400 disabled:shadow-none disabled:cursor-not-allowed transition-all"
+              className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-xl font-medium shadow-lg shadow-blue-200/50 hover:bg-blue-700 disabled:bg-gray-300 disabled:shadow-none disabled:cursor-not-allowed transition-all"
             >
               {creating ? (
                 <>
@@ -470,14 +470,14 @@ const MetricsSelectionPage = () => {
 
         {selectionMode === "ai" ? (
           <div className="space-y-6">
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-5">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200/60 p-5">
               <div className="flex items-start gap-3 mb-4">
-                <div className="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-600 flex items-center justify-center shrink-0">
+                <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
                   <Sparkles className="w-5 h-5" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-semibold text-slate-800">Describe the analysis</h2>
-                  <p className="text-sm text-slate-500">
+                  <h2 className="text-lg font-semibold text-gray-800">Describe the analysis</h2>
+                  <p className="text-sm text-gray-500">
                     Example: "Show me commits over time for Alice in 2025 as a line chart."
                   </p>
                 </div>
@@ -486,7 +486,7 @@ const MetricsSelectionPage = () => {
               {/* LLM Provider & Model */}
               <div className="mb-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">Provider</label>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Provider</label>
                   <div className="flex gap-2">
                     <button
                       type="button"
@@ -496,8 +496,8 @@ const MetricsSelectionPage = () => {
                       }}
                       className={`flex-1 rounded-xl border px-3 py-2 text-sm font-medium transition-all ${
                         llmProvider === LLM_PROVIDERS.OPENROUTER
-                          ? "border-indigo-400 bg-indigo-600 text-white"
-                          : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100"
+                          ? "border-blue-400 bg-blue-600 text-white"
+                          : "border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100"
                       }`}
                     >
                       OpenRouter
@@ -510,8 +510,8 @@ const MetricsSelectionPage = () => {
                       }}
                       className={`flex-1 rounded-xl border px-3 py-2 text-sm font-medium transition-all ${
                         llmProvider === LLM_PROVIDERS.OLLAMA
-                          ? "border-indigo-400 bg-indigo-600 text-white"
-                          : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100"
+                          ? "border-blue-400 bg-blue-600 text-white"
+                          : "border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100"
                       }`}
                     >
                       Ollama (local)
@@ -519,12 +519,12 @@ const MetricsSelectionPage = () => {
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">Model</label>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Model</label>
                   {llmProvider === LLM_PROVIDERS.OPENROUTER ? (
                     <select
                       value={llmModel}
                       onChange={(e) => setLlmModel(e.target.value)}
-                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                       {OPENROUTER_MODELS.map((m) => (
                         <option key={m.id} value={m.id}>{m.name}</option>
@@ -536,7 +536,7 @@ const MetricsSelectionPage = () => {
                       value={llmModel}
                       onChange={(e) => setLlmModel(e.target.value)}
                       placeholder="e.g. deepseek-r1, llama3.2"
-                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   )}
                 </div>
@@ -550,32 +550,32 @@ const MetricsSelectionPage = () => {
                   setError(null);
                 }}
                 placeholder="Show me commits over time"
-                className="w-full min-h-36 rounded-2xl border border-slate-200 bg-slate-50/60 px-4 py-3 text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-y"
+                className="w-full min-h-36 rounded-xl border border-gray-200 bg-gray-50/60 px-4 py-3 text-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-y"
               />
 
-              <div className="mt-4 p-3 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-600 flex items-start gap-2">
-                <Info className="w-4 h-4 mt-0.5 shrink-0 text-slate-400" />
+              <div className="mt-4 p-3 rounded-xl bg-gray-50 border border-gray-200 text-sm text-gray-600 flex items-start gap-2">
+                <Info className="w-4 h-4 mt-0.5 shrink-0 text-gray-400" />
                 The prompt goes through the API gateway, gets normalized against this dataset's available metrics, and then runs through the same chart generation pipeline as manual mode.
               </div>
             </div>
 
             {aiPreview && (
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-5">
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200/60 p-5">
                 <div className="flex items-center gap-2 mb-4">
-                  <Bot className="w-5 h-5 text-indigo-600" />
-                  <h2 className="text-lg font-semibold text-slate-800">AI Resolution</h2>
+                  <Bot className="w-5 h-5 text-blue-600" />
+                  <h2 className="text-lg font-semibold text-gray-800">AI Resolution</h2>
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
-                  <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
-                    <p className="text-xs font-medium tracking-wide text-slate-400 uppercase mb-2">
+                  <div className="rounded-xl border border-gray-200 bg-gray-50/70 p-4">
+                    <p className="text-xs font-medium tracking-wide text-gray-400 uppercase mb-2">
                       Metrics
                     </p>
                     <div className="flex flex-wrap gap-2">
                       {(aiPreview.selection?.metrics || []).map((metricCode) => (
                         <span
                           key={metricCode}
-                          className="px-2.5 py-1 rounded-full bg-indigo-100 text-indigo-700 text-xs font-medium"
+                          className="px-2.5 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-medium"
                         >
                           {availableMetricsMap.get(metricCode)?.name || metricCode}
                         </span>
@@ -583,31 +583,31 @@ const MetricsSelectionPage = () => {
                     </div>
                   </div>
 
-                  <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
-                    <p className="text-xs font-medium tracking-wide text-slate-400 uppercase mb-2">
+                  <div className="rounded-xl border border-gray-200 bg-gray-50/70 p-4">
+                    <p className="text-xs font-medium tracking-wide text-gray-400 uppercase mb-2">
                       Visualization
                     </p>
-                    <p className="text-sm font-medium text-slate-700">
+                    <p className="text-sm font-medium text-gray-700">
                       {aiPreview.selection?.visualization || "Metric defaults"}
                     </p>
-                    <p className="text-xs text-slate-500 mt-1">
+                    <p className="text-xs text-gray-500 mt-1">
                       Applied chart type: {aiPreview.selection?.chart_type || "default"}
                     </p>
                   </div>
 
-                  <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
-                    <p className="text-xs font-medium tracking-wide text-slate-400 uppercase mb-2">
+                  <div className="rounded-xl border border-gray-200 bg-gray-50/70 p-4">
+                    <p className="text-xs font-medium tracking-wide text-gray-400 uppercase mb-2">
                       Filters
                     </p>
-                    <p className="text-sm text-slate-700">
+                    <p className="text-sm text-gray-700">
                       {(aiPreview.selection?.filters?.authors || []).length} author filter
                       {(aiPreview.selection?.filters?.authors || []).length !== 1 ? "s" : ""}
                     </p>
-                    <p className="text-sm text-slate-700">
+                    <p className="text-sm text-gray-700">
                       {(aiPreview.selection?.filters?.repositories || []).length} repository filter
                       {(aiPreview.selection?.filters?.repositories || []).length !== 1 ? "s" : ""}
                     </p>
-                    <p className="text-sm text-slate-700">
+                    <p className="text-sm text-gray-700">
                       {aiPreview.selection?.filters?.date_range ? "Date range applied" : "No date range"}
                     </p>
                   </div>
@@ -634,24 +634,24 @@ const MetricsSelectionPage = () => {
           </div>
         ) : (
           <>
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-4 mb-6">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200/60 p-4 mb-6">
               <div className="relative">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input
                   type="text"
                   placeholder="Search metrics..."
                   value={searchTerm}
                   onChange={(event) => setSearchTerm(event.target.value)}
-                  className="w-full pl-12 pr-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-slate-50/50 transition-all"
+                  className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50/50 transition-all"
                 />
               </div>
             </div>
 
             <div className="space-y-4">
               {Object.entries(allMetricsByCategory).length === 0 ? (
-                <div className="bg-white rounded-2xl border border-slate-200/60 p-12 text-center">
-                  <BarChart3 className="w-12 h-12 mx-auto mb-4 text-slate-300" />
-                  <p className="text-slate-500">No metrics available.</p>
+                <div className="bg-white rounded-xl border border-gray-200/60 p-12 text-center">
+                  <BarChart3 className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                  <p className="text-gray-500">No metrics available.</p>
                 </div>
               ) : (
                 Object.entries(allMetricsByCategory).map(([category, metrics]) => {
@@ -667,11 +667,11 @@ const MetricsSelectionPage = () => {
                   return (
                     <div
                       key={category}
-                      className="bg-white rounded-2xl border border-slate-200/60 overflow-hidden"
+                      className="bg-white rounded-xl border border-gray-200/60 overflow-hidden"
                     >
                       <button
                         onClick={() => toggleCategory(category)}
-                        className="w-full flex items-center gap-3 px-5 py-4 hover:bg-slate-50/50 transition-colors"
+                        className="w-full flex items-center gap-3 px-5 py-4 hover:bg-gray-50/50 transition-colors"
                       >
                         <div
                           className={`w-9 h-9 rounded-lg flex items-center justify-center bg-${catMeta.color || "slate"}-100 text-${catMeta.color || "slate"}-600`}
@@ -679,17 +679,17 @@ const MetricsSelectionPage = () => {
                           <CatIcon className="w-5 h-5" />
                         </div>
                         <div className="text-left flex-1">
-                          <p className="font-semibold text-slate-800">
+                          <p className="font-semibold text-gray-800">
                             {catMeta.label || category.charAt(0).toUpperCase() + category.slice(1)}
                           </p>
-                          <p className="text-xs text-slate-400">
+                          <p className="text-xs text-gray-400">
                             {availableInCat.length} available · {selectedInCat.length} selected
                           </p>
                         </div>
                         {isExpanded ? (
-                          <ChevronDown className="w-5 h-5 text-slate-400" />
+                          <ChevronDown className="w-5 h-5 text-gray-400" />
                         ) : (
-                          <ChevronRight className="w-5 h-5 text-slate-400" />
+                          <ChevronRight className="w-5 h-5 text-gray-400" />
                         )}
                       </button>
 
@@ -709,20 +709,20 @@ const MetricsSelectionPage = () => {
                                 className={`relative flex items-start gap-3 p-4 rounded-xl border-2 transition-all ${
                                   isAvailable
                                     ? isSelected
-                                      ? "border-indigo-400 bg-indigo-50/40 shadow-sm cursor-pointer"
-                                      : "border-slate-200 bg-white hover:border-indigo-200 hover:bg-indigo-50/20 cursor-pointer"
-                                    : "border-slate-100 bg-slate-50/60 cursor-not-allowed"
+                                      ? "border-blue-400 bg-blue-50/40 shadow-sm cursor-pointer"
+                                      : "border-gray-200 bg-white hover:border-blue-200 hover:bg-blue-50/20 cursor-pointer"
+                                    : "border-gray-100 bg-gray-50/60 cursor-not-allowed"
                                 }`}
                               >
                                 <div className="mt-0.5">
                                   {isAvailable ? (
                                     isSelected ? (
-                                      <CheckSquare className="w-5 h-5 text-indigo-600" />
+                                      <CheckSquare className="w-5 h-5 text-blue-600" />
                                     ) : (
-                                      <Square className="w-5 h-5 text-slate-300" />
+                                      <Square className="w-5 h-5 text-gray-300" />
                                     )
                                   ) : (
-                                    <Lock className="w-5 h-5 text-slate-300" />
+                                    <Lock className="w-5 h-5 text-gray-300" />
                                   )}
                                 </div>
 
@@ -730,20 +730,20 @@ const MetricsSelectionPage = () => {
                                   <div className="flex items-center gap-2 mb-1">
                                     <p
                                       className={`font-medium truncate ${
-                                        isAvailable ? "text-slate-800" : "text-slate-400"
+                                        isAvailable ? "text-gray-800" : "text-gray-400"
                                       }`}
                                     >
                                       {metric.name}
                                     </p>
                                     <ChartIcon
                                       className={`w-4 h-4 shrink-0 ${
-                                        isAvailable ? "text-slate-400" : "text-slate-300"
+                                        isAvailable ? "text-gray-400" : "text-gray-300"
                                       }`}
                                     />
                                   </div>
                                   <p
                                     className={`text-xs leading-relaxed ${
-                                      isAvailable ? "text-slate-500" : "text-slate-300"
+                                      isAvailable ? "text-gray-500" : "text-gray-300"
                                     }`}
                                   >
                                     {metric.description}
@@ -775,7 +775,7 @@ const MetricsSelectionPage = () => {
         <div className="mt-8 flex justify-between">
           <button
             onClick={() => navigate(entryPath)}
-            className="flex items-center gap-2 px-6 py-3 text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors font-medium"
+            className="flex items-center gap-2 px-6 py-3 text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors font-medium"
           >
             <ArrowLeft className="w-4 h-4" />
             Back
@@ -787,7 +787,7 @@ const MetricsSelectionPage = () => {
               (selectionMode === "manual" && totalSelected === 0) ||
               (selectionMode === "ai" && !llmPrompt.trim())
             }
-            className="flex items-center gap-2 px-8 py-3 bg-linear-to-r from-indigo-600 to-blue-600 text-white rounded-xl font-medium shadow-lg shadow-indigo-200/50 hover:from-indigo-700 hover:to-blue-700 disabled:from-slate-300 disabled:to-slate-400 disabled:shadow-none disabled:cursor-not-allowed transition-all"
+            className="flex items-center gap-2 px-8 py-3 bg-blue-600 text-white rounded-xl font-medium shadow-lg shadow-blue-200/50 hover:bg-blue-700 disabled:bg-gray-300 disabled:shadow-none disabled:cursor-not-allowed transition-all"
           >
             {creating ? (
               <>

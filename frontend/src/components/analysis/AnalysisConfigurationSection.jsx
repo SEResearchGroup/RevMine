@@ -213,21 +213,21 @@ const AnalysisConfigurationSection = ({
       <div className="mb-6">
         <button
           onClick={onChangeDataset}
-          className="flex items-center space-x-2 text-slate-600 hover:text-slate-800 mb-4"
+          className="flex items-center space-x-2 text-gray-600 hover:text-gray-800 mb-4"
         >
           <ArrowLeft className="w-4 h-4" />
           <span>Change Dataset</span>
         </button>
 
-        <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-5">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-5">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
               <FileText className="w-8 h-8 text-blue-600" />
               <div>
-                <h1 className="text-2xl font-bold text-slate-800">
+                <h1 className="text-2xl font-bold text-gray-800">
                   {datasetName}
                 </h1>
-                <p className="text-sm text-slate-600 mt-1">
+                <p className="text-sm text-gray-600 mt-1">
                   {uploadedFile
                     ? "New dataset - ready to analyze"
                     : `${dataset?.results_count || 0} charts available`}
@@ -248,13 +248,13 @@ const AnalysisConfigurationSection = ({
 
       {/* Loading State */}
       {(analysisStatus === "processing" || loading) && (
-        <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-12">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12">
           <div className="text-center">
             <Loader2 className="w-16 h-16 animate-spin mx-auto mb-4 text-blue-600" />
-            <p className="text-lg font-medium text-slate-700">
+            <p className="text-lg font-medium text-gray-700">
               Processing your data...
             </p>
-            <p className="text-sm text-slate-600 mt-2">
+            <p className="text-sm text-gray-600 mt-2">
               This may take a few minutes
             </p>
           </div>

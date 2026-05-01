@@ -54,7 +54,7 @@ def create_dataset(db):
         **kwargs
     ):
         defaults = {
-            'file_path': '/tmp/test_data.csv',
+            'file_path': 'datasets/test_data.csv',
             'rows_count': 100,
             'columns_count': 10,
             'platform': 'github'
@@ -81,15 +81,15 @@ def create_analysis(db, dataset):
     def _create_analysis(
         dataset=dataset,
         status='pending',
-        requested_charts=None,
+        metric_code='commits_over_time',
+        chart_type='bar',
         **kwargs
     ):
-        if requested_charts is None:
-            requested_charts = ['commits_over_time', 'lead_time_distribution']
         return Analysis.objects.create(
             dataset=dataset,
             status=status,
-            requested_charts=requested_charts,
+            metric_code=metric_code,
+            chart_type=chart_type,
             **kwargs
         )
     return _create_analysis
@@ -112,7 +112,6 @@ def create_analysis_result(db, completed_analysis):
     """Factory fixture to create analysis results."""
     def _create_result(
         analysis=completed_analysis,
-        chart_type='commits_over_time',
         **kwargs
     ):
         defaults = {
@@ -122,7 +121,6 @@ def create_analysis_result(db, completed_analysis):
         defaults.update(kwargs)
         return AnalysisResult.objects.create(
             analysis=analysis,
-            chart_type=chart_type,
             **defaults
         )
     return _create_result

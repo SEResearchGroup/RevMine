@@ -1,33 +1,27 @@
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework import status
-from django.shortcuts import get_object_or_404
-from django.db.models import Q
-from django.core.paginator import Paginator
+# SHIM: content moved to workspaces.api.views — re-exported for backward compatibility.
+from workspaces.api.views import (
+    WorkspaceListCreateView,
+    WorkspaceDetailView,
+    WorkspaceTokenView,
+    WorkspaceTestConnectionView,
+    WorkspaceRepositoriesView,
+    RepositoryImportView,
+    RepositoryListView,
+    RepositoryDetailView,
+    AllRepositoriesView,
+)
 
-from .models import Workspace, Repository
-from .serializers import (
-    WorkspaceSerializer,
-    WorkspaceListSerializer,
-    TestConnectionSerializer,
-    RepositorySerializer,
-)
-from .services import ConnectionService, RepositoryService, WorkspaceService
-from .schema import (
-    workspace_list_schema,
-    workspace_create_schema,
-    workspace_detail_retrieve_schema,
-    workspace_update_put_schema,
-    workspace_update_patch_schema,
-    workspace_delete_schema,
-    workspace_token_schema,
-    workspace_test_connection_schema,
-    workspace_repositories_schema,
-    repository_import_schema,
-    repository_list_schema,
-    repository_detail_schema,
-    repository_delete_schema,
-)
+__all__ = [
+    "WorkspaceListCreateView",
+    "WorkspaceDetailView",
+    "WorkspaceTokenView",
+    "WorkspaceTestConnectionView",
+    "WorkspaceRepositoriesView",
+    "RepositoryImportView",
+    "RepositoryListView",
+    "RepositoryDetailView",
+    "AllRepositoriesView",
+]
 
 
 class WorkspaceListCreateView(APIView):

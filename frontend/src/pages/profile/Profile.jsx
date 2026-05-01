@@ -139,7 +139,7 @@ const Profile = () => {
 
   return (
     <div className="w-full p-6 sm:p-8">
-      <h2 className="text-xl sm:text-2xl font-bold text-[#008CFF] text-center mb-6 sm:mb-8">
+      <h2 className="text-xl sm:text-2xl font-bold text-[#2563EB] text-center mb-6 sm:mb-8">
         My Profile
       </h2>
 
@@ -333,7 +333,7 @@ const Profile = () => {
           <button
             onClick={handleSubmit}
             disabled={loading || !firstName || !lastName || !email}
-            className="w-full bg-[#008CFF] text-white py-2.5 sm:py-3 text-sm sm:text-base rounded-lg hover:bg-[#007ACC] transition font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            className="w-full bg-[#2563EB] text-white py-2.5 sm:py-3 text-sm sm:text-base rounded-lg hover:bg-[#007ACC] transition font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             <Save className="w-4 h-4 sm:w-5 sm:h-5" />
             {loading ? "Saving..." : "Save Changes"}

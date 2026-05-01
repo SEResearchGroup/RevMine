@@ -984,7 +984,7 @@ function ProjectDetail() {
                           </button>
                           <button
                             disabled
-                            className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                             title="Analyze (Coming soon)"
                           >
                             <BarChart3 className="w-4 h-4" />
@@ -1034,7 +1034,7 @@ function ProjectDetail() {
                 onClick={() => setCollectionMode("automatic")}
                 className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
                   collectionMode === "automatic"
-                    ? "bg-white text-sky-700 shadow-sm"
+                    ? "bg-white text-blue-700 shadow-sm"
                     : "text-gray-600 hover:text-gray-900"
                 }`}
               >

@@ -52,8 +52,8 @@ const steps = [
     title: "Import projects",
     description:
       "Select the repositories you want to track. They become Projects inside your Workspace — each project is an independent unit of analysis.",
-    color: "from-purple-500 to-purple-600",
-    bg: "bg-purple-50",
+    color: "from-blue-500 to-purple-600",
+    bg: "bg-blue-50",
     ring: "ring-purple-200",
   },
   {
@@ -62,8 +62,8 @@ const steps = [
     title: "Collect data",
     description:
       "Launch a collection plan for any project. Choose the metrics you need (MR metadata, commits, discussions, notes, file changes), set date ranges and branch filters.",
-    color: "from-emerald-500 to-emerald-600",
-    bg: "bg-emerald-50",
+    color: "from-green-500 to-green-600",
+    bg: "bg-green-50",
     ring: "ring-emerald-200",
   },
   {
@@ -83,7 +83,7 @@ const steps = [
     description:
       "Pick from 20+ analysis metrics across code quality, collaboration, distribution, correlation, and time series categories. Launch analyses to generate interactive charts.",
     color: "from-rose-500 to-rose-600",
-    bg: "bg-rose-50",
+    bg: "bg-red-50",
     ring: "ring-rose-200",
   },
   {
@@ -92,8 +92,8 @@ const steps = [
     title: "Explore & export",
     description:
       "Browse interactive dashboards, detect trends, identify top contributors, and export results for further processing.",
-    color: "from-cyan-500 to-cyan-600",
-    bg: "bg-cyan-50",
+    color: "from-blue-500 to-cyan-600",
+    bg: "bg-blue-50",
     ring: "ring-cyan-200",
   },
 ];
@@ -112,14 +112,14 @@ const concepts = [
     term: "Project",
     definition:
       "An individual repository imported into a Workspace. It is the unit on which you run collection plans, clean data, and perform analyses.",
-    color: "text-purple-600 bg-purple-50",
+    color: "text-blue-600 bg-blue-50",
   },
   {
     icon: Key,
     term: "GitHub / GitLab Token",
     definition:
       "A personal access token (PAT) generated from your GitHub or GitLab account settings. It grants RevMine read-only access to repository metadata, commits, and merge requests. Tokens are stored encrypted and never exposed in plain text.",
-    color: "text-emerald-600 bg-emerald-50",
+    color: "text-green-600 bg-green-50",
   },
   {
     icon: Database,
@@ -133,14 +133,14 @@ const concepts = [
     term: "Data Cleaning",
     definition:
       "A post-collection step where you apply filters (reviewers, committers, date ranges, etc.) to remove noise and generate a clean CSV for analysis.",
-    color: "text-rose-600 bg-rose-50",
+    color: "text-red-600 bg-red-50",
   },
   {
     icon: LineChart,
     term: "Analysis",
     definition:
       "Select metrics and chart types to visualize your cleaned data. RevMine provides 20+ built-in analysis metrics including code churn, collaboration, complexity, time series and more.",
-    color: "text-cyan-600 bg-cyan-50",
+    color: "text-blue-600 bg-blue-50",
   },
 ];
 
@@ -166,7 +166,7 @@ const collectionMetricGroups = [
   {
     title: "Commits",
     icon: GitCommit,
-    color: "text-purple-600 bg-purple-50",
+    color: "text-blue-600 bg-blue-50",
     metrics: [
       "Commit ID",
       "Commit Messages",
@@ -178,7 +178,7 @@ const collectionMetricGroups = [
   {
     title: "Discussions",
     icon: MessageSquare,
-    color: "text-emerald-600 bg-emerald-50",
+    color: "text-green-600 bg-green-50",
     metrics: ["Discussion ID", "Discussion Notes", "Resolved Status"],
   },
   {
@@ -190,7 +190,7 @@ const collectionMetricGroups = [
   {
     title: "Changes",
     icon: FileDiff,
-    color: "text-rose-600 bg-rose-50",
+    color: "text-red-600 bg-red-50",
     metrics: [
       "Old File Path",
       "New File Path",
@@ -218,9 +218,9 @@ const devopsTracks = [
   {
     title: "Kanban Boards",
     icon: Kanban,
-    color: "from-violet-500 to-indigo-600",
-    bg: "bg-violet-50",
-    text: "text-violet-700",
+    color: "from-blue-500 to-blue-600",
+    bg: "bg-blue-50",
+    text: "text-blue-700",
     description:
       "Pull live issues from a GitHub Projects v2 board or a GitLab Issue Board. Compute lead time, cycle time, throughput, WIP, CFD, and more.",
     cta: "New Kanban analysis",
@@ -229,9 +229,9 @@ const devopsTracks = [
   {
     title: "CI/CD Pipelines",
     icon: Workflow,
-    color: "from-emerald-500 to-emerald-600",
-    bg: "bg-emerald-50",
-    text: "text-emerald-700",
+    color: "from-green-500 to-green-600",
+    bg: "bg-green-50",
+    text: "text-green-700",
     description:
       "Pull recent runs from GitHub Actions or GitLab CI. Compute success rate, build duration, MTTR, deploy frequency, queue time, flaky jobs.",
     cta: "New CI/CD analysis",
@@ -247,7 +247,7 @@ const devopsFlow = [
     title: "Pick a source",
     description:
       "From a connected workspace or with a manual access token, choose the Kanban board or CI/CD pipeline you want to ingest.",
-    color: "from-violet-500 to-indigo-600",
+    color: "from-blue-500 to-blue-600",
   },
   {
     step: 2,
@@ -271,7 +271,7 @@ const devopsFlow = [
     title: "Continue to analysis",
     description:
       "Move into the analysis service to turn the same dataset into interactive charts and dashboards. The metric catalogue is filtered to the matching DevOps domain.",
-    color: "from-emerald-500 to-emerald-600",
+    color: "from-green-500 to-green-600",
   },
 ];
 
@@ -280,7 +280,7 @@ const devopsMetricGroups = [
   {
     title: "Kanban metrics",
     icon: Kanban,
-    color: "text-violet-600 bg-violet-50",
+    color: "text-blue-600 bg-blue-50",
     metrics: [
       "Lead Time",
       "Cycle Time",
@@ -295,7 +295,7 @@ const devopsMetricGroups = [
   {
     title: "CI/CD metrics",
     icon: Workflow,
-    color: "text-emerald-600 bg-emerald-50",
+    color: "text-green-600 bg-green-50",
     metrics: [
       "Success Rate",
       "Build Duration",
@@ -327,7 +327,7 @@ const analysisCategories = [
   {
     title: "Collaboration",
     icon: Users,
-    color: "text-purple-600 bg-purple-50",
+    color: "text-blue-600 bg-blue-50",
     border: "border-purple-200",
     metrics: [
       { name: "Collaboration Metrics", charts: "Bar, Pie" },
@@ -342,8 +342,8 @@ const analysisCategories = [
   {
     title: "Correlation",
     icon: TrendingUp,
-    color: "text-emerald-600 bg-emerald-50",
-    border: "border-emerald-200",
+    color: "text-green-600 bg-green-50",
+    border: "border-green-200",
     metrics: [
       { name: "Churn Correlation", charts: "Scatter" },
       { name: "Correlation Matrix", charts: "Heatmap" },
@@ -363,7 +363,7 @@ const analysisCategories = [
   {
     title: "Overview",
     icon: BarChart3,
-    color: "text-rose-600 bg-rose-50",
+    color: "text-red-600 bg-red-50",
     border: "border-rose-200",
     metrics: [
       { name: "MR Complexity", charts: "Pie, Bar" },
@@ -374,7 +374,7 @@ const analysisCategories = [
   {
     title: "Time Series",
     icon: Clock,
-    color: "text-cyan-600 bg-cyan-50",
+    color: "text-blue-600 bg-blue-50",
     border: "border-cyan-200",
     metrics: [
       { name: "Commits Over Time", charts: "Line, Bar, Area" },
@@ -495,12 +495,12 @@ const GetStarted = () => {
 
         {/* ── Intelligent Assistant banner ── */}
         <section className="mb-14">
-          <div className="relative overflow-hidden bg-gradient-to-r from-indigo-600 via-blue-600 to-cyan-600 rounded-2xl p-6 sm:p-8 text-white">
+          <div className="relative overflow-hidden bg-gradient-to-r from-blue-600 via-blue-600 to-cyan-600 rounded-xl p-6 sm:p-8 text-white">
             <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/3" />
             <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/5 rounded-full translate-y-1/3 -translate-x-1/4" />
 
             <div className="relative flex flex-col sm:flex-row items-start sm:items-center gap-5">
-              <div className="w-14 h-14 bg-white/15 backdrop-blur rounded-2xl flex items-center justify-center shrink-0">
+              <div className="w-14 h-14 bg-white/15 backdrop-blur rounded-xl flex items-center justify-center shrink-0">
                 <BrainCircuit className="w-7 h-7 text-white" />
               </div>
               <div className="flex-1">
@@ -559,7 +559,7 @@ const GetStarted = () => {
         {/* ── DevOps tracks (NEW) ── */}
         <section className="mb-14">
           <div className="text-center mb-8">
-            <div className="inline-flex items-center gap-2 px-3 py-1 bg-violet-50 text-violet-700 rounded-full text-xs font-semibold uppercase tracking-wide mb-3">
+            <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-semibold uppercase tracking-wide mb-3">
               <Sparkles className="w-3.5 h-3.5" />
               New
             </div>
@@ -789,7 +789,7 @@ const GetStarted = () => {
 
         {/* ── Quick tips ── */}
         <section className="mb-8">
-          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl border border-blue-100 p-6 sm:p-8">
+          <div className="bg-gradient-to-br from-blue-50 to-blue-50 rounded-xl border border-blue-100 p-6 sm:p-8">
             <div className="flex items-center gap-2.5 mb-5">
               <Lightbulb className="w-5 h-5 text-blue-600" />
               <h2 className="font-bold text-blue-900">Quick tips</h2>

@@ -10,13 +10,13 @@ from kafka_utils.request_reply import RequestReplyClient
 from kafka_utils.topics import Topics
 
 from .models import Collection, CleanedData
-from .branch_fetcher import BranchFetcher
-from .metrics_config import get_metrics_for_platform
-from .minio_client import MinIOClient
-from .csv_generator import CSVGenerator, StatisticsCSVGenerator
+from collectors.infrastructure.providers.branch_fetcher import BranchFetcher
+from collectors.domain.entities.metrics_config import get_metrics_for_platform
+from collectors.infrastructure.storage.minio_client import MinIOClient
+from collectors.infrastructure.exporters.csv_generator import CSVGenerator, StatisticsCSVGenerator
 from .tasks import run_collection_in_background, cancellation_registry
-from .serializers import CollectionSerializer, CleanedDataSerializer
-from .metadata_extractor import _ReplayStream
+from collectors.api.serializers import CollectionSerializer, CleanedDataSerializer
+from collectors.domain.processors.metadata_extractor import _ReplayStream
 import ijson
 
 logger = logging.getLogger(__name__)

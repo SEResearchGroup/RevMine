@@ -1,6 +1,41 @@
-"""Collection Views - HTTP orchestration layer."""
+"""Backward-compatibility shim.
 
-from rest_framework.views import APIView
+The canonical API layer lives at::
+
+    collectors.api.views
+
+This module re-exports every view class so that any remaining code that
+imports from ``collectors.views`` continues to work without modification.
+"""
+from collectors.api.views import *  # noqa: F401, F403
+from collectors.api.views import (
+    UserIdRequiredMixin,
+    GetAvailableMetricsView,
+    GetBranchesForRepositoryView,
+    GetBranchesView,
+    StartCollectionView,
+    ConfigureMetricsView,
+    ValidateCollectionPlanView,
+    ExecuteCollectionView,
+    CollectionStatusView,
+    ResumeCollectionView,
+    PauseCollectionView,
+    CollectionPlanListView,
+    CollectionHistoryView,
+    DeleteCollectionView,
+    CollectedDataView,
+    DownloadCollectionJSONView,
+    DataCleaningConfigView,
+    ApplyFiltersAndCreateCSVView,
+    CollectionCleanedDataListView,
+    CreateCleanedDataView,
+    CleanedDataDetailView,
+    DownloadCleanedDataCSVView,
+    UserDatasetsView,
+    UploadExternalCollectionView,
+    CleanedCollectionsForAnalysisView,
+)
+
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework import status

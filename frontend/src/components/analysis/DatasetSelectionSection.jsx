@@ -124,28 +124,28 @@ const DatasetSelectionSection = ({ onSelectDataset, onFileSelect }) => {
   return (
     <div className="p-6 max-w-7xl mx-auto">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-slate-800 mb-2">
+        <h1 className="text-3xl font-bold text-gray-800 mb-2">
           Data Analysis
         </h1>
-        <p className="text-slate-600">
+        <p className="text-gray-600">
           Upload a new dataset or select from existing analyses
         </p>
       </div>
 
       {/* Upload Section */}
-      <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6 mb-6">
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
         <div
           className={`border-2 border-dashed rounded-lg p-8 text-center transition-all ${
             dragActive
               ? "border-blue-500 bg-blue-50"
-              : "border-slate-300 hover:border-slate-400"
+              : "border-gray-300 hover:border-gray-400"
           }`}
           onDragEnter={handleDrag}
           onDragLeave={handleDrag}
           onDragOver={handleDrag}
           onDrop={handleDrop}
         >
-          <Upload className="w-12 h-12 mx-auto mb-4 text-slate-400" />
+          <Upload className="w-12 h-12 mx-auto mb-4 text-gray-400" />
 
           {file ? (
             <div className="space-y-3">
@@ -153,13 +153,13 @@ const DatasetSelectionSection = ({ onSelectDataset, onFileSelect }) => {
                 <FileText className="w-5 h-5" />
                 <span className="font-medium">{file.name}</span>
               </div>
-              <p className="text-sm text-slate-600">
+              <p className="text-sm text-gray-600">
                 {(file.size / 1024).toFixed(2)} KB
               </p>
               <div className="flex justify-center space-x-3">
                 <button
                   onClick={() => setFile(null)}
-                  className="text-sm text-slate-600 hover:text-slate-700 font-medium"
+                  className="text-sm text-gray-600 hover:text-gray-700 font-medium"
                 >
                   Cancel
                 </button>
@@ -174,10 +174,10 @@ const DatasetSelectionSection = ({ onSelectDataset, onFileSelect }) => {
             </div>
           ) : (
             <>
-              <p className="text-lg font-medium text-slate-700 mb-2">
+              <p className="text-lg font-medium text-gray-700 mb-2">
                 Drop your CSV file here or click to browse
               </p>
-              <p className="text-sm text-slate-500 mb-4">
+              <p className="text-sm text-gray-500 mb-4">
                 Supports GitHub and GitLab data exports
               </p>
               <input
@@ -201,18 +201,18 @@ const DatasetSelectionSection = ({ onSelectDataset, onFileSelect }) => {
       {/* Search and Filter */}
       <div className="flex items-center space-x-3 mb-6">
         <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
           <input
             type="text"
             placeholder="Search datasets..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
         <button
           onClick={() => setFilterOpen(!filterOpen)}
-          className="px-4 py-3 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors flex items-center space-x-2"
+          className="px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center space-x-2"
         >
           <Filter className="w-5 h-5" />
           <span>Filter</span>
@@ -221,7 +221,7 @@ const DatasetSelectionSection = ({ onSelectDataset, onFileSelect }) => {
 
       {/* Available Datasets */}
       <div>
-        <h2 className="text-xl font-semibold text-slate-800 mb-4">
+        <h2 className="text-xl font-semibold text-gray-800 mb-4">
           Available Datasets
         </h2>
 
@@ -230,9 +230,9 @@ const DatasetSelectionSection = ({ onSelectDataset, onFileSelect }) => {
             <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
           </div>
         ) : filteredDatasets.length === 0 ? (
-          <div className="bg-white rounded-lg border border-slate-200 p-12 text-center">
-            <FileText className="w-12 h-12 mx-auto mb-4 text-slate-400" />
-            <p className="text-slate-600">
+          <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
+            <FileText className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+            <p className="text-gray-600">
               {searchTerm
                 ? "No datasets match your search"
                 : "No datasets available. Upload your first dataset above."}
@@ -253,7 +253,7 @@ const DatasetSelectionSection = ({ onSelectDataset, onFileSelect }) => {
                   onSelectDataset(dataset);
                 }}
 
-                className="bg-white rounded-lg border border-slate-200 p-5 hover:shadow-md hover:border-blue-300 transition-all cursor-pointer group"
+                className="bg-white rounded-lg border border-gray-200 p-5 hover:shadow-md hover:border-blue-300 transition-all cursor-pointer group"
               >
                 <div className="flex items-start justify-between mb-3">
                   <FileText className="w-8 h-8 text-blue-600 shrink-0" />
@@ -262,22 +262,22 @@ const DatasetSelectionSection = ({ onSelectDataset, onFileSelect }) => {
                   )}
                 </div>
 
-                <h3 className="font-semibold text-slate-800 mb-2 group-hover:text-blue-600 transition-colors truncate">
+                <h3 className="font-semibold text-gray-800 mb-2 group-hover:text-blue-600 transition-colors truncate">
                   {dataset.dataset_filename}
                 </h3>
 
                 {/* Infos repo une sous l'autre */}
-                <div className="space-y-1 text-sm text-slate-600 mb-3">
+                <div className="space-y-1 text-sm text-gray-600 mb-3">
                   <div className="flex items-center space-x-2">
-                    <Github className="w-4 h-4 text-slate-500" />
+                    <Github className="w-4 h-4 text-gray-500" />
                     <span className="font-medium truncate">
                       {dataset.repository_name}
                     </span>
                   </div>
-                  <p className="text-slate-500 text-xs truncate">
+                  <p className="text-gray-500 text-xs truncate">
                     {dataset.repository_full_name}
                   </p>
-                  <p className="text-slate-500 text-xs capitalize">
+                  <p className="text-gray-500 text-xs capitalize">
                     Platform: {dataset.platform}
                   </p>
                   {dataset.repository_url && (
@@ -293,14 +293,14 @@ const DatasetSelectionSection = ({ onSelectDataset, onFileSelect }) => {
                   )}
                 </div>
 
-                <div className="space-y-2 text-sm text-slate-600">
+                <div className="space-y-2 text-sm text-gray-600">
                   <div className="flex items-center space-x-2">
                     <Calendar className="w-4 h-4" />
                     <span>{formatDate(dataset.created_at)}</span>
                   </div>
 
                   <div className="flex items-center justify-between">
-                    <span className="text-slate-500">
+                    <span className="text-gray-500">
                       {dataset.results_count} charts
                     </span>
                     <span
@@ -309,7 +309,7 @@ const DatasetSelectionSection = ({ onSelectDataset, onFileSelect }) => {
                           ? "bg-green-100 text-green-700"
                           : dataset.status === "processing"
                           ? "bg-blue-100 text-blue-700"
-                          : "bg-slate-100 text-slate-700"
+                          : "bg-gray-100 text-gray-700"
                       }`}
                     >
                       {dataset.status}

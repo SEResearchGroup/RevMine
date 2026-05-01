@@ -135,31 +135,31 @@ export default function KanbanSourceSelectionPage() {
     (mode === MODE_WORKSPACE && selectedRepo);
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-gray-50">
       <div className="max-w-3xl mx-auto px-6 py-10">
         <button
           onClick={() => navigate("/kanban/new")}
-          className="flex items-center gap-1.5 text-slate-500 hover:text-slate-700 text-sm mb-6"
+          className="flex items-center gap-1.5 text-gray-500 hover:text-gray-700 text-sm mb-6"
         >
           <ArrowLeft className="w-4 h-4" /> Back
         </button>
 
-        <h1 className="text-2xl font-bold text-slate-800 mb-2">
+        <h1 className="text-2xl font-bold text-gray-800 mb-2">
           Connect to a Kanban board
         </h1>
-        <p className="text-sm text-slate-500 mb-8">
+        <p className="text-sm text-gray-500 mb-8">
           Pick a repository from one of your connected workspaces — Revmine will
           use the stored OAuth token. Or paste a personal token manually.
         </p>
 
         {/* Mode tabs */}
-        <div className="flex gap-2 mb-5 bg-white border border-slate-200 rounded-xl p-1">
+        <div className="flex gap-2 mb-5 bg-white border border-gray-200 rounded-xl p-1">
           <button
             onClick={() => setMode(MODE_WORKSPACE)}
             className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm ${
               mode === MODE_WORKSPACE
-                ? "bg-violet-50 text-violet-700 font-medium"
-                : "text-slate-500 hover:text-slate-700"
+                ? "bg-blue-50 text-blue-700 font-medium"
+                : "text-gray-500 hover:text-gray-700"
             }`}
           >
             <LinkIcon className="w-4 h-4" /> From workspace
@@ -168,27 +168,27 @@ export default function KanbanSourceSelectionPage() {
             onClick={() => setMode(MODE_TOKEN)}
             className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm ${
               mode === MODE_TOKEN
-                ? "bg-violet-50 text-violet-700 font-medium"
-                : "text-slate-500 hover:text-slate-700"
+                ? "bg-blue-50 text-blue-700 font-medium"
+                : "text-gray-500 hover:text-gray-700"
             }`}
           >
             <Key className="w-4 h-4" /> Manual token
           </button>
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-2xl p-6 space-y-4">
+        <div className="bg-white border border-gray-200 rounded-xl p-6 space-y-4">
           {mode === MODE_WORKSPACE ? (
             <>
               {reposLoading ? (
                 <div className="flex items-center justify-center py-10">
-                  <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
+                  <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
                 </div>
               ) : repos.length === 0 ? (
-                <p className="text-sm text-slate-500">
+                <p className="text-sm text-gray-500">
                   No imported repositories found. Go to{" "}
                   <button
                     onClick={() => navigate("/workspaces")}
-                    className="text-violet-600 hover:underline"
+                    className="text-blue-600 hover:underline"
                   >
                     Workspaces
                   </button>{" "}
@@ -196,13 +196,13 @@ export default function KanbanSourceSelectionPage() {
                 </p>
               ) : (
                 <>
-                  <label className="block text-sm font-medium text-slate-700">
+                  <label className="block text-sm font-medium text-gray-700">
                     Repository
                   </label>
                   <select
                     value={selectedRepoId || ""}
                     onChange={(e) => setSelectedRepoId(Number(e.target.value) || null)}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-hidden focus:ring-2 focus:ring-violet-500"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="">— choose a repository —</option>
                     {repos.map((r) => (
@@ -212,8 +212,8 @@ export default function KanbanSourceSelectionPage() {
                     ))}
                   </select>
                   {selectedRepo && (
-                    <p className="text-xs text-slate-500">
-                      Platform: <span className="font-medium text-slate-700">{provider}</span>
+                    <p className="text-xs text-gray-500">
+                      Platform: <span className="font-medium text-gray-700">{provider}</span>
                       {" · "}Workspace token will be used automatically.
                     </p>
                   )}
@@ -227,8 +227,8 @@ export default function KanbanSourceSelectionPage() {
                   onClick={() => setProvider("github")}
                   className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg border ${
                     provider === "github"
-                      ? "border-violet-500 bg-violet-50 text-violet-700"
-                      : "border-slate-200 text-slate-600 hover:border-slate-300"
+                      ? "border-blue-500 bg-blue-50 text-blue-700"
+                      : "border-gray-200 text-gray-600 hover:border-gray-300"
                   }`}
                 >
                   <Github className="w-4 h-4" /> GitHub Projects
@@ -237,15 +237,15 @@ export default function KanbanSourceSelectionPage() {
                   onClick={() => setProvider("gitlab")}
                   className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg border ${
                     provider === "gitlab"
-                      ? "border-violet-500 bg-violet-50 text-violet-700"
-                      : "border-slate-200 text-slate-600 hover:border-slate-300"
+                      ? "border-blue-500 bg-blue-50 text-blue-700"
+                      : "border-gray-200 text-gray-600 hover:border-gray-300"
                   }`}
                 >
                   <GitMerge className="w-4 h-4" /> GitLab Boards
                 </button>
               </div>
 
-              <label className="block text-sm font-medium text-slate-700">
+              <label className="block text-sm font-medium text-gray-700">
                 Access token
               </label>
               <input
@@ -253,39 +253,39 @@ export default function KanbanSourceSelectionPage() {
                 value={token}
                 onChange={(e) => setToken(e.target.value)}
                 placeholder={provider === "github" ? "ghp_…" : "glpat-…"}
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-hidden focus:ring-2 focus:ring-violet-500"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500"
               />
 
               {provider === "github" ? (
                 <>
-                  <label className="block text-sm font-medium text-slate-700">
+                  <label className="block text-sm font-medium text-gray-700">
                     Owner (user or org)
                   </label>
                   <input
                     value={owner}
                     onChange={(e) => setOwner(e.target.value)}
                     placeholder="octocat"
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-hidden focus:ring-2 focus:ring-violet-500"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500"
                   />
                 </>
               ) : (
                 <>
-                  <label className="block text-sm font-medium text-slate-700">
+                  <label className="block text-sm font-medium text-gray-700">
                     GitLab project ID
                   </label>
                   <input
                     value={projectId}
                     onChange={(e) => setProjectId(e.target.value)}
                     placeholder="1234567"
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-hidden focus:ring-2 focus:ring-violet-500"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500"
                   />
-                  <label className="block text-sm font-medium text-slate-700">
+                  <label className="block text-sm font-medium text-gray-700">
                     GitLab base URL
                   </label>
                   <input
                     value={baseUrl}
                     onChange={(e) => setBaseUrl(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-hidden focus:ring-2 focus:ring-violet-500"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500"
                   />
                 </>
               )}
@@ -295,7 +295,7 @@ export default function KanbanSourceSelectionPage() {
           <button
             onClick={handleListBoards}
             disabled={loading || !canListBoards}
-            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-violet-600 text-white font-medium disabled:opacity-50"
+            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-blue-600 text-white font-medium disabled:opacity-50"
           >
             {loading ? (
               <Loader2 className="w-4 h-4 animate-spin" />
@@ -313,26 +313,26 @@ export default function KanbanSourceSelectionPage() {
         </div>
 
         {boards && (
-          <div className="mt-8 bg-white border border-slate-200 rounded-2xl p-6">
-            <h2 className="text-lg font-semibold text-slate-800 mb-4">
+          <div className="mt-8 bg-white border border-gray-200 rounded-xl p-6">
+            <h2 className="text-lg font-semibold text-gray-800 mb-4">
               {boards.length} board(s) found
             </h2>
             {boards.length === 0 ? (
-              <p className="text-sm text-slate-500">No boards available for this account.</p>
+              <p className="text-sm text-gray-500">No boards available for this account.</p>
             ) : (
-              <ul className="divide-y divide-slate-100">
+              <ul className="divide-y divide-gray-100">
                 {boards.map((board) => (
                   <li
                     key={board.id}
                     className="py-3 flex items-center justify-between"
                   >
-                    <span className="text-slate-700 font-medium">
+                    <span className="text-gray-700 font-medium">
                       {board.title || board.name || `Board #${board.id}`}
                     </span>
                     <button
                       onClick={() => handleCollect(board)}
                       disabled={loading}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-50 text-violet-700 text-sm hover:bg-violet-100 disabled:opacity-50"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 text-sm hover:bg-blue-100 disabled:opacity-50"
                     >
                       Collect <ArrowRight className="w-3.5 h-3.5" />
                     </button>

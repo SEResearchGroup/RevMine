@@ -74,7 +74,7 @@ const Login = () => {
   return (
     <div className="w-full flex items-center justify-center px-4 py-8 sm:py-12">
       <div className="w-full max-w-md lg:max-w-lg xl:max-w-xl bg-white rounded-lg shadow-lg p-6 sm:p-8">
-        <h2 className="text-xl sm:text-2xl font-bold text-[#008CFF] text-center mb-6 sm:mb-8">
+        <h2 className="text-xl sm:text-2xl font-bold text-blue-600 text-center mb-6 sm:mb-8">
           Login to your account
         </h2>
 
@@ -163,7 +163,7 @@ const Login = () => {
             <div className="text-right mt-2">
               <a
                 href="#"
-                className="text-[#008CFF] hover:underline text-xs sm:text-sm font-medium"
+                className="text-blue-600 hover:underline text-xs sm:text-sm font-medium"
               >
                 Forgot password?
               </a>
@@ -173,7 +173,7 @@ const Login = () => {
           <button
             type="submit"
             disabled={loading || !email || !password}
-            className="w-full bg-[#008CFF] text-white py-2.5 sm:py-3 text-sm sm:text-base rounded-lg hover:bg-[#007ACC] transition font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full bg-blue-600 text-white py-2.5 sm:py-3 text-sm sm:text-base rounded-lg hover:bg-blue-700 transition font-medium disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? "Logging in..." : "Sign In"}
           </button>
@@ -183,7 +183,7 @@ const Login = () => {
           Don't have an account?{" "}
           <a
             href="/register"
-            className="text-[#008CFF] hover:underline font-medium"
+            className="text-blue-600 hover:underline font-medium"
           >
             Register here
           </a>

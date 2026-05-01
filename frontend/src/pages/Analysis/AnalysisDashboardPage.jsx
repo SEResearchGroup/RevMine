@@ -37,22 +37,22 @@ const TIME_AGG_LABELS = { D: "Daily", W: "Weekly", M: "Monthly", Q: "Quarterly",
 /* ------------------------------------------------------------------ */
 const SummaryStatCard = ({ icon: Icon, label, value, color = "indigo" }) => {
   const colorMap = {
-    indigo: "from-indigo-500 to-blue-600 shadow-indigo-200/50",
-    emerald: "from-emerald-500 to-teal-600 shadow-emerald-200/50",
-    amber: "from-amber-500 to-orange-600 shadow-amber-200/50",
-    rose: "from-rose-500 to-pink-600 shadow-rose-200/50",
-    violet: "from-violet-500 to-purple-600 shadow-violet-200/50",
-    cyan: "from-cyan-500 to-sky-600 shadow-cyan-200/50",
-    blue: "from-blue-500 to-indigo-600 shadow-blue-200/50",
+    indigo: "bg-blue-600",
+    emerald: "bg-green-600",
+    amber:   "bg-amber-500",
+    rose:    "bg-red-500",
+    violet:  "bg-blue-600",
+    cyan:    "bg-blue-500",
+    blue:    "bg-blue-600",
   };
   return (
-    <div className="bg-white rounded-xl border border-slate-200/60 p-4 flex items-center gap-3">
-      <div className={`w-10 h-10 rounded-xl bg-linear-to-br ${colorMap[color] || colorMap.indigo} flex items-center justify-center shadow-lg shrink-0`}>
+    <div className="bg-white rounded-xl border border-gray-200 p-4 flex items-center gap-3">
+      <div className={`w-10 h-10 rounded-xl ${colorMap[color] || colorMap.indigo} flex items-center justify-center shrink-0`}>
         <Icon className="w-5 h-5 text-white" />
       </div>
       <div className="min-w-0">
-        <p className="text-[10px] uppercase tracking-wider text-slate-400 font-medium">{label}</p>
-        <p className="text-lg font-bold text-slate-800 truncate">{value}</p>
+        <p className="text-[10px] uppercase tracking-wider text-gray-400 font-medium">{label}</p>
+        <p className="text-lg font-bold text-gray-800 truncate">{value}</p>
       </div>
     </div>
   );
@@ -127,20 +127,20 @@ const DashboardChart = ({
   const TIME_FILTER_LABELS = { all: "All", daily: "24h", weekly: "7d", monthly: "30d" };
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm hover:shadow-md transition-shadow overflow-hidden flex flex-col">
+    <div className="bg-white rounded-xl border border-gray-200/60 shadow-sm hover:shadow-md transition-shadow overflow-hidden flex flex-col">
       {/* Card header */}
-      <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100">
+      <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
         <div className="flex items-center gap-2 min-w-0">
-          <ChartIcon className="w-4 h-4 text-indigo-500" />
-          <h3 className="font-semibold text-slate-800 text-sm truncate">{title}</h3>
-          <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[10px] uppercase tracking-wider font-medium">
+          <ChartIcon className="w-4 h-4 text-blue-500" />
+          <h3 className="font-semibold text-gray-800 text-sm truncate">{title}</h3>
+          <span className="px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 text-[10px] uppercase tracking-wider font-medium">
             {isHistogram ? "histogram" : activeType}
           </span>
         </div>
         <div className="flex items-center gap-1">
           {/* Histogram time filter – All / 24h / 7d / 30d */}
           {isHistogram && (
-            <div className="flex items-center bg-slate-100 rounded-lg p-0.5 mr-2">
+            <div className="flex items-center bg-gray-100 rounded-lg p-0.5 mr-2">
               {Object.entries(TIME_FILTER_LABELS).map(([k, v]) => (
                 <button
                   key={k}
@@ -148,8 +148,8 @@ const DashboardChart = ({
                   disabled={isChanging}
                   className={`px-2 py-1 text-[10px] font-medium rounded-md transition-colors disabled:opacity-50 ${
                     localTimeFilter === k
-                      ? "bg-white text-indigo-600 shadow-sm"
-                      : "text-slate-500 hover:text-slate-700"
+                      ? "bg-white text-blue-600 shadow-sm"
+                      : "text-gray-500 hover:text-gray-700"
                   }`}
                 >
                   {v}
@@ -163,25 +163,25 @@ const DashboardChart = ({
                 value={localTimeAgg}
                 onChange={(e) => handleTimeAggChange(e.target.value)}
                 disabled={isChanging}
-                className="appearance-none pl-2 pr-7 py-1 text-xs border border-slate-200 rounded-lg bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-400 cursor-pointer disabled:opacity-50"
+                className="appearance-none pl-2 pr-7 py-1 text-xs border border-gray-200 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-400 cursor-pointer disabled:opacity-50"
               >
                 {Object.entries(TIME_AGG_LABELS).map(([k, v]) => (
                   <option key={k} value={k}>{v}</option>
                 ))}
               </select>
-              <ChevronDown className="w-3 h-3 text-slate-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <ChevronDown className="w-3 h-3 text-gray-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
             </div>
           )}
           <button
             onClick={() => onExportImage(index)}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+            className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
             title="Download image"
           >
             <Image className="w-4 h-4" />
           </button>
           <button
             onClick={() => onFullscreen(index)}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+            className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
             title="Fullscreen"
           >
             <Maximize2 className="w-4 h-4" />
@@ -189,7 +189,7 @@ const DashboardChart = ({
           <button
             onClick={() => onRetry(index)}
             disabled={retrying}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+            className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
             title="Refresh"
           >
             <RefreshCw className={`w-4 h-4 ${retrying ? "animate-spin" : ""}`} />
@@ -201,7 +201,7 @@ const DashboardChart = ({
       <div className="flex-1 p-4 min-h-[300px]">
         {isChanging ? (
           <div className="h-full flex items-center justify-center">
-            <Loader2 className="w-6 h-6 animate-spin text-indigo-400" />
+            <Loader2 className="w-6 h-6 animate-spin text-blue-400" />
           </div>
         ) : result.error ? (
           <div className="h-full flex flex-col items-center justify-center text-red-400 gap-2">
@@ -223,12 +223,12 @@ const DashboardChart = ({
 
       {/* Statistics footer */}
       {result.statistics && Object.keys(result.statistics).length > 0 && (
-        <div className="px-5 py-3 border-t border-slate-100 bg-slate-50/50">
+        <div className="px-5 py-3 border-t border-gray-100 bg-gray-50/50">
           <div className="flex flex-wrap gap-x-6 gap-y-2">
             {Object.entries(result.statistics).slice(0, 4).map(([key, val]) => (
               <div key={key} className="text-center min-w-20">
-                <p className="text-[10px] uppercase tracking-wider text-slate-400 font-medium whitespace-nowrap">{key.replace(/_/g, " ")}</p>
-                <p className="text-sm font-bold text-slate-700">
+                <p className="text-[10px] uppercase tracking-wider text-gray-400 font-medium whitespace-nowrap">{key.replace(/_/g, " ")}</p>
+                <p className="text-sm font-bold text-gray-700">
                   {typeof val === "number" ? val.toLocaleString(undefined, { maximumFractionDigits: 2 }) : String(val)}
                 </p>
               </div>
@@ -253,13 +253,13 @@ const FullscreenOverlay = ({ result, chartTypeOverride, onChartTypeChange, onClo
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-6">
       <div className="bg-white rounded-3xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-auto">
-        <div className="flex items-center justify-between p-6 border-b border-slate-100">
-          <h2 className="text-lg font-bold text-slate-800">{title}</h2>
+        <div className="flex items-center justify-between p-6 border-b border-gray-100">
+          <h2 className="text-lg font-bold text-gray-800">{title}</h2>
           <button
             onClick={onClose}
-            className="p-2 rounded-lg hover:bg-slate-100 transition-colors"
+            className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
           >
-            <X className="w-5 h-5 text-slate-500" />
+            <X className="w-5 h-5 text-gray-500" />
           </button>
         </div>
         <div className="p-6">
@@ -274,12 +274,12 @@ const FullscreenOverlay = ({ result, chartTypeOverride, onChartTypeChange, onClo
         </div>
         {result.statistics && Object.keys(result.statistics).length > 0 && (
           <div className="px-6 pb-6">
-            <h4 className="text-sm font-semibold text-slate-600 mb-3">Statistics</h4>
+            <h4 className="text-sm font-semibold text-gray-600 mb-3">Statistics</h4>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {Object.entries(result.statistics).map(([key, val]) => (
-                <div key={key} className="bg-slate-50 rounded-xl p-3 text-center">
-                  <p className="text-[10px] uppercase tracking-wider text-slate-400 font-medium whitespace-nowrap">{key.replace(/_/g, " ")}</p>
-                  <p className="text-lg font-bold text-slate-700">
+                <div key={key} className="bg-gray-50 rounded-xl p-3 text-center">
+                  <p className="text-[10px] uppercase tracking-wider text-gray-400 font-medium whitespace-nowrap">{key.replace(/_/g, " ")}</p>
+                  <p className="text-lg font-bold text-gray-700">
                     {typeof val === "number" ? val.toLocaleString(undefined, { maximumFractionDigits: 2 }) : String(val)}
                   </p>
                 </div>
@@ -562,10 +562,10 @@ const AnalysisDashboardPage = () => {
   /* ---- render ---- */
   if (loading) {
     return (
-      <div className="min-h-screen bg-linear-to-br from-slate-50 via-blue-50/30 to-indigo-50/40 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="w-10 h-10 animate-spin text-indigo-500 mx-auto mb-3" />
-          <p className="text-slate-500">Loading dashboard...</p>
+          <Loader2 className="w-10 h-10 animate-spin text-blue-500 mx-auto mb-3" />
+          <p className="text-gray-500">Loading dashboard...</p>
         </div>
       </div>
     );
@@ -575,7 +575,7 @@ const AnalysisDashboardPage = () => {
   const failedResults = results.filter((r) => r.error);
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-slate-50 via-blue-50/30 to-indigo-50/40">
+    <div className="min-h-screen bg-gray-50">
       <div className="max-w-[1400px] mx-auto px-6 py-6">
         {/* Top bar */}
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-6">
@@ -586,15 +586,15 @@ const AnalysisDashboardPage = () => {
                   ? navigate(`/analysis/${datasetId}/detail`)
                   : navigate(`/${section}/history`)
               }
-              className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-white transition-colors"
+              className="p-2 rounded-xl text-gray-400 hover:text-gray-600 hover:bg-white transition-colors"
             >
               <ArrowLeft className="w-5 h-5" />
             </button>
             <div>
-              <h1 className="text-xl font-bold text-slate-800">
+              <h1 className="text-xl font-bold text-gray-800">
                 Analysis Dashboard
               </h1>
-              <p className="text-sm text-slate-500">
+              <p className="text-sm text-gray-500">
                 {dataset?.filename || dataset?.name || dataset?.original_filename}
                 {" · "}
                 {successResults.length} chart{successResults.length !== 1 ? "s" : ""}
@@ -609,11 +609,11 @@ const AnalysisDashboardPage = () => {
 
           <div className="flex items-center gap-2">
             {/* Layout toggle */}
-            <div className="flex items-center bg-white rounded-xl border border-slate-200 p-1">
+            <div className="flex items-center bg-white rounded-xl border border-gray-200 p-1">
               <button
                 onClick={() => setLayout("grid")}
                 className={`p-1.5 rounded-lg transition-colors ${
-                  layout === "grid" ? "bg-indigo-50 text-indigo-600" : "text-slate-400 hover:text-slate-600"
+                  layout === "grid" ? "bg-blue-50 text-blue-600" : "text-gray-400 hover:text-gray-600"
                 }`}
               >
                 <LayoutGrid className="w-4 h-4" />
@@ -621,7 +621,7 @@ const AnalysisDashboardPage = () => {
               <button
                 onClick={() => setLayout("list")}
                 className={`p-1.5 rounded-lg transition-colors ${
-                  layout === "list" ? "bg-indigo-50 text-indigo-600" : "text-slate-400 hover:text-slate-600"
+                  layout === "list" ? "bg-blue-50 text-blue-600" : "text-gray-400 hover:text-gray-600"
                 }`}
               >
                 <LayoutList className="w-4 h-4" />
@@ -632,7 +632,7 @@ const AnalysisDashboardPage = () => {
             <button
               onClick={handleExportPDF}
               disabled={exporting || successResults.length === 0}
-              className="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {exporting ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -645,7 +645,7 @@ const AnalysisDashboardPage = () => {
             {/* Add more metrics */}
             <button
               onClick={() => navigate(`/${section}/${datasetId}/metrics`)}
-              className="flex items-center gap-2 px-4 py-2.5 bg-linear-to-r from-indigo-600 to-blue-600 text-white rounded-xl text-sm font-medium shadow-sm hover:from-indigo-700 hover:to-blue-700 transition-all"
+              className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-medium shadow-sm hover:bg-blue-700 transition-all"
             >
               <TrendingUp className="w-4 h-4" />
               Add Charts
@@ -683,9 +683,9 @@ const AnalysisDashboardPage = () => {
             {Object.entries(summary.state_distribution).map(([state, count]) => (
               <span
                 key={state}
-                className="px-3 py-1.5 rounded-lg bg-white border border-slate-200/60 text-xs font-medium text-slate-600"
+                className="px-3 py-1.5 rounded-lg bg-white border border-gray-200/60 text-xs font-medium text-gray-600"
               >
-                {state}: <span className="font-bold text-slate-800">{count.toLocaleString()}</span>
+                {state}: <span className="font-bold text-gray-800">{count.toLocaleString()}</span>
               </span>
             ))}
           </div>
@@ -693,12 +693,12 @@ const AnalysisDashboardPage = () => {
 
         {/* Charts grid */}
         {results.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-slate-200/60 p-16 text-center">
-            <BarChart3 className="w-12 h-12 mx-auto mb-4 text-slate-300" />
-            <p className="text-slate-500 mb-4">No charts generated yet.</p>
+          <div className="bg-white rounded-xl border border-gray-200/60 p-16 text-center">
+            <BarChart3 className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+            <p className="text-gray-500 mb-4">No charts generated yet.</p>
             <button
               onClick={() => navigate(`/${section}/${datasetId}/metrics`)}
-              className="px-6 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700 transition-colors"
+              className="px-6 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 transition-colors"
             >
               Select Metrics
             </button>

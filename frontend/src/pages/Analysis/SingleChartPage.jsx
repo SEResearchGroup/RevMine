@@ -40,10 +40,10 @@ const FullscreenOverlay = ({ result, activeType, onChartTypeChange, onClose }) =
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-6">
       <div className="bg-white rounded-3xl shadow-2xl w-full max-w-6xl max-h-[90vh] overflow-auto">
-        <div className="flex items-center justify-between p-6 border-b border-slate-100">
-          <h2 className="text-lg font-bold text-slate-800">{title}</h2>
-          <button onClick={onClose} className="p-2 rounded-lg hover:bg-slate-100 transition-colors">
-            <X className="w-5 h-5 text-slate-500" />
+        <div className="flex items-center justify-between p-6 border-b border-gray-100">
+          <h2 className="text-lg font-bold text-gray-800">{title}</h2>
+          <button onClick={onClose} className="p-2 rounded-lg hover:bg-gray-100 transition-colors">
+            <X className="w-5 h-5 text-gray-500" />
           </button>
         </div>
         <div className="p-6">
@@ -171,10 +171,10 @@ export default function SingleChartPage() {
   /* ---- loading / error states ---- */
   if (loading) {
     return (
-      <div className="min-h-screen bg-linear-to-br from-slate-50 via-blue-50/30 to-indigo-50/40 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="w-10 h-10 animate-spin text-indigo-500 mx-auto mb-3" />
-          <p className="text-slate-500">Loading chart...</p>
+          <Loader2 className="w-10 h-10 animate-spin text-blue-500 mx-auto mb-3" />
+          <p className="text-gray-500">Loading chart...</p>
         </div>
       </div>
     );
@@ -182,12 +182,12 @@ export default function SingleChartPage() {
 
   if (error || !result) {
     return (
-      <div className="min-h-screen bg-linear-to-br from-slate-50 via-blue-50/30 to-indigo-50/40 flex flex-col items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center">
         <AlertCircle className="w-12 h-12 text-red-400 mb-3" />
-        <p className="text-slate-600">{error || "Chart not found"}</p>
+        <p className="text-gray-600">{error || "Chart not found"}</p>
         <button
           onClick={() => navigate(`/analysis/${datasetId}/detail`)}
-          className="mt-4 px-4 py-2 text-sm text-indigo-600 hover:text-indigo-700 font-medium"
+          className="mt-4 px-4 py-2 text-sm text-blue-600 hover:text-blue-700 font-medium"
         >
           Back to project
         </button>
@@ -196,7 +196,7 @@ export default function SingleChartPage() {
   }
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-slate-50 via-blue-50/30 to-indigo-50/40">
+    <div className="min-h-screen bg-gray-50">
       <div className="max-w-5xl mx-auto px-6 py-8">
         {/* Header */}
         <div className="flex items-center gap-4 mb-6">
@@ -204,17 +204,17 @@ export default function SingleChartPage() {
             onClick={() => navigate(`/analysis/${datasetId}/detail`)}
             className="p-2 rounded-xl hover:bg-white hover:shadow-sm transition-all"
           >
-            <ArrowLeft className="w-5 h-5 text-slate-500" />
+            <ArrowLeft className="w-5 h-5 text-gray-500" />
           </button>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
-              <ChartIcon className="w-5 h-5 text-indigo-500" />
-              <h1 className="text-xl font-bold text-slate-800 truncate">{title}</h1>
-              <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[10px] uppercase tracking-wider font-medium">
+              <ChartIcon className="w-5 h-5 text-blue-500" />
+              <h1 className="text-xl font-bold text-gray-800 truncate">{title}</h1>
+              <span className="px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 text-[10px] uppercase tracking-wider font-medium">
                 {activeType}
               </span>
             </div>
-            <p className="text-sm text-slate-500 mt-0.5">
+            <p className="text-sm text-gray-500 mt-0.5">
               {result.metric_code?.replace(/_/g, " ")}
               {result.created_at && ` · ${new Date(result.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`}
             </p>
@@ -222,11 +222,11 @@ export default function SingleChartPage() {
         </div>
 
         {/* Chart card */}
-        <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden mb-6">
+        <div className="bg-white rounded-xl border border-gray-200/60 shadow-sm overflow-hidden mb-6">
           {/* Toolbar */}
-          <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100">
-            <div className="flex items-center gap-2 text-sm text-slate-600 font-medium">
-              <ChartIcon className="w-4 h-4 text-indigo-500" />
+          <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
+            <div className="flex items-center gap-2 text-sm text-gray-600 font-medium">
+              <ChartIcon className="w-4 h-4 text-blue-500" />
               {title}
             </div>
             <div className="flex items-center gap-1">
@@ -236,25 +236,25 @@ export default function SingleChartPage() {
                     value={timeAgg}
                     onChange={(e) => handleTimeAggChange(e.target.value)}
                     disabled={timeChanging}
-                    className="appearance-none pl-2 pr-7 py-1 text-xs border border-slate-200 rounded-lg bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-400 cursor-pointer disabled:opacity-50"
+                    className="appearance-none pl-2 pr-7 py-1 text-xs border border-gray-200 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-400 cursor-pointer disabled:opacity-50"
                   >
                     {Object.entries(TIME_AGG_LABELS).map(([k, v]) => (
                       <option key={k} value={k}>{v}</option>
                     ))}
                   </select>
-                  <ChevronDown className="w-3 h-3 text-slate-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <ChevronDown className="w-3 h-3 text-gray-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
                 </div>
               )}
               <button
                 onClick={handleExportImage}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
                 title="Download image"
               >
                 <Image className="w-4 h-4" />
               </button>
               <button
                 onClick={() => setFullscreen(true)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
                 title="Fullscreen"
               >
                 <Maximize2 className="w-4 h-4" />
@@ -262,7 +262,7 @@ export default function SingleChartPage() {
               <button
                 onClick={handleRetry}
                 disabled={retrying}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
                 title="Refresh"
               >
                 <RefreshCw className={`w-4 h-4 ${retrying ? "animate-spin" : ""}`} />
@@ -274,7 +274,7 @@ export default function SingleChartPage() {
           <div className="p-6">
             {timeChanging ? (
               <div className="h-[420px] flex items-center justify-center">
-                <Loader2 className="w-8 h-8 animate-spin text-indigo-400" />
+                <Loader2 className="w-8 h-8 animate-spin text-blue-400" />
               </div>
             ) : result.error ? (
               <div className="h-[420px] flex flex-col items-center justify-center text-red-400 gap-2">
@@ -296,17 +296,17 @@ export default function SingleChartPage() {
 
         {/* Statistics */}
         {result.statistics && Object.keys(result.statistics).length > 0 && (
-          <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm p-6">
-            <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wider mb-4">
+          <div className="bg-white rounded-xl border border-gray-200/60 shadow-sm p-6">
+            <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-4">
               Statistics
             </h3>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {Object.entries(result.statistics).map(([key, val]) => (
-                <div key={key} className="bg-slate-50 rounded-xl p-4 text-center">
-                  <p className="text-[10px] uppercase tracking-wider text-slate-400 font-medium whitespace-nowrap mb-1">
+                <div key={key} className="bg-gray-50 rounded-xl p-4 text-center">
+                  <p className="text-[10px] uppercase tracking-wider text-gray-400 font-medium whitespace-nowrap mb-1">
                     {key.replace(/_/g, " ")}
                   </p>
-                  <p className="text-lg font-bold text-slate-700">
+                  <p className="text-lg font-bold text-gray-700">
                     {typeof val === "number"
                       ? val.toLocaleString(undefined, { maximumFractionDigits: 2 })
                       : String(val)}

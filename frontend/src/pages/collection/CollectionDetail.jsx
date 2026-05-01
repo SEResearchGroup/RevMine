@@ -438,7 +438,7 @@ function CollectionDetail() {
                           )}
                           <button
                             onClick={() => handleViewCleanedData(cleaning.id)}
-                            className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                             title="View details"
                           >
                             <Eye className="w-4 h-4" />

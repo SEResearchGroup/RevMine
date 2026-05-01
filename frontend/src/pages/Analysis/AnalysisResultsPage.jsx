@@ -236,37 +236,37 @@ const AnalysisResultsPage = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-linear-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="w-12 h-12 animate-spin text-indigo-600 mx-auto mb-4" />
-          <p className="text-slate-600">Loading results...</p>
+          <Loader2 className="w-12 h-12 animate-spin text-blue-600 mx-auto mb-4" />
+          <p className="text-gray-600">Loading results...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-slate-50 via-blue-50 to-indigo-50">
+    <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-6 py-8">
         {/* Header */}
         <div className="mb-6">
           <button
             onClick={() => navigate(`/analysis/datasets/${datasetId}`)}
-            className="flex items-center gap-2 text-slate-600 hover:text-slate-800 mb-4 transition-colors"
+            className="flex items-center gap-2 text-gray-600 hover:text-gray-800 mb-4 transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to dataset
           </button>
 
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-6">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200/60 p-6">
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
               <div className="flex items-center gap-4">
-                <div className="w-14 h-14 bg-linear-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center shadow-lg shadow-green-200">
+                <div className="w-14 h-14 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-green-200">
                   <BarChart3 className="w-7 h-7 text-white" />
                 </div>
                 <div>
-                  <h1 className="text-2xl font-bold text-slate-800">Analysis Results</h1>
-                  <p className="text-slate-500 mt-1">
+                  <h1 className="text-2xl font-bold text-gray-800">Analysis Results</h1>
+                  <p className="text-gray-500 mt-1">
                     {dataset?.name || dataset?.original_filename}
                     {" · "}
                     {analyses.length} graphiques
@@ -277,14 +277,14 @@ const AnalysisResultsPage = () => {
               <div className="flex items-center gap-3">
                 <button
                   onClick={loadData}
-                  className="flex items-center gap-2 px-4 py-2.5 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors text-slate-700"
+                  className="flex items-center gap-2 px-4 py-2.5 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors text-gray-700"
                 >
                   <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
                   Refresh
                 </button>
                 <button
                   onClick={() => navigate(`/analysis/datasets/${datasetId}/analyze`)}
-                  className="flex items-center gap-2 px-5 py-2.5 bg-linear-to-r from-indigo-600 to-blue-600 text-white rounded-xl hover:from-indigo-700 hover:to-blue-700 transition-all shadow-lg shadow-indigo-200 font-medium"
+                  className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 font-medium"
                 >
                   <BarChart3 className="w-4 h-4" />
                   New analysis
@@ -295,11 +295,11 @@ const AnalysisResultsPage = () => {
         </div>
 
         {/* Filters */}
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-4 mb-6">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200/60 p-4 mb-6">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div className="flex items-center gap-2">
-              <Filter className="w-5 h-5 text-slate-400" />
-              <span className="text-sm text-slate-600">Filter by status:</span>
+              <Filter className="w-5 h-5 text-gray-400" />
+              <span className="text-sm text-gray-600">Filter by status:</span>
               <div className="flex gap-2">
                 {["all", "completed", "processing", "pending", "failed"].map((status) => (
                   <button
@@ -307,8 +307,8 @@ const AnalysisResultsPage = () => {
                     onClick={() => setStatusFilter(status)}
                     className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
                       statusFilter === status
-                        ? "bg-indigo-100 text-indigo-700 font-medium"
-                        : "text-slate-600 hover:bg-slate-100"
+                        ? "bg-blue-100 text-blue-700 font-medium"
+                        : "text-gray-600 hover:bg-gray-100"
                     }`}
                   >
                     {status === "all" ? "All" : status}
@@ -322,8 +322,8 @@ const AnalysisResultsPage = () => {
                 onClick={() => setViewMode("grid")}
                 className={`p-2 rounded-lg transition-colors ${
                   viewMode === "grid"
-                    ? "bg-indigo-100 text-indigo-600"
-                    : "text-slate-400 hover:bg-slate-100"
+                    ? "bg-blue-100 text-blue-600"
+                    : "text-gray-400 hover:bg-gray-100"
                 }`}
               >
                 <Grid3X3 className="w-5 h-5" />
@@ -332,8 +332,8 @@ const AnalysisResultsPage = () => {
                 onClick={() => setViewMode("list")}
                 className={`p-2 rounded-lg transition-colors ${
                   viewMode === "list"
-                    ? "bg-indigo-100 text-indigo-600"
-                    : "text-slate-400 hover:bg-slate-100"
+                    ? "bg-blue-100 text-blue-600"
+                    : "text-gray-400 hover:bg-gray-100"
                 }`}
               >
                 <List className="w-5 h-5" />
@@ -344,24 +344,24 @@ const AnalysisResultsPage = () => {
 
         {/* Results */}
         {filteredAnalyses.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-slate-200/60 p-16 text-center">
-            <BarChart3 className="w-12 h-12 mx-auto mb-4 text-slate-400" />
-            <p className="text-slate-600">No analysis found</p>
+          <div className="bg-white rounded-xl border border-gray-200/60 p-16 text-center">
+            <BarChart3 className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+            <p className="text-gray-600">No analysis found</p>
           </div>
         ) : viewMode === "grid" ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {filteredAnalyses.map((analysis, index) => (
               <div
                 key={analysis.id}
-                className="bg-white rounded-2xl border border-slate-200/60 overflow-hidden hover:shadow-xl hover:shadow-indigo-100/50 transition-all"
+                className="bg-white rounded-xl border border-gray-200/60 overflow-hidden hover:shadow-xl hover:shadow-blue-100/50 transition-all"
               >
-                <div className="p-5 border-b border-slate-100">
+                <div className="p-5 border-b border-gray-100">
                   <div className="flex items-start justify-between">
                     <div>
-                      <h3 className="font-semibold text-slate-800">
+                      <h3 className="font-semibold text-gray-800">
                         {analysis.metric || analysis.chart_type || "Analyse"}
                       </h3>
-                      <p className="text-sm text-slate-500 mt-1">
+                      <p className="text-sm text-gray-500 mt-1">
                         {new Date(analysis.created_at).toLocaleString("en-US")}
                       </p>
                     </div>
@@ -371,7 +371,7 @@ const AnalysisResultsPage = () => {
 
                 <div className="p-5">
                   {analysis.status === "completed" && analysis.result?.chart_data ? (
-                    <div className="h-64 bg-slate-50 rounded-xl overflow-hidden">
+                    <div className="h-64 bg-gray-50 rounded-xl overflow-hidden">
                       <DynamicChart
                         chartData={analysis.result.chart_data}
                         chartType={analysis.result.chart_data?.type || analysis.chart_type}
@@ -380,10 +380,10 @@ const AnalysisResultsPage = () => {
                       />
                     </div>
                   ) : analysis.status === "processing" || analysis.status === "pending" ? (
-                    <div className="h-64 bg-slate-50 rounded-xl flex items-center justify-center">
+                    <div className="h-64 bg-gray-50 rounded-xl flex items-center justify-center">
                       <div className="text-center">
-                        <Loader2 className="w-8 h-8 animate-spin text-indigo-600 mx-auto mb-2" />
-                        <p className="text-sm text-slate-600">Processing...</p>
+                        <Loader2 className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-2" />
+                        <p className="text-sm text-gray-600">Processing...</p>
                       </div>
                     </div>
                   ) : analysis.status === "failed" ? (
@@ -408,8 +408,8 @@ const AnalysisResultsPage = () => {
                       </div>
                     </div>
                   ) : (
-                    <div className="h-64 bg-slate-50 rounded-xl flex items-center justify-center">
-                      <p className="text-slate-500">No data</p>
+                    <div className="h-64 bg-gray-50 rounded-xl flex items-center justify-center">
+                      <p className="text-gray-500">No data</p>
                     </div>
                   )}
                 </div>
@@ -418,7 +418,7 @@ const AnalysisResultsPage = () => {
                   <div className="px-5 pb-5 flex items-center justify-end gap-2">
                     <button
                       onClick={() => openFullscreen(analysis, index)}
-                      className="flex items-center gap-2 px-3 py-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors text-sm"
+                      className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors text-sm"
                     >
                       <Maximize2 className="w-4 h-4" />
                       Fullscreen
@@ -426,7 +426,7 @@ const AnalysisResultsPage = () => {
                     <button
                       onClick={() => handleDownload(analysis)}
                       disabled={downloadingId === analysis.id}
-                      className="flex items-center gap-2 px-3 py-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors text-sm font-medium"
+                      className="flex items-center gap-2 px-3 py-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors text-sm font-medium"
                     >
                       {downloadingId === analysis.id ? (
                         <Loader2 className="w-4 h-4 animate-spin" />
@@ -445,12 +445,12 @@ const AnalysisResultsPage = () => {
             {filteredAnalyses.map((analysis, index) => (
               <div
                 key={analysis.id}
-                className="bg-white rounded-2xl border border-slate-200/60 p-6 hover:shadow-lg transition-all"
+                className="bg-white rounded-xl border border-gray-200/60 p-6 hover:shadow-lg transition-all"
               >
                 <div className="flex flex-col lg:flex-row gap-6">
                   <div className="lg:w-1/3">
                     {analysis.status === "completed" && analysis.result?.chart_data ? (
-                      <div className="h-48 bg-slate-50 rounded-xl overflow-hidden">
+                      <div className="h-48 bg-gray-50 rounded-xl overflow-hidden">
                         <DynamicChart
                           chartData={analysis.result.chart_data}
                           chartType={analysis.result.chart_data?.type || analysis.chart_type}
@@ -459,9 +459,9 @@ const AnalysisResultsPage = () => {
                         />
                       </div>
                     ) : (
-                      <div className="h-48 bg-slate-50 rounded-xl flex items-center justify-center">
+                      <div className="h-48 bg-gray-50 rounded-xl flex items-center justify-center">
                         {analysis.status === "processing" || analysis.status === "pending" ? (
-                          <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+                          <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
                         ) : (
                           <AlertCircle className="w-8 h-8 text-red-500" />
                         )}
@@ -472,20 +472,20 @@ const AnalysisResultsPage = () => {
                   <div className="lg:flex-1 flex flex-col justify-between">
                     <div>
                       <div className="flex items-start justify-between mb-2">
-                        <h3 className="text-xl font-semibold text-slate-800">
+                        <h3 className="text-xl font-semibold text-gray-800">
                           {analysis.metric || analysis.chart_type || "Analyse"}
                         </h3>
                         {getStatusBadge(analysis.status)}
                       </div>
-                      <p className="text-sm text-slate-500">
+                      <p className="text-sm text-gray-500">
                         Created on {new Date(analysis.created_at).toLocaleString("en-US")}
                       </p>
                       {analysis.result?.stats && (
                         <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4">
                           {Object.entries(analysis.result.stats).slice(0, 4).map(([key, value]) => (
-                            <div key={key} className="bg-slate-50 rounded-lg p-3">
-                              <p className="text-xs text-slate-500 uppercase">{key}</p>
-                              <p className="text-lg font-semibold text-slate-800">
+                            <div key={key} className="bg-gray-50 rounded-lg p-3">
+                              <p className="text-xs text-gray-500 uppercase">{key}</p>
+                              <p className="text-lg font-semibold text-gray-800">
                                 {typeof value === "number" ? value.toFixed(2) : value}
                               </p>
                             </div>
@@ -513,7 +513,7 @@ const AnalysisResultsPage = () => {
                         <>
                           <button
                             onClick={() => openFullscreen(analysis, index)}
-                            className="flex items-center gap-2 px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                            className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
                           >
                             <Maximize2 className="w-4 h-4" />
                             Fullscreen
@@ -521,7 +521,7 @@ const AnalysisResultsPage = () => {
                           <button
                             onClick={() => handleDownload(analysis)}
                             disabled={downloadingId === analysis.id}
-                            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                           >
                             {downloadingId === analysis.id ? (
                               <Loader2 className="w-4 h-4 animate-spin" />
@@ -566,21 +566,21 @@ const AnalysisResultsPage = () => {
           </button>
 
           <div className="w-full max-w-6xl mx-8">
-            <div className="bg-white rounded-2xl overflow-hidden">
-              <div className="p-6 border-b border-slate-200">
+            <div className="bg-white rounded-xl overflow-hidden">
+              <div className="p-6 border-b border-gray-200">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h2 className="text-xl font-semibold text-slate-800">
+                    <h2 className="text-xl font-semibold text-gray-800">
                       {fullscreenChart.metric || fullscreenChart.chart_type || "Analyse"}
                     </h2>
-                    <p className="text-sm text-slate-500 mt-1">
+                    <p className="text-sm text-gray-500 mt-1">
                       {currentIndex + 1} / {filteredAnalyses.length}
                     </p>
                   </div>
                   <button
                     onClick={() => handleDownload(fullscreenChart)}
                     disabled={downloadingId === fullscreenChart.id}
-                    className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                   >
                     {downloadingId === fullscreenChart.id ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
@@ -591,7 +591,7 @@ const AnalysisResultsPage = () => {
                   </button>
                 </div>
               </div>
-              <div className="p-8 bg-slate-50">
+              <div className="p-8 bg-gray-50">
                 <div className="h-[60vh]">
                   {fullscreenChart.result?.chart_data ? (
                     <DynamicChart
@@ -601,7 +601,7 @@ const AnalysisResultsPage = () => {
                       showControls={true}
                     />
                   ) : (
-                    <div className="flex items-center justify-center h-full text-slate-500">
+                    <div className="flex items-center justify-center h-full text-gray-500">
                       No data available
                     </div>
                   )}

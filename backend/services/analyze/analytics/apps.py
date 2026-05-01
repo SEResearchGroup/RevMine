@@ -10,6 +10,6 @@ class AnalyticsConfig(AppConfig):
         if any(cmd in sys.argv for cmd in ['migrate', 'makemigrations', 'collectstatic', 'shell', 'test']):
             return
 
-        from .kafka_handlers import start_kafka_consumers
+        from analytics.infrastructure.messaging.kafka_handlers import start_kafka_consumers
         start_kafka_consumers()
 

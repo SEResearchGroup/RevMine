@@ -1,7 +1,7 @@
 class Topics:
     # Configuration service
-    TOKENS_REQUEST  = "config.tokens.request"   # demande de token
-    TOKENS_RESPONSE = "config.tokens.response"  # réponse avec token
+    TOKENS_REQUEST  = "config.tokens.request"   # get tokens request
+    TOKENS_RESPONSE = "config.tokens.response"  # response with token
 
     # Collection service
     COLLECTION_STARTED   = "collection.events.started"

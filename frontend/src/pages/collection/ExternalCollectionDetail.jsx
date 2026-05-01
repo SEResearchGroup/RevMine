@@ -201,7 +201,7 @@ function ExternalCollectionDetail() {
         {/* Collection Information */}
         <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
           <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 bg-violet-100 rounded-lg flex items-center justify-center text-violet-600">
+            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center text-blue-600">
               <Upload className="w-5 h-5" />
             </div>
             <div>
@@ -209,7 +209,7 @@ function ExternalCollectionDetail() {
                 {collection.repository_name}
               </h1>
               <div className="flex items-center gap-2 text-sm text-gray-500">
-                <span className="px-2 py-0.5 bg-violet-100 text-violet-700 text-xs font-medium rounded-full">
+                <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded-full">
                   External Upload
                 </span>
               </div>
@@ -355,7 +355,7 @@ function ExternalCollectionDetail() {
                           )}
                           <button
                             onClick={() => handleViewCleanedData(cleaning.id)}
-                            className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                             title="View details"
                           >
                             <Eye className="w-4 h-4" />
