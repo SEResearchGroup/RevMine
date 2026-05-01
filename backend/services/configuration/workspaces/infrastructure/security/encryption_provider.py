@@ -27,5 +27,23 @@ class FernetEncryptionProvider:
         return self.cipher.decrypt(encrypted).decode()
 
 
+class _LazyEncryptionProvider:
+    """Lazy wrapper: the real provider is created on first use, not at import."""
+
+    def __init__(self):
+        self._provider = None
+
+    def _get(self):
+        if self._provider is None:
+            self._provider = FernetEncryptionProvider()
+        return self._provider
+
+    def encrypt(self, plaintext: str) -> str:
+        return self._get().encrypt(plaintext)
+
+    def decrypt(self, ciphertext: str) -> str:
+        return self._get().decrypt(ciphertext)
+
+
 # Module-level singleton — avoids re-initialising the cipher on every call.
-token_encryption = FernetEncryptionProvider()
+token_encryption = _LazyEncryptionProvider()

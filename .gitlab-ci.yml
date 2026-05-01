@@ -77,7 +77,7 @@ test:all:
         'CELERY_BROKER_URL=memory://' \
         'CELERY_RESULT_BACKEND=cache+memory://' \
         'KAFKA_BOOTSTRAP_SERVERS=localhost:9092' \
-        'ENCRYPTION_KEY=dGVzdC1lbmNyeXB0aW9uLWtleS0zMi1ieXRlcy10ZXN0' \
+        'ENCRYPTION_KEY=nk1hNYEsLfbfxri5VX7PG6p_le60MEDyom1TXLlcWpY=' \
         'MINIO_ENDPOINT=localhost:9000' \
         'MINIO_ACCESS_KEY=minioadmin' \
         'MINIO_SECRET_KEY=minioadmin' \
