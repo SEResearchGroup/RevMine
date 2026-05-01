@@ -45,6 +45,87 @@ services:
       retries: 10
     restart: unless-stopped
 
+  # ── Test PostgreSQL (utilisé uniquement par test-runner) ─────────────────
+  test-postgres:
+    image: postgres:15
+    container_name: test-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: "no"
+
+  # ── Test Runner ───────────────────────────────────────────────────────────
+  # Exécute pytest pour chaque service DANS Docker (chemins /usr/src/...) afin
+  # que les coverage.xml générés contiennent des chemins absolus compatibles
+  # avec ce que SonarQube voit (le projet est monté dans /usr/src).
+  test-runner:
+    image: python:3.11-slim
+    container_name: test-runner
+    working_dir: /usr/src
+    volumes:
+      - ./:/usr/src
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      CI: "true"
+      # Surcharge des hôtes et noms de bases de données pour pointer
+      # vers le postgres de test local au lieu des services de production.
+      DATABASE_USER: postgres
+      DATABASE_PASSWORD: postgres
+      APIGATEWAY_DATABASE_HOST: test-postgres
+      APIGATEWAY_DATABASE_NAME: gateway_db
+      APIGATEWAY_DATABASE_PORT: "5432"
+      COLLECTION_DATABASE_HOST: test-postgres
+      COLLECTION_DATABASE_NAME: collection_db
+      COLLECTION_DATABASE_PORT: "5432"
+      ANALYZE_DATABASE_HOST: test-postgres
+      ANALYZE_DATABASE_NAME: analyze_db
+      ANALYZE_DATABASE_PORT: "5432"
+      CONFIGURATION_DATABASE_HOST: test-postgres
+      CONFIGURATION_DATABASE_NAME: configuration_db
+      CONFIGURATION_DATABASE_PORT: "5432"
+    command:
+      - /bin/sh
+      - -c
+      - |
+        set -e
+        pip install --quiet --upgrade pip
+
+        echo '=== [1/4] API Gateway ==='
+        pip install --quiet -r /usr/src/backend/api-gateway/requirements.txt
+        (cd /usr/src/backend/api-gateway && python -m pytest) || true
+
+        # kafka-python (api-gateway) et kafka-python-ng (autres services)
+        # partagent le même namespace — supprimer kafka-python avant la suite.
+        if pip show kafka-python >/dev/null 2>&1 && pip show kafka-python-ng >/dev/null 2>&1; then
+          pip uninstall -y kafka-python >/dev/null 2>&1 || true
+          pip install --quiet --force-reinstall kafka-python-ng >/dev/null 2>&1 || true
+        fi
+
+        echo '=== [2/4] Analyze Service ==='
+        pip install --quiet -r /usr/src/backend/services/analyze/requirements.txt
+        (cd /usr/src/backend/services/analyze && python -m pytest) || true
+
+        echo '=== [3/4] Configuration Service ==='
+        pip install --quiet -r /usr/src/backend/services/configuration/requirements.txt
+        (cd /usr/src/backend/services/configuration && python -m pytest) || true
+
+        echo '=== [4/4] Collection Service ==='
+        pip install --quiet -r /usr/src/backend/services/collection/requirements.txt
+        (cd /usr/src/backend/services/collection && python -m pytest) || true
+
+        echo '=== Coverage générée avec succes — chemins /usr/src/... ==='
+    depends_on:
+      test-postgres:
+        condition: service_healthy
+    restart: "no"
+
   # ── SonarScanner ─────────────────────────────────────────────────────────
   # Lancement à la demande uniquement (ne démarre pas avec `up`).
   # Usage depuis la racine du projet :
@@ -60,6 +141,8 @@ services:
     depends_on:
       sonarqube:
         condition: service_healthy
+      test-runner:
+        condition: service_completed_successfully
     restart: "no"
 
 volumes:
