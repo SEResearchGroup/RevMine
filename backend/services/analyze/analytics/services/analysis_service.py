@@ -11,6 +11,7 @@ No computation logic here — delegate everything to the domain layer.
 from __future__ import annotations
 
 import logging
+import time
 
 import pandas as pd
 from django.utils import timezone
@@ -58,12 +59,41 @@ class AnalysisService:
         Updates ``analysis.status`` to 'completed' or 'failed'.
         Raises on unexpected errors (caller may choose to swallow them).
         """
+        _start = time.monotonic()
+        dataset_id = str(getattr(analysis, "dataset_id", ""))
+        metric_code = getattr(analysis, "metric_code", "unknown")
+
         try:
             analysis.status = "processing"
             analysis.save()
 
+            logger.info(
+                "Analysis pipeline started",
+                extra={
+                    "analysis_id": str(analysis.id),
+                    "metric": metric_code,
+                    "dataset_id": dataset_id,
+                    "status": "processing",
+                    "event": "analysis_started",
+                },
+            )
+
+            _load_start = time.monotonic()
             df = DatasetService().load_dataframe(analysis.dataset)
             df = self._parse_dates(df)
+            _load_duration = round(time.monotonic() - _load_start, 3)
+
+            logger.info(
+                "Dataset loaded for analysis",
+                extra={
+                    "analysis_id": str(analysis.id),
+                    "dataset_id": dataset_id,
+                    "rows": len(df),
+                    "columns": list(df.columns),
+                    "load_duration": _load_duration,
+                    "event": "analysis_dataset_loaded",
+                },
+            )
 
             function_name = self._get_function_name(analysis.metric_code)
             analysis_fn = self._engine.function_mapping.get(function_name)
@@ -73,8 +103,10 @@ class AnalysisService:
                     f"Analysis function for metric '{analysis.metric_code}' not found"
                 )
 
+            _compute_start = time.monotonic()
             result_data = analysis_fn(df, analysis)
             result_data = self._engine._sanitize_value(result_data)
+            _compute_duration = round(time.monotonic() - _compute_start, 3)
 
             AnalysisResult.objects.create(
                 analysis=analysis,
@@ -87,10 +119,40 @@ class AnalysisService:
             analysis.completed_at = timezone.now()
             analysis.save()
 
+            _total_duration = round(time.monotonic() - _start, 3)
+            logger.info(
+                "Analysis pipeline completed",
+                extra={
+                    "analysis_id": str(analysis.id),
+                    "metric": metric_code,
+                    "dataset_id": dataset_id,
+                    "rows": len(df),
+                    "duration": _total_duration,
+                    "load_duration": _load_duration,
+                    "compute_duration": _compute_duration,
+                    "status": "success",
+                    "event": "analysis_completed",
+                },
+            )
+
         except Exception as exc:
+            _total_duration = round(time.monotonic() - _start, 3)
             analysis.status = "failed"
             analysis.error_message = str(exc)
             analysis.save()
+            logger.error(
+                "Analysis pipeline failed",
+                extra={
+                    "analysis_id": str(analysis.id),
+                    "metric": metric_code,
+                    "dataset_id": dataset_id,
+                    "status": "failed",
+                    "error": str(exc),
+                    "duration": _total_duration,
+                    "event": "analysis_failed",
+                },
+                exc_info=True,
+            )
 
     def _sanitize_value(self, value):
         """Proxy to MetricsEngine._sanitize_value for backward compatibility."""

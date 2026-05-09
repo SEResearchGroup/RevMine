@@ -2,7 +2,7 @@ package handler
 
 import (
 	"database/sql"
-	"log"
+	"log/slog"
 	"strconv"
 
 	dbpkg "notification-service/internal/db"
@@ -48,13 +48,29 @@ func (h *Handler) WebSocket() fiber.Handler {
 		userIDStr := c.Query("user_id")
 		userID, err := strconv.Atoi(userIDStr)
 		if err != nil || userID == 0 {
-			log.Printf("[WS] Invalid user_id: %s", userIDStr)
+			slog.Warn("WebSocket rejected: invalid user_id",
+				"service", "notification",
+				"user_id_raw", userIDStr,
+				"event", "ws_rejected",
+			)
 			c.Close()
 			return
 		}
 
+		slog.Info("WebSocket client connected",
+			"service", "notification",
+			"user_id", userID,
+			"event", "ws_connected",
+		)
 		h.hub.Register(userID, c)
-		defer h.hub.Unregister(userID, c)
+		defer func() {
+			h.hub.Unregister(userID, c)
+			slog.Info("WebSocket client disconnected",
+				"service", "notification",
+				"user_id", userID,
+				"event", "ws_disconnected",
+			)
+		}()
 
 		// Read loop to keep the connection alive and detect disconnects
 		for {

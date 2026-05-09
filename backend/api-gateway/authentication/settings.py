@@ -45,15 +45,15 @@ LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
     "formatters": {
-        "verbose": {
-            "format": "{levelname} {asctime} {name} {message}",
-            "style": "{",
+        "json": {
+            "()": "authentication.logging_utils.JSONFormatter",
+            "service": "api-gateway",
         },
     },
     "handlers": {
         "console": {
-            "class": "logging.StreamHandler", 
-            "formatter": "verbose",
+            "class": "logging.StreamHandler",
+            "formatter": "json",
         },
     },
     "root": {
@@ -62,6 +62,16 @@ LOGGING = {
     },
     "loggers": {
         "django": {
+            "handlers": ["console"],
+            "level": "WARNING",
+            "propagate": False,
+        },
+        "django.request": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "users": {
             "handlers": ["console"],
             "level": "INFO",
             "propagate": False,

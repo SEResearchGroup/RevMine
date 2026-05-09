@@ -611,8 +611,8 @@ def _compute_metric_rows(dataset, codes):
     return a flat list of {metric_code, metric_name, statistic, value}.
     Errors per metric are captured as a single row with statistic="error".
     """
-    from .analysis_service import AnalysisService
-    from .models import Analysis, MetricDefinition
+    from analytics.services.analysis_service import AnalysisService
+    from analytics.models import Analysis, MetricDefinition
 
     service = DatasetService()
     df = service.load_dataframe(dataset)

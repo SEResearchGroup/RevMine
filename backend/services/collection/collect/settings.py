@@ -147,28 +147,28 @@ FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024             # 10 MB – beyond th
 FILE_UPLOAD_HANDLERS = [
     'django.core.files.uploadhandler.TemporaryFileUploadHandler',
 ]
-# Logging Configuration 
+# Logging Configuration
 _LOG_HANDLERS = ["console"] if _CI_MODE else ["console", "file"]
 
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
     "formatters": {
-        "verbose": {
-            "format": "[{levelname}] {asctime} {name} {message}",
-            "style": "{",
+        "json": {
+            "()": "collectors.logging_utils.JSONFormatter",
+            "service": "collection",
         },
     },
     "handlers": {
         "console": {
             "class": "logging.StreamHandler",
-            "formatter": "verbose",
+            "formatter": "json",
         },
         **({} if _CI_MODE else {
             "file": {
                 "class": "logging.FileHandler",
                 "filename": os.getenv("COLLECTION_LOG_FILE", str(BASE_DIR / "collection.log")),
-                "formatter": "verbose",
+                "formatter": "json",
             },
         }),
     },
@@ -179,7 +179,12 @@ LOGGING = {
     "loggers": {
         "django": {
             "handlers": _LOG_HANDLERS,
-            "level": os.getenv("DJANGO_LOG_LEVEL", "INFO"),
+            "level": os.getenv("DJANGO_LOG_LEVEL", "WARNING"),
+            "propagate": False,
+        },
+        "django.request": {
+            "handlers": _LOG_HANDLERS,
+            "level": "INFO",
             "propagate": False,
         },
         "collectors": {

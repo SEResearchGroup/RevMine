@@ -5,7 +5,8 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
+	"time"
 
 	"notification-service/internal/db"
 	"notification-service/internal/model"
@@ -62,7 +63,12 @@ func (c *Consumer) Start() {
 			return
 		default:
 			if err := c.group.Consume(context.Background(), subscribedTopics, handler); err != nil {
-				log.Printf("[Kafka] Consumer error: %v", err)
+				slog.Error("Kafka consumer error",
+					"service", "notification",
+					"error", err.Error(),
+					"event", "kafka_consumer_error",
+					"status", "error",
+				)
 			}
 		}
 	}
@@ -80,18 +86,31 @@ type consumerGroupHandler struct {
 }
 
 func (h *consumerGroupHandler) Setup(_ sarama.ConsumerGroupSession) error {
-	log.Println("[Kafka] Consumer group session setup")
+	slog.Info("Kafka consumer group session setup",
+		"service", "notification",
+		"event", "kafka_session_setup",
+	)
 	return nil
 }
 
 func (h *consumerGroupHandler) Cleanup(_ sarama.ConsumerGroupSession) error {
-	log.Println("[Kafka] Consumer group session cleanup")
+	slog.Info("Kafka consumer group session cleanup",
+		"service", "notification",
+		"event", "kafka_session_cleanup",
+	)
 	return nil
 }
 
 func (h *consumerGroupHandler) ConsumeClaim(session sarama.ConsumerGroupSession, claim sarama.ConsumerGroupClaim) error {
 	for msg := range claim.Messages() {
-		log.Printf("[Kafka] Received message from topic %s: %s", msg.Topic, string(msg.Value))
+		_start := time.Now()
+		slog.Info("Kafka message received",
+			"service", "notification",
+			"topic", msg.Topic,
+			"partition", msg.Partition,
+			"offset", msg.Offset,
+			"event", "kafka_message_received",
+		)
 
 		notification := h.transformEvent(msg.Topic, msg.Value)
 		if notification == nil {
@@ -101,7 +120,14 @@ func (h *consumerGroupHandler) ConsumeClaim(session sarama.ConsumerGroupSession,
 
 		// Persist to database
 		if err := db.InsertNotification(h.database, notification); err != nil {
-			log.Printf("[Kafka] Failed to insert notification: %v", err)
+			slog.Error("Failed to insert notification",
+				"service", "notification",
+				"topic", msg.Topic,
+				"user_id", notification.UserID,
+				"error", err.Error(),
+				"event", "notification_insert_failed",
+				"status", "error",
+			)
 			session.MarkMessage(msg, "")
 			continue
 		}
@@ -111,6 +137,17 @@ func (h *consumerGroupHandler) ConsumeClaim(session sarama.ConsumerGroupSession,
 		if err == nil {
 			h.hub.SendToUser(notification.UserID, payload)
 		}
+
+		_duration := time.Since(_start).Seconds()
+		slog.Info("Notification processed and dispatched",
+			"service", "notification",
+			"topic", msg.Topic,
+			"user_id", notification.UserID,
+			"notification_type", notification.Type,
+			"duration", _duration,
+			"status", "success",
+			"event", "notification_dispatched",
+		)
 
 		session.MarkMessage(msg, "")
 	}
@@ -135,12 +172,22 @@ type kafkaEvent struct {
 func (h *consumerGroupHandler) transformEvent(topic string, value []byte) *model.Notification {
 	var event kafkaEvent
 	if err := json.Unmarshal(value, &event); err != nil {
-		log.Printf("[Kafka] Failed to parse event: %v", err)
+		slog.Error("Failed to parse Kafka event",
+			"service", "notification",
+			"topic", topic,
+			"error", err.Error(),
+			"event", "kafka_parse_failed",
+			"status", "error",
+		)
 		return nil
 	}
 
 	if event.UserID == 0 {
-		log.Printf("[Kafka] Skipping event with no user_id on topic %s", topic)
+		slog.Warn("Skipping Kafka event with no user_id",
+			"service", "notification",
+			"topic", topic,
+			"event", "kafka_event_skipped_no_user",
+		)
 		return nil
 	}
 
@@ -181,6 +228,14 @@ func (h *consumerGroupHandler) transformEvent(topic string, value []byte) *model
 			n.LinkURL = fmt.Sprintf("workspaces/%d/repositories/%d/collect", event.WorkspaceID, event.RepositoryID)
 		}
 		extraData["error"] = event.Error
+		slog.Warn("Collection failed event received",
+			"service", "notification",
+			"collection_id", event.CollectionID,
+			"repository_id", event.RepositoryID,
+			"error", event.Error,
+			"event", "collection_failed_event",
+			"status", "failed",
+		)
 
 	case "analysis.events.requested":
 		n.Type = "analysis_requested"
@@ -195,7 +250,10 @@ func (h *consumerGroupHandler) transformEvent(topic string, value []byte) *model
 	case "notification.events":
 		// Generic notification — services can send arbitrary notifications
 		if event.Type == "" || event.Message == "" {
-			log.Printf("[Kafka] notification.events missing type or message")
+			slog.Warn("notification.events missing type or message",
+				"service", "notification",
+				"event", "notification_event_incomplete",
+			)
 			return nil
 		}
 		n.Type = event.Type
@@ -204,7 +262,11 @@ func (h *consumerGroupHandler) transformEvent(topic string, value []byte) *model
 		n.LinkURL = event.LinkURL // Pass through optional link
 
 	default:
-		log.Printf("[Kafka] Unknown topic: %s", topic)
+		slog.Warn("Unknown Kafka topic",
+			"service", "notification",
+			"topic", topic,
+			"event", "kafka_unknown_topic",
+		)
 		return nil
 	}
 

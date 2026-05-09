@@ -1,4 +1,10 @@
-from fastapi import Depends, FastAPI, HTTPException
+import json
+import logging
+import time
+import traceback
+from datetime import datetime, timezone as dt_timezone
+
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from ollama._types import ResponseError
 
@@ -7,10 +13,76 @@ from schemas import ParseRequest, ParseResponse
 from services.ollama_service import OllamaParserService
 from services.openrouter_service import OpenRouterParserService
 
+
+# ---------------------------------------------------------------------------
+# Structured JSON logging setup
+# ---------------------------------------------------------------------------
+
+class _JSONFormatter(logging.Formatter):
+    _RESERVED = frozenset({
+        "name", "msg", "args", "levelname", "levelno", "pathname",
+        "filename", "module", "exc_info", "exc_text", "stack_info",
+        "lineno", "funcName", "created", "msecs", "relativeCreated",
+        "thread", "threadName", "processName", "process", "taskName",
+        "message", "asctime",
+    })
+
+    def format(self, record: logging.LogRecord) -> str:
+        obj = {
+            "timestamp": datetime.fromtimestamp(record.created, tz=dt_timezone.utc).isoformat(),
+            "level": record.levelname,
+            "service": "llm",
+            "logger": record.name,
+            "message": record.getMessage(),
+        }
+        for k, v in record.__dict__.items():
+            if k not in self._RESERVED:
+                obj[k] = v
+        if record.exc_info:
+            obj["exception"] = {
+                "type": record.exc_info[0].__name__ if record.exc_info[0] else None,
+                "message": str(record.exc_info[1]) if record.exc_info[1] else None,
+                "traceback": traceback.format_exception(*record.exc_info),
+            }
+        return json.dumps(obj, default=str, ensure_ascii=False)
+
+
+_handler = logging.StreamHandler()
+_handler.setFormatter(_JSONFormatter())
+logging.basicConfig(handlers=[_handler], level=logging.INFO, force=True)
+# Silence noisy uvicorn access logs (replaced by our middleware below)
+logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
+
+logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# App
+# ---------------------------------------------------------------------------
+
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
 )
+
+
+@app.middleware("http")
+async def _request_logging_middleware(request: Request, call_next):
+    """Log every HTTP request with method, path, status code and duration."""
+    _start = time.monotonic()
+    response = await call_next(request)
+    duration = round(time.monotonic() - _start, 3)
+    logger.info(
+        "HTTP request handled",
+        extra={
+            "method": request.method,
+            "path": request.url.path,
+            "status_code": response.status_code,
+            "duration": duration,
+            "event": "http_request",
+        },
+    )
+    return response
 
 
 def get_parser_service() -> OllamaParserService:

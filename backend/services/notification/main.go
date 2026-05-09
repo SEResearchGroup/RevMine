@@ -2,9 +2,11 @@ package main
 
 import (
 	"log"
+	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"notification-service/internal/config"
 	"notification-service/internal/db"
@@ -14,11 +16,33 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
-	"github.com/gofiber/fiber/v2/middleware/logger"
 )
 
 func main() {
+	// Structured JSON logging via slog
+	jsonLogger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+		Level: slog.LevelInfo,
+		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
+			// Rename "time" → "timestamp" for consistency with other services
+			if a.Key == slog.TimeKey {
+				a.Key = "timestamp"
+			}
+			// Rename "msg" → "message" for Loki JSON parsing
+			if a.Key == slog.MessageKey {
+				a.Key = "message"
+			}
+			return a
+		},
+	}))
+	slog.SetDefault(jsonLogger)
+
 	cfg := config.Load()
+
+	slog.Info("Notification service starting",
+		"service", "notification",
+		"port", cfg.Port,
+		"event", "service_startup",
+	)
 
 	// Initialize database
 	database, err := db.Connect(cfg.DatabaseURL)
@@ -26,14 +50,17 @@ func main() {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 	defer database.Close()
+	slog.Info("Database connected", "service", "notification", "event", "db_connected")
 
 	if err := db.Migrate(database); err != nil {
 		log.Fatalf("Failed to run migrations: %v", err)
 	}
+	slog.Info("Database migrations applied", "service", "notification", "event", "db_migrated")
 
 	// Initialize WebSocket hub
 	hub := ws.NewHub()
 	go hub.Run()
+	slog.Info("WebSocket hub started", "service", "notification", "event", "ws_hub_started")
 
 	// Initialize Kafka consumer
 	consumer, err := kafka.NewConsumer(cfg.KafkaBrokers, cfg.KafkaGroupID, database, hub)
@@ -41,13 +68,34 @@ func main() {
 		log.Fatalf("Failed to create Kafka consumer: %v", err)
 	}
 	go consumer.Start()
+	slog.Info("Kafka consumer started",
+		"service", "notification",
+		"brokers", cfg.KafkaBrokers,
+		"group_id", cfg.KafkaGroupID,
+		"event", "kafka_consumer_started",
+	)
 
-	// Initialize Fiber app
+	// Initialize Fiber app (no built-in logger — replaced by slog middleware)
 	app := fiber.New(fiber.Config{
 		DisableStartupMessage: false,
 	})
 
-	app.Use(logger.New())
+	// Request logging middleware
+	app.Use(func(c *fiber.Ctx) error {
+		start := time.Now()
+		err := c.Next()
+		duration := time.Since(start).Seconds()
+		slog.Info("HTTP request",
+			"service", "notification",
+			"method", c.Method(),
+			"path", c.Path(),
+			"status_code", c.Response().StatusCode(),
+			"duration", duration,
+			"event", "http_request",
+		)
+		return err
+	})
+
 	app.Use(cors.New(cors.Config{
 		AllowOrigins: "*",
 		AllowHeaders: "Origin, Content-Type, Accept, Authorization, X-User-ID",
@@ -74,7 +122,10 @@ func main() {
 
 	go func() {
 		<-quit
-		log.Println("Shutting down...")
+		slog.Info("Shutdown signal received, stopping service",
+			"service", "notification",
+			"event", "service_shutdown",
+		)
 		consumer.Stop()
 		app.Shutdown()
 	}()
@@ -83,7 +134,11 @@ func main() {
 	if port == "" {
 		port = "8005"
 	}
-	log.Printf("Notification service starting on :%s", port)
+	slog.Info("Notification service listening",
+		"service", "notification",
+		"port", port,
+		"event", "service_ready",
+	)
 	if err := app.Listen(":" + port); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}

@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import logging
 import threading
+import time
 import uuid
 from typing import Optional
 
@@ -44,7 +45,17 @@ def start_job(job: DevOpsCollectionJob, token: str) -> None:
         name=f"devops-job-{job.id}",
     )
     thread.start()
-    logger.info("Started background DevOps job %s (%s)", job.id, job.source_type)
+    logger.info(
+        "DevOps background job started",
+        extra={
+            "job_id": str(job.id),
+            "source_type": job.source_type,
+            "provider": job.provider,
+            "repository_id": str(job.repository_id) if job.repository_id else None,
+            "event": "devops_job_thread_started",
+            "status": "started",
+        },
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -54,15 +65,32 @@ def start_job(job: DevOpsCollectionJob, token: str) -> None:
 def _run_job(job_id: str, token: str) -> None:
     job = DevOpsCollectionJob.objects.filter(id=job_id).first()
     if job is None:
-        logger.warning("DevOps job %s vanished before worker started", job_id)
+        logger.warning(
+            "DevOps job vanished before worker started",
+            extra={"job_id": job_id, "event": "devops_job_not_found", "status": "error"},
+        )
         return
 
+    _start = time.monotonic()
     try:
         job.status = "in_progress"
         job.started_at = timezone.now()
         job.progress_percent = 5
         job.progress_message = "Connecting to provider…"
         job.save(update_fields=["status", "started_at", "progress_percent", "progress_message"])
+
+        logger.info(
+            "DevOps job worker running",
+            extra={
+                "job_id": job_id,
+                "source_type": job.source_type,
+                "provider": job.provider,
+                "workspace_id": str(job.workspace_id) if job.workspace_id else None,
+                "repository_id": str(job.repository_id) if job.repository_id else None,
+                "status": "in_progress",
+                "event": "devops_job_running",
+            },
+        )
 
         _publish_notification(job, "started")
 
@@ -79,6 +107,7 @@ def _run_job(job_id: str, token: str) -> None:
         _set_progress(job, 80, "Saving dataset…")
 
         payload = job.request_payload or {}
+        _save_start = time.monotonic()
         dataset = DatasetService().create_dataset_from_dataframe(
             df=df,
             filename=_filename_for_job(job, payload),
@@ -89,6 +118,7 @@ def _run_job(job_id: str, token: str) -> None:
             repository_id=job.repository_id,
             platform=job.provider,
         )
+        _save_duration = round(time.monotonic() - _save_start, 3)
 
         job.refresh_from_db()
         job.dataset = dataset
@@ -110,14 +140,38 @@ def _run_job(job_id: str, token: str) -> None:
             ]
         )
 
+        _total_duration = round(time.monotonic() - _start, 3)
         _publish_notification(job, "completed", dataset=dataset)
         logger.info(
-            "DevOps job %s completed: %d rows → dataset %s",
-            job.id, job.collected_items, dataset.id,
+            "DevOps job completed",
+            extra={
+                "job_id": job_id,
+                "source_type": job.source_type,
+                "provider": job.provider,
+                "repository": str(job.repository_id) if job.repository_id else None,
+                "dataset_id": str(dataset.id),
+                "rows": job.collected_items,
+                "duration": _total_duration,
+                "save_duration": _save_duration,
+                "status": "success",
+                "event": "devops_job_completed",
+            },
         )
 
     except Exception as exc:
-        logger.exception("DevOps job %s failed", job_id)
+        _total_duration = round(time.monotonic() - _start, 3)
+        logger.exception(
+            "DevOps job failed",
+            extra={
+                "job_id": job_id,
+                "source_type": job.source_type if job else None,
+                "provider": job.provider if job else None,
+                "status": "failed",
+                "error": str(exc),
+                "duration": _total_duration,
+                "event": "devops_job_failed",
+            },
+        )
         try:
             job.refresh_from_db()
             job.status = "failed"
