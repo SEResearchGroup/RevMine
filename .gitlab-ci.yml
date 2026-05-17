@@ -5,7 +5,15 @@
 #  Stages :
 #    1. test    → un job par service, déclenché par rules:changes
 #    2. quality → analyse SonarQube (quality gate bloquante)
-#    3. build   → images Docker du service modifié (main/master)
+#    3. build   → image Docker du service modifié
+#
+#  Exemples :
+#    - backend/services/collection/**      → test:collection + build:collection
+#    - backend/services/analyze/**         → test:analyze + build:analyze
+#    - backend/services/configuration/**   → test:configuration + build:configuration
+#    - backend/api-gateway/**              → test:api-gateway + build:api-gateway
+#    - backend/services/notification/**    → test:notification + build:notification
+#    - .gitlab-ci.yml ou scripts/ci/**     → tous les jobs de test/build impactés
 #
 #  Variables CI/CD requises (GitLab > Settings > CI/CD > Variables) :
 #    SONAR_TOKEN    — token SonarQube (ex: sqp_xxx)   [masquée]
@@ -75,10 +83,10 @@ test:api-gateway:
   variables:
     SERVICE_DIR: backend/api-gateway
   rules:
-    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"'
     - changes:
         - .gitlab-ci.yml
         - scripts/ci/**/*
+        - docker-compose*.yml
         - backend/api-gateway/**/*
         - backend/shared/**/*
 
@@ -88,10 +96,10 @@ test:authentication:
     SERVICE_DIR: backend/services/authentication
     USE_SQLITE_FOR_TESTS: "True"
   rules:
-    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"'
     - changes:
         - .gitlab-ci.yml
         - scripts/ci/**/*
+        - docker-compose*.yml
         - backend/services/authentication/**/*
         - backend/shared/**/*
         - infrastructure/keycloak/**/*
@@ -101,10 +109,10 @@ test:analyze:
   variables:
     SERVICE_DIR: backend/services/analyze
   rules:
-    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"'
     - changes:
         - .gitlab-ci.yml
         - scripts/ci/**/*
+        - docker-compose*.yml
         - backend/services/analyze/**/*
         - backend/shared/**/*
 
@@ -114,10 +122,10 @@ test:configuration:
     SERVICE_DIR: backend/services/configuration
     USE_SQLITE_FOR_TESTS: "True"
   rules:
-    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"'
     - changes:
         - .gitlab-ci.yml
         - scripts/ci/**/*
+        - docker-compose*.yml
         - backend/services/configuration/**/*
         - backend/shared/**/*
 
@@ -127,10 +135,10 @@ test:collection:
     SERVICE_DIR: backend/services/collection
     USE_SQLITE_FOR_TESTS: "True"
   rules:
-    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"'
     - changes:
         - .gitlab-ci.yml
         - scripts/ci/**/*
+        - docker-compose*.yml
         - backend/services/collection/**/*
         - backend/shared/**/*
 
@@ -139,12 +147,27 @@ test:llm:
   variables:
     SERVICE_DIR: backend/services/llm
   rules:
-    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"'
     - changes:
         - .gitlab-ci.yml
         - scripts/ci/**/*
+        - docker-compose*.yml
         - backend/services/llm/**/*
         - backend/shared/**/*
+
+test:notification:
+  stage: test
+  image: golang:1.22-alpine
+  variables:
+    GOCACHE: /tmp/go-cache
+    GOPATH: /tmp/go
+  script:
+    - cd backend/services/notification
+    - go test ./...
+  rules:
+    - changes:
+        - .gitlab-ci.yml
+        - docker-compose*.yml
+        - backend/services/notification/**/*
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  STAGE 2 — QUALITY (SonarQube — quality gate bloquante)
@@ -191,9 +214,9 @@ test:llm:
 build:api-gateway:
   <<: *build_docker
   rules:
-    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"'
-      changes:
+    - changes:
         - .gitlab-ci.yml
+        - docker-compose*.yml
         - backend/api-gateway/**/*
         - backend/shared/**/*
   script:
@@ -202,9 +225,9 @@ build:api-gateway:
 build:authentication:
   <<: *build_docker
   rules:
-    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"'
-      changes:
+    - changes:
         - .gitlab-ci.yml
+        - docker-compose*.yml
         - backend/services/authentication/**/*
         - backend/shared/**/*
         - infrastructure/keycloak/**/*
@@ -214,9 +237,9 @@ build:authentication:
 build:analyze:
   <<: *build_docker
   rules:
-    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"'
-      changes:
+    - changes:
         - .gitlab-ci.yml
+        - docker-compose*.yml
         - backend/services/analyze/**/*
         - backend/shared/**/*
   script:
@@ -225,9 +248,9 @@ build:analyze:
 build:configuration:
   <<: *build_docker
   rules:
-    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"'
-      changes:
+    - changes:
         - .gitlab-ci.yml
+        - docker-compose*.yml
         - backend/services/configuration/**/*
         - backend/shared/**/*
   script:
@@ -236,9 +259,9 @@ build:configuration:
 build:collection:
   <<: *build_docker
   rules:
-    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"'
-      changes:
+    - changes:
         - .gitlab-ci.yml
+        - docker-compose*.yml
         - backend/services/collection/**/*
         - backend/shared/**/*
   script:
@@ -247,9 +270,9 @@ build:collection:
 build:llm:
   <<: *build_docker
   rules:
-    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"'
-      changes:
+    - changes:
         - .gitlab-ci.yml
+        - docker-compose*.yml
         - backend/services/llm/**/*
         - backend/shared/**/*
   script:
@@ -258,9 +281,9 @@ build:llm:
 build:notification:
   <<: *build_docker
   rules:
-    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"'
-      changes:
+    - changes:
         - .gitlab-ci.yml
+        - docker-compose*.yml
         - backend/services/notification/**/*
   script:
     - docker build -t revmine/notification:$CI_COMMIT_SHORT_SHA backend/services/notification/
