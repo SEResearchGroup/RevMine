@@ -103,7 +103,7 @@ func (h *consumerGroupHandler) Cleanup(_ sarama.ConsumerGroupSession) error {
 
 func (h *consumerGroupHandler) ConsumeClaim(session sarama.ConsumerGroupSession, claim sarama.ConsumerGroupClaim) error {
 	for msg := range claim.Messages() {
-		_start := time.Now()
+		startedAt := time.Now()
 		slog.Info("Kafka message received",
 			"service", "notification",
 			"topic", msg.Topic,
@@ -138,13 +138,13 @@ func (h *consumerGroupHandler) ConsumeClaim(session sarama.ConsumerGroupSession,
 			h.hub.SendToUser(notification.UserID, payload)
 		}
 
-		_duration := time.Since(_start).Seconds()
+		duration := time.Since(startedAt).Seconds()
 		slog.Info("Notification processed and dispatched",
 			"service", "notification",
 			"topic", msg.Topic,
 			"user_id", notification.UserID,
 			"notification_type", notification.Type,
-			"duration", _duration,
+			"duration", duration,
 			"status", "success",
 			"event", "notification_dispatched",
 		)

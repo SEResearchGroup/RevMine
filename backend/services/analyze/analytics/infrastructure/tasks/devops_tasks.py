@@ -71,116 +71,144 @@ def _run_job(job_id: str, token: str) -> None:
         )
         return
 
-    _start = time.monotonic()
+    started_at = time.monotonic()
     try:
-        job.status = "in_progress"
-        job.started_at = timezone.now()
-        job.progress_percent = 5
-        job.progress_message = "Connecting to provider…"
-        job.save(update_fields=["status", "started_at", "progress_percent", "progress_message"])
-
-        logger.info(
-            "DevOps job worker running",
-            extra={
-                "job_id": job_id,
-                "source_type": job.source_type,
-                "provider": job.provider,
-                "workspace_id": str(job.workspace_id) if job.workspace_id else None,
-                "repository_id": str(job.repository_id) if job.repository_id else None,
-                "status": "in_progress",
-                "event": "devops_job_running",
-            },
-        )
-
+        _mark_job_running(job, job_id)
         _publish_notification(job, "started")
 
-        if job.source_type == "kanban":
-            df = _run_kanban(job, token)
-        elif job.source_type == "cicd":
-            df = _run_cicd(job, token)
-        else:
-            raise ValueError(f"Unsupported source_type: {job.source_type}")
-
+        df = _collect_for_job(job, token)
         if df is None or df.empty:
             raise RuntimeError("Provider returned no rows.")
 
         _set_progress(job, 80, "Saving dataset…")
-
-        payload = job.request_payload or {}
-        _save_start = time.monotonic()
-        dataset = DatasetService().create_dataset_from_dataframe(
-            df=df,
-            filename=_filename_for_job(job, payload),
-            source_type=job.source_type,
-            source_config=_source_config_for_job(job, payload),
-            collection_id=uuid.uuid4(),
-            workspace_id=job.workspace_id,
-            repository_id=job.repository_id,
-            platform=job.provider,
-        )
-        _save_duration = round(time.monotonic() - _save_start, 3)
-
-        job.refresh_from_db()
-        job.dataset = dataset
-        job.collected_items = int(getattr(dataset, "rows_count", 0) or 0)
-        job.total_items = job.collected_items
-        job.status = "completed"
-        job.progress_percent = 100
-        job.progress_message = "Collection complete."
-        job.completed_at = timezone.now()
-        job.save(
-            update_fields=[
-                "dataset",
-                "collected_items",
-                "total_items",
-                "status",
-                "progress_percent",
-                "progress_message",
-                "completed_at",
-            ]
-        )
-
-        _total_duration = round(time.monotonic() - _start, 3)
+        dataset, save_duration = _create_dataset(job, df)
+        _mark_job_completed(job, dataset)
         _publish_notification(job, "completed", dataset=dataset)
-        logger.info(
-            "DevOps job completed",
-            extra={
-                "job_id": job_id,
-                "source_type": job.source_type,
-                "provider": job.provider,
-                "repository": str(job.repository_id) if job.repository_id else None,
-                "dataset_id": str(dataset.id),
-                "rows": job.collected_items,
-                "duration": _total_duration,
-                "save_duration": _save_duration,
-                "status": "success",
-                "event": "devops_job_completed",
-            },
-        )
+        _log_job_completed(job, job_id, dataset, started_at, save_duration)
 
     except Exception as exc:
-        _total_duration = round(time.monotonic() - _start, 3)
-        logger.exception(
-            "DevOps job failed",
-            extra={
-                "job_id": job_id,
-                "source_type": job.source_type if job else None,
-                "provider": job.provider if job else None,
-                "status": "failed",
-                "error": str(exc),
-                "duration": _total_duration,
-                "event": "devops_job_failed",
-            },
-        )
-        try:
-            job.refresh_from_db()
-            job.status = "failed"
-            job.error_message = str(exc)
-            job.completed_at = timezone.now()
-            job.save(update_fields=["status", "error_message", "completed_at"])
-        except Exception:
-            pass
-        _publish_notification(job, "failed", error=str(exc))
+        _handle_job_failure(job, job_id, exc, started_at)
+
+
+def _mark_job_running(job: DevOpsCollectionJob, job_id: str) -> None:
+    job.status = "in_progress"
+    job.started_at = timezone.now()
+    job.progress_percent = 5
+    job.progress_message = "Connecting to provider…"
+    job.save(update_fields=["status", "started_at", "progress_percent", "progress_message"])
+
+    logger.info(
+        "DevOps job worker running",
+        extra={
+            "job_id": job_id,
+            "source_type": job.source_type,
+            "provider": job.provider,
+            "workspace_id": str(job.workspace_id) if job.workspace_id else None,
+            "repository_id": str(job.repository_id) if job.repository_id else None,
+            "status": "in_progress",
+            "event": "devops_job_running",
+        },
+    )
+
+
+def _collect_for_job(job: DevOpsCollectionJob, token: str):
+    if job.source_type == "kanban":
+        return _run_kanban(job, token)
+    if job.source_type == "cicd":
+        return _run_cicd(job, token)
+    raise ValueError(f"Unsupported source_type: {job.source_type}")
+
+
+def _create_dataset(job: DevOpsCollectionJob, df):
+    payload = job.request_payload or {}
+    save_started_at = time.monotonic()
+    dataset = DatasetService().create_dataset_from_dataframe(
+        df=df,
+        filename=_filename_for_job(job, payload),
+        source_type=job.source_type,
+        source_config=_source_config_for_job(job, payload),
+        collection_id=uuid.uuid4(),
+        workspace_id=job.workspace_id,
+        repository_id=job.repository_id,
+        platform=job.provider,
+    )
+    save_duration = round(time.monotonic() - save_started_at, 3)
+    return dataset, save_duration
+
+
+def _mark_job_completed(job: DevOpsCollectionJob, dataset) -> None:
+    job.refresh_from_db()
+    job.dataset = dataset
+    job.collected_items = int(getattr(dataset, "rows_count", 0) or 0)
+    job.total_items = job.collected_items
+    job.status = "completed"
+    job.progress_percent = 100
+    job.progress_message = "Collection complete."
+    job.completed_at = timezone.now()
+    job.save(
+        update_fields=[
+            "dataset",
+            "collected_items",
+            "total_items",
+            "status",
+            "progress_percent",
+            "progress_message",
+            "completed_at",
+        ]
+    )
+
+
+def _log_job_completed(
+    job: DevOpsCollectionJob,
+    job_id: str,
+    dataset,
+    started_at: float,
+    save_duration: float,
+) -> None:
+    logger.info(
+        "DevOps job completed",
+        extra={
+            "job_id": job_id,
+            "source_type": job.source_type,
+            "provider": job.provider,
+            "repository": str(job.repository_id) if job.repository_id else None,
+            "dataset_id": str(dataset.id),
+            "rows": job.collected_items,
+            "duration": round(time.monotonic() - started_at, 3),
+            "save_duration": save_duration,
+            "status": "success",
+            "event": "devops_job_completed",
+        },
+    )
+
+
+def _handle_job_failure(
+    job: DevOpsCollectionJob,
+    job_id: str,
+    exc: Exception,
+    started_at: float,
+) -> None:
+    logger.exception(
+        "DevOps job failed",
+        extra={
+            "job_id": job_id,
+            "source_type": job.source_type,
+            "provider": job.provider,
+            "status": "failed",
+            "error": str(exc),
+            "duration": round(time.monotonic() - started_at, 3),
+            "event": "devops_job_failed",
+        },
+    )
+    try:
+        job.refresh_from_db()
+        job.status = "failed"
+        job.error_message = str(exc)
+        job.completed_at = timezone.now()
+        job.save(update_fields=["status", "error_message", "completed_at"])
+    except Exception:
+        pass
+    _publish_notification(job, "failed", error=str(exc))
 
 
 # ---------------------------------------------------------------------------
