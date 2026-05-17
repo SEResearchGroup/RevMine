@@ -1,6 +1,6 @@
 from fastapi.testclient import TestClient
 
-from main import app, get_parser_service
+from main import app, get_openrouter_service, get_parser_service
 
 
 class SuccessParserService:
@@ -40,7 +40,7 @@ def test_parse_endpoint_success():
     app.dependency_overrides[get_parser_service] = lambda: SuccessParserService()
     with TestClient(app) as client:
         response = client.post(
-            "/parse",
+            "/ollama",
             json={
                 "user_message": "Collect merge requests and compute lead time",
                 "model": "deepseek-r1",
@@ -60,7 +60,7 @@ def test_parse_endpoint_invalid_model_json():
     app.dependency_overrides[get_parser_service] = lambda: BrokenParserService()
     with TestClient(app) as client:
         response = client.post(
-            "/parse",
+            "/ollama",
             json={
                 "user_message": "Collect merge requests",
                 "model": "deepseek-r1",
@@ -72,3 +72,45 @@ def test_parse_endpoint_invalid_model_json():
     assert response.status_code == 422
     body = response.json()
     assert body["detail"]["error"] == "invalid_model_json"
+
+
+def test_models_endpoint_lists_providers():
+    with TestClient(app) as client:
+        response = client.get("/models")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert "openrouter" in body
+    assert "ollama" in body
+
+
+def test_openrouter_endpoint_success():
+    app.dependency_overrides[get_openrouter_service] = lambda: SuccessParserService()
+    with TestClient(app) as client:
+        response = client.post(
+            "/openrouter",
+            json={"user_message": "Collect merge requests"},
+        )
+
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert response.json()["result"]["intent"] == "collect"
+
+
+def test_openrouter_endpoint_runtime_error_returns_502():
+    class RuntimeBrokenParser:
+        def parse_user_request(self, user_message: str, model: str | None = None):
+            raise RuntimeError("provider down")
+
+    app.dependency_overrides[get_openrouter_service] = lambda: RuntimeBrokenParser()
+    with TestClient(app) as client:
+        response = client.post(
+            "/openrouter",
+            json={"user_message": "Collect merge requests"},
+        )
+
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 502
+    assert response.json()["detail"] == "provider down"

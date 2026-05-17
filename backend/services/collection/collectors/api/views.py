@@ -8,8 +8,6 @@ from django.db import models as db_models
 from django.shortcuts import get_object_or_404
 from django.http import HttpResponse, FileResponse
 from django.views import View
-from django.views.decorators.csrf import csrf_exempt
-from django.utils.decorators import method_decorator
 
 from collectors.api.serializers import (
     StartCollectionSerializer,
@@ -77,7 +75,10 @@ class UserIdRequiredMixin:
         user_id = request.headers.get("X-User-ID")
         if not user_id:
             return None
-        return int(user_id)
+        try:
+            return int(user_id)
+        except (TypeError, ValueError):
+            return None
 
     def user_id_error_response(self):
         """Return 401 error response."""
@@ -773,7 +774,6 @@ class CleanedDataDetailView(UserIdRequiredMixin, APIView):
             )
 
 
-@method_decorator(csrf_exempt, name="dispatch")
 class DownloadCleanedDataCSVView(View):
     """Download CSV file from a cleaned data instance."""
 
@@ -866,79 +866,6 @@ class DownloadCleanedDataCSVView(View):
         return response
 
 
-class UserDatasetsView(APIView):
-    """
-    Get all datasets (collections and cleaned data) for a user
-    """
-
-    def get(self, request):
-        user_id = request.headers.get("X-User-ID")
-
-        if not user_id:
-            return Response(
-                {"error": "X-User-ID header is required"},
-                status=status.HTTP_401_UNAUTHORIZED,
-            )
-
-        try:
-            user_id = int(user_id)
-        except (ValueError, TypeError):
-            return Response(
-                {"error": "Invalid user_id format"}, status=status.HTTP_400_BAD_REQUEST
-            )
-
-        logger.info(f"Fetching datasets for user {user_id}")
-
-        collections_query = Collection.objects.filter(user=user_id)
-
-        collections = collections_query.select_related().prefetch_related(
-            "cleaned_data"
-        )
-
-        # Serialize data
-        collections_data = CollectionSerializer(collections, many=True).data
-
-        response_data = {
-            "user_id": user_id,
-            "total_collections": collections.count(),
-            "collections": collections_data,
-        }
-
-        cleaned_data_list = []
-        for collection in collections:
-            cleaned_items = collection.cleaned_data.all()
-            for cleaned in cleaned_items:
-                cleaned_data_list.append(
-                    {
-                        **CleanedDataSerializer(cleaned).data,
-                        "collection_id": collection.id,
-                        "repository_name": collection.repository_name,
-                        "repository_full_name": collection.repository_full_name,
-                        "platform": collection.platform,
-                        "repository_url": collection.repository_url,
-                        "repository_id": collection.repository_id,
-                        "workspace_id": collection.workspace_id,
-                    }
-                )
-
-        response_data["total_cleaned_datasets"] = len(cleaned_data_list)
-        response_data["cleaned_datasets"] = cleaned_data_list
-
-        # Global statistics
-        response_data["statistics"] = {
-            "total_items_collected": sum(c.collected_items for c in collections),
-            "active_collections": collections.filter(
-                status__in=Collection.ACTIVE_STATUSES
-            ).count(),
-            "completed_collections": collections.filter(status="completed").count(),
-            "failed_collections": collections.filter(status="failed").count(),
-        }
-
-        logger.info(f"Returning {collections.count()} collections for user {user_id}")
-
-        return Response(response_data, status=status.HTTP_200_OK)
-
-
 # =============================================================================
 # External Upload View
 # =============================================================================
@@ -987,7 +914,7 @@ class UploadExternalCollectionView(UserIdRequiredMixin, APIView):
         # ---- Stream the file directly to MinIO ----
         file_size = uploaded_file.size
 
-        from .minio_client import MinIOClient
+        from collectors.minio_client import MinIOClient
         minio_client = MinIOClient()
 
         # Create DB record first (need the id for the filename)
@@ -1030,7 +957,7 @@ class UploadExternalCollectionView(UserIdRequiredMixin, APIView):
         # Stream-extract cleaning metadata (authors, extensions, count) without
         # loading the full file into memory.
         try:
-            from .metadata_extractor import extract_cleaning_metadata
+            from collectors.metadata_extractor import extract_cleaning_metadata
             obj_stream = minio_client.get_object_stream(filename)
             if obj_stream:
                 try:
@@ -1145,6 +1072,4 @@ class UserDatasetsView(UserIdRequiredMixin, APIView):
 CollectionCleaningsListView = CollectionCleanedDataListView
 CreateCleaningView = CreateCleanedDataView
 CleaningDetailView = CleanedDataDetailView
-DownloadCleaningCSVView = DownloadCleanedDataCSVView
-
 DownloadCleaningCSVView = DownloadCleanedDataCSVView

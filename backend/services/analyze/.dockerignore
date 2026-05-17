@@ -1,0 +1,9 @@
+.env
+.coverage
+.pytest_cache/
+__pycache__/
+**/__pycache__/
+coverage.xml
+junit-report.xml
+**/tests/
+debug_test.py

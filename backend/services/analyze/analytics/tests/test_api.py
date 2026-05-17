@@ -5,7 +5,7 @@ Analytics API Test Script
 Run this script to test all analytics API endpoints.
 
 Usage:
-    python test_api.py [--base-url http://localhost:8003]
+    python test_api.py [--base-url https://api.example.test/api/analysis]
 
 Requirements:
     pip install requests
@@ -18,7 +18,7 @@ import os
 from pathlib import Path
 
 # Configuration
-BASE_URL = os.environ.get("API_BASE_URL", "http://localhost:8000/api/analysis")
+BASE_URL = os.environ.get("API_BASE_URL", "https://api.example.test/api/analysis")
 SAMPLE_DATA_PATH = Path(__file__).parent / "sample_data.csv"
 
 

@@ -1,6 +1,8 @@
 import requests
 import logging
 
+from .http_client import resolve_tls_verify
+
 logger = logging.getLogger(__name__)
 
 
@@ -17,6 +19,7 @@ class BranchFetcher:
         self.repo_full_name = repo_full_name
         self.base_url = base_url or self._get_base_url()
         self.headers = self._get_headers()
+        self.verify_tls = resolve_tls_verify("GITLAB_CA_BUNDLE", "REQUESTS_CA_BUNDLE")
 
     def _get_base_url(self) -> str:
         """Get API base URL based on platform"""
@@ -59,7 +62,10 @@ class BranchFetcher:
 
         try:
             response = requests.get(
-                endpoint, headers=self.headers, params={"per_page": 100}, timeout=30
+                endpoint,
+                headers=self.headers,
+                params={"per_page": 100},
+                timeout=30,
             )
 
             if response.status_code != 200:
@@ -95,7 +101,11 @@ class BranchFetcher:
 
         try:
             response = requests.get(
-                endpoint, headers=self.headers, params={"per_page": 100}, timeout=30
+                endpoint,
+                headers=self.headers,
+                params={"per_page": 100},
+                timeout=30,
+                verify=self.verify_tls,
             )
 
             if response.status_code != 200:
@@ -127,7 +137,12 @@ class BranchFetcher:
             encoded_path = self.repo_full_name.replace("/", "%2F")
             endpoint = f"{self.base_url}/projects/{encoded_path}"
 
-            response = requests.get(endpoint, headers=self.headers, timeout=10)
+            response = requests.get(
+                endpoint,
+                headers=self.headers,
+                timeout=10,
+                verify=self.verify_tls,
+            )
             if response.status_code == 200:
                 return str(response.json()["id"])
         except Exception as e:
@@ -200,7 +215,7 @@ class BranchFetcher:
                 headers=self.headers,
                 params={"state": "all", "order_by": "created_at", "sort": "desc", "per_page": 1},
                 timeout=30,
-                verify=False,
+                verify=self.verify_tls,
             )
             if response.status_code == 200:
                 data = response.json()
@@ -216,7 +231,7 @@ class BranchFetcher:
                 headers=self.headers,
                 params={"state": "all", "order_by": "created_at", "sort": "asc", "per_page": 1},
                 timeout=30,
-                verify=False,
+                verify=self.verify_tls,
             )
             if response.status_code == 200:
                 data = response.json()

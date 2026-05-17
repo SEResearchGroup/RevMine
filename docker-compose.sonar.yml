@@ -74,21 +74,36 @@ services:
         required: false
     environment:
       CI: "true"
+      SECRET_KEY: "sonar-test-secret-key"
+      DEBUG: "False"
+      ALLOWED_HOSTS: "localhost,127.0.0.1,testserver"
+      CORS_ALLOWED_ORIGINS: "http://localhost:5173"
+      FRONTEND_URL: "http://localhost:5173"
+      ENCRYPTION_KEY: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+      MINIO_ENDPOINT: "storage.example.invalid"
+      MINIO_ACCESS_KEY: "test-access-key"
+      MINIO_SECRET_KEY: "test-secret-key"
+      MINIO_BUCKET_NAME: "revmine-test"
+      CELERY_BROKER_URL: "memory://"
+      CELERY_RESULT_BACKEND: "cache+memory://"
+      OLLAMA_HOST: "http://ollama.test"
+      OPENROUTER_API_KEY: "sk-test"
+      USE_SQLITE_FOR_TESTS: "False"
       # Surcharge des hôtes et noms de bases de données pour pointer
       # vers le postgres de test local au lieu des services de production.
       DATABASE_USER: postgres
       DATABASE_PASSWORD: postgres
-      APIGATEWAY_DATABASE_HOST: test-postgres
-      APIGATEWAY_DATABASE_NAME: gateway_db
-      APIGATEWAY_DATABASE_PORT: "5432"
+      AUTH_DATABASE_HOST: test-postgres
+      AUTH_DATABASE_NAME: postgres
+      AUTH_DATABASE_PORT: "5432"
       COLLECTION_DATABASE_HOST: test-postgres
-      COLLECTION_DATABASE_NAME: collection_db
+      COLLECTION_DATABASE_NAME: postgres
       COLLECTION_DATABASE_PORT: "5432"
       ANALYZE_DATABASE_HOST: test-postgres
-      ANALYZE_DATABASE_NAME: analyze_db
+      ANALYZE_DATABASE_NAME: postgres
       ANALYZE_DATABASE_PORT: "5432"
       CONFIGURATION_DATABASE_HOST: test-postgres
-      CONFIGURATION_DATABASE_NAME: configuration_db
+      CONFIGURATION_DATABASE_NAME: postgres
       CONFIGURATION_DATABASE_PORT: "5432"
     command:
       - /bin/sh
@@ -97,28 +112,35 @@ services:
         set -e
         pip install --quiet --upgrade pip
 
-        echo '=== [1/4] API Gateway ==='
+        echo '=== [1/6] API Gateway ==='
+        export AUTH_SERVICE_URL=http://auth-service:8006/api/auth
+        export CONFIGURATION_SERVICE_URL=http://configuration-service:8001/api/workspaces
+        export COLLECTION_SERVICE_URL=http://collection-service:8002/api/collections
+        export ANALYZE_SERVICE_URL=http://analyze-service:8003/api/analysis
+        export LLM_SERVICE_URL=http://llm-service:8004
+        export NOTIFICATION_SERVICE_URL=http://notification-service:8005
         pip install --quiet -r /usr/src/backend/api-gateway/requirements.txt
-        (cd /usr/src/backend/api-gateway && python -m pytest) || true
+        (cd /usr/src/backend/api-gateway && python -m pytest)
 
-        # kafka-python (api-gateway) et kafka-python-ng (autres services)
-        # partagent le même namespace — supprimer kafka-python avant la suite.
-        if pip show kafka-python >/dev/null 2>&1 && pip show kafka-python-ng >/dev/null 2>&1; then
-          pip uninstall -y kafka-python >/dev/null 2>&1 || true
-          pip install --quiet --force-reinstall kafka-python-ng >/dev/null 2>&1 || true
-        fi
+        echo '=== [2/6] Authentication Service ==='
+        pip install --quiet -r /usr/src/backend/services/authentication/requirements.txt
+        (cd /usr/src/backend/services/authentication && python -m pytest)
 
-        echo '=== [2/4] Analyze Service ==='
+        echo '=== [3/6] Analyze Service ==='
         pip install --quiet -r /usr/src/backend/services/analyze/requirements.txt
-        (cd /usr/src/backend/services/analyze && python -m pytest) || true
+        (cd /usr/src/backend/services/analyze && python -m pytest)
 
-        echo '=== [3/4] Configuration Service ==='
+        echo '=== [4/6] Configuration Service ==='
         pip install --quiet -r /usr/src/backend/services/configuration/requirements.txt
-        (cd /usr/src/backend/services/configuration && python -m pytest) || true
+        (cd /usr/src/backend/services/configuration && python -m pytest)
 
-        echo '=== [4/4] Collection Service ==='
+        echo '=== [5/6] Collection Service ==='
         pip install --quiet -r /usr/src/backend/services/collection/requirements.txt
-        (cd /usr/src/backend/services/collection && python -m pytest) || true
+        (cd /usr/src/backend/services/collection && python -m pytest)
+
+        echo '=== [6/6] LLM Service ==='
+        pip install --quiet -r /usr/src/backend/services/llm/requirements.txt
+        (cd /usr/src/backend/services/llm && python -m pytest)
 
         echo '=== Coverage générée avec succes — chemins /usr/src/... ==='
     depends_on:
@@ -137,7 +159,7 @@ services:
       - ./:/usr/src
     environment:
       SONAR_HOST_URL: http://sonarqube:9000
-      SONAR_TOKEN: "${SONAR_TOKEN:?Erreur : SONAR_TOKEN manquant. Exemple: SONAR_TOKEN=sqp_xxx docker compose run --rm sonar-scanner}"
+      SONAR_TOKEN: "${SONAR_TOKEN}"
     depends_on:
       sonarqube:
         condition: service_healthy

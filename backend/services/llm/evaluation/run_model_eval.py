@@ -1,5 +1,6 @@
 import argparse
 import json
+import os
 import time
 from pathlib import Path
 
@@ -42,7 +43,7 @@ def main():
     parser.add_argument(
         "--base-url",
         type=str,
-        default="http://127.0.0.1:8004",
+        default=os.getenv("LLM_EVAL_BASE_URL"),
         help="Base URL of your FastAPI service",
     )
     parser.add_argument(
@@ -58,6 +59,8 @@ def main():
         help="Delay in seconds between requests",
     )
     args = parser.parse_args()
+    if not args.base_url:
+        raise ValueError("LLM_EVAL_BASE_URL or --base-url is required")
 
     input_path = Path(args.input_file)
     output_path = Path(args.output_file)
@@ -139,4 +142,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

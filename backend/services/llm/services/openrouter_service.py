@@ -22,6 +22,8 @@ class OpenRouterParserService:
         self, user_message: str, model: str | None = None
     ) -> Dict[str, Any]:
         selected_model = model or settings.OPENROUTER_DEFAULT_MODEL
+        if not self.api_key:
+            raise RuntimeError("OPENROUTER_API_KEY is required for OpenRouter inference")
         system_prompt = build_system_prompt()
         _start = time.monotonic()
 

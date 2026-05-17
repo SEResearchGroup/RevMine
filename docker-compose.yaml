@@ -84,7 +84,7 @@ services:
       - "3001:3000"
     environment:
       GF_SECURITY_ADMIN_USER: admin
-      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?GRAFANA_ADMIN_PASSWORD is required}
       GF_USERS_ALLOW_SIGN_UP: "false"
     volumes:
       - grafana_data:/var/lib/grafana
@@ -125,17 +125,17 @@ services:
     networks:
       - app-network
 
-  gateway-db:
+  auth-db:
     image: postgres:15
-    container_name: gateway-db
+    container_name: auth-db
     environment:
-      POSTGRES_DB: gateway_db
+      POSTGRES_DB: auth_db
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
     ports:
       - "5432:5432"
     volumes:
-      - gateway_postgres_data:/var/lib/postgresql/data
+      - auth_postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
       interval: 5s
@@ -238,6 +238,32 @@ services:
     restart: unless-stopped
     logging: *default-logging
 
+  auth-service:
+    build:
+      context: ./backend/services/authentication
+    container_name: auth-service
+    hostname: auth-service
+    ports:
+      - "8006:8006"
+    env_file:
+      - ./.env
+    environment:
+      AUTH_DATABASE_HOST: auth-db
+      AUTH_DATABASE_NAME: auth_db
+      DATABASE_USER: ${POSTGRES_USER:-postgres}
+      DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      AUTH_DATABASE_PORT: 5432
+    depends_on:
+      auth-db:
+        condition: service_healthy
+    volumes:
+      - ./backend/services/authentication:/app
+    networks:
+      - app-network
+    command: sh -c "python manage.py migrate --noinput && python manage.py runserver 0.0.0.0:8006"
+    restart: unless-stopped
+    logging: *default-logging
+
   api-gateway:
     build:
       context: ./backend/api-gateway
@@ -248,27 +274,24 @@ services:
     env_file:
       - ./.env
     environment:
-      APIGATEWAY_DATABASE_HOST: gateway-db
-      APIGATEWAY_DATABASE_NAME: gateway_db
-      DATABASE_USER: ${POSTGRES_USER:-postgres}
-      DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      APIGATEWAY_DATABASE_PORT: 5432
+      AUTH_SERVICE_URL: http://auth-service:8006/api/auth
       CONFIGURATION_SERVICE_URL: http://configuration-service:8001/api/workspaces
-      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      COLLECTION_SERVICE_URL: http://collection-service:8002/api/collections
+      ANALYZE_SERVICE_URL: http://analyze-service:8003/api/analysis
       LLM_SERVICE_URL: http://llm-service:8004
       NOTIFICATION_SERVICE_URL: http://notification-service:8005
+      RATE_LIMIT_REQUESTS: "120"
+      RATE_LIMIT_WINDOW_SECONDS: "60"
     depends_on:
-      gateway-db:
-        condition: service_healthy
-      kafka:
-        condition: service_healthy
+      auth-service:
+        condition: service_started
       llm-service:
         condition: service_started
     volumes:
       - ./backend/api-gateway:/app
     networks:
       - app-network
-    command: sh -c "sleep 5 && python manage.py migrate && python manage.py runserver 0.0.0.0:8000"
+    command: uvicorn main:app --host 0.0.0.0 --port 8000
     restart: unless-stopped
     logging: *default-logging
 
@@ -291,8 +314,6 @@ services:
     depends_on:
       configuration-db:
         condition: service_healthy
-      api-gateway:
-        condition: service_started
       kafka:
         condition: service_healthy
     volumes:
@@ -323,8 +344,6 @@ services:
     depends_on:
       collection-db:
         condition: service_healthy
-      api-gateway:
-        condition: service_started
       kafka:
         condition: service_healthy
       llm-service:
@@ -359,8 +378,6 @@ services:
     depends_on:
       analyze-db:
         condition: service_healthy
-      api-gateway:
-        condition: service_started
       kafka:
         condition: service_healthy
       llm-service:
@@ -450,7 +467,7 @@ services:
       - "8005:8005"
     environment:
       PORT: "8005"
-      DATABASE_URL: "postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@notification-db:5432/notification_db?sslmode=disable"
+      DATABASE_URL: ${NOTIFICATION_DATABASE_URL:?NOTIFICATION_DATABASE_URL is required}
       KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
       KAFKA_GROUP_ID: "notification-service"
     depends_on:
@@ -486,7 +503,7 @@ services:
 
 volumes:
   kafka_data:
-  gateway_postgres_data:
+  auth_postgres_data:
   configuration_postgres_data:
   collection_postgres_data:
   analyze_postgres_data:

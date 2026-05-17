@@ -12,7 +12,7 @@ type Config struct {
 func Load() *Config {
 	return &Config{
 		Port:         getEnv("PORT", "8005"),
-		DatabaseURL:  getEnv("DATABASE_URL", "postgres://postgres:postgres@notification-db:5432/notification_db?sslmode=disable"),
+		DatabaseURL:  requireEnv("DATABASE_URL"),
 		KafkaBrokers: []string{getEnv("KAFKA_BOOTSTRAP_SERVERS", "kafka:9092")},
 		KafkaGroupID: getEnv("KAFKA_GROUP_ID", "notification-service"),
 	}
@@ -23,4 +23,11 @@ func getEnv(key, fallback string) string {
 		return val
 	}
 	return fallback
+}
+
+func requireEnv(key string) string {
+	if val := os.Getenv(key); val != "" {
+		return val
+	}
+	panic("missing required environment variable: " + key)
 }

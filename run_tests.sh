@@ -22,9 +22,11 @@ section(){ echo -e "\n${BOLD}━━━━━━━━━━━━━━━━━
 # Format : "NOM_AFFICHAGE|CHEMIN_RELATIF"
 SERVICES=(
     "API Gateway|backend/api-gateway"
+    "Authentication Service|backend/services/authentication"
     "Analyze Service|backend/services/analyze"
     "Configuration Service|backend/services/configuration"
     "Collection Service|backend/services/collection"
+    "LLM Service|backend/services/llm"
 )
 
 # ── Gestion du venv ───────────────────────────────────────────────────────────
@@ -58,6 +60,22 @@ if [[ -f "$SCRIPT_DIR/.env" ]]; then
 else
     warn "Aucun fichier .env trouvé à $SCRIPT_DIR — utilisation des valeurs par défaut"
 fi
+
+# Les tests doivent être reproductibles et indépendants des valeurs locales de
+# développement (ex: DEBUG=release ou une clé Fernet invalide).
+export DEBUG=False
+export SECRET_KEY="${SECRET_KEY:-revmine-test-secret-key}"
+export ENCRYPTION_KEY="AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+export CORS_ALLOWED_ORIGINS="${CORS_ALLOWED_ORIGINS:-http://localhost:5173}"
+export FRONTEND_URL="${FRONTEND_URL:-http://localhost:5173}"
+export MINIO_ENDPOINT="${MINIO_ENDPOINT:-storage.example.invalid}"
+export MINIO_ACCESS_KEY="${MINIO_ACCESS_KEY:-test-access-key}"
+export MINIO_SECRET_KEY="${MINIO_SECRET_KEY:-test-secret-key}"
+export MINIO_BUCKET_NAME="${MINIO_BUCKET_NAME:-revmine-test}"
+export CELERY_BROKER_URL="${CELERY_BROKER_URL:-memory://}"
+export CELERY_RESULT_BACKEND="${CELERY_RESULT_BACKEND:-cache+memory://}"
+export OLLAMA_HOST="${OLLAMA_HOST:-http://ollama.test}"
+export OPENROUTER_API_KEY="${OPENROUTER_API_KEY:-sk-test}"
 
 # ── Variables de résultat ─────────────────────────────────────────────────────
 declare -a PASSED_SERVICES=()
@@ -112,6 +130,14 @@ for entry in "${SERVICES[@]}"; do
 
     # ── Exécution de pytest ───────────────────────────────────────────────────
     log "Lancement de pytest (avec couverture)..."
+    case "$relpath" in
+        backend/services/authentication|backend/services/configuration|backend/services/collection)
+            export USE_SQLITE_FOR_TESTS=True
+            ;;
+        *)
+            unset USE_SQLITE_FOR_TESTS
+            ;;
+    esac
     # Les options --cov et --cov-report=xml sont définies dans pytest.ini.
     # Les coverage.xml générés ici ont des chemins locaux absolus (usage local).
     # Pour SonarQube, les coverage.xml sont regénérés avec les bons chemins

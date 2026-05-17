@@ -169,7 +169,7 @@ def execute_collection_task(plan_id, resume=False):
         _collection_start = time.monotonic()
 
         def save_progress(current, total, message="", item_data=None, all_data=None):
-            nonlocal items_since_last_save
+            nonlocal items_since_last_save, raw_data_filename
             try:
                 # Check if collection was paused or cancelled
                 if cancellation_registry.is_cancelled(plan_id):
@@ -250,6 +250,7 @@ def execute_collection_task(plan_id, resume=False):
                 if raw_data_filename:
                     try:
                         minio_client.delete_file(raw_data_filename)
+                        raw_data_filename = None
                     except Exception:
                         pass
                 raise CollectionCancelledException(f"Collection {plan_id} was deleted")

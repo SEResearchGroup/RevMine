@@ -26,8 +26,8 @@ DEBUG = config("DEBUG", default=False, cast=bool)
 # ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='').split(',')
 ALLOWED_HOSTS = ["*"]
 KAFKA_BOOTSTRAP_SERVERS = config('KAFKA_BOOTSTRAP_SERVERS', default='kafka:9092')
-CELERY_BROKER_URL = config('CELERY_BROKER_URL')
-CELERY_RESULT_BACKEND = config('CELERY_RESULT_BACKEND')
+CELERY_BROKER_URL = config("CELERY_BROKER_URL", default="memory://")
+CELERY_RESULT_BACKEND = config("CELERY_RESULT_BACKEND", default="cache+memory://")
 
 
 LOGGING = {
@@ -124,16 +124,24 @@ WSGI_APPLICATION = "analyze_service.wsgi.application"
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": config("ANALYZE_DATABASE_NAME"),
-        "USER": config("DATABASE_USER"),
-        "PASSWORD": config("DATABASE_PASSWORD"),
-        "HOST": config("ANALYZE_DATABASE_HOST"),
-        "PORT": config("ANALYZE_DATABASE_PORT", default="5435"),
+if config("USE_SQLITE_FOR_TESTS", default=False, cast=bool):
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "test.sqlite3",
+        }
     }
-}
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": config("ANALYZE_DATABASE_NAME"),
+            "USER": config("DATABASE_USER"),
+            "PASSWORD": config("DATABASE_PASSWORD"),
+            "HOST": config("ANALYZE_DATABASE_HOST"),
+            "PORT": config("ANALYZE_DATABASE_PORT", default="5435"),
+        }
+    }
 
 
 # Password validation

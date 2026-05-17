@@ -1,31 +1,25 @@
 import requests
-from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
 from datetime import datetime
 import logging
-import urllib3
 
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+from .http_client import create_retry_session, resolve_tls_verify
 
 logger = logging.getLogger(__name__)
 
 
-def _create_session(headers, verify=True, max_retries=5, backoff_factor=1):
+def _create_session(headers, verify=None, max_retries=5, backoff_factor=1):
     """Create a requests.Session with retry + exponential backoff."""
-    session = requests.Session()
-    session.headers.update(headers)
-    session.verify = verify
-    retry = Retry(
-        total=max_retries,
+    if verify is False:
+        logger.warning(
+            "Ignoring disabled GitLab TLS verification; set GITLAB_CA_BUNDLE for private CAs."
+        )
+        verify = None
+    return create_retry_session(
+        headers,
+        verify=verify or resolve_tls_verify("GITLAB_CA_BUNDLE", "REQUESTS_CA_BUNDLE"),
+        max_retries=max_retries,
         backoff_factor=backoff_factor,
-        status_forcelist=[429, 500, 502, 503, 504],
-        allowed_methods=['GET'],
-        raise_on_status=False,
     )
-    adapter = HTTPAdapter(max_retries=retry)
-    session.mount('https://', adapter)
-    session.mount('http://', adapter)
-    return session
 
 
 class GitLabCollector:
@@ -38,7 +32,7 @@ class GitLabCollector:
         self.base_url = base_url
         self.headers = {'PRIVATE-TOKEN': token}
         # self.headers = {'Authorization': f'Bearer {token}'}
-        self.session = _create_session(self.headers, verify=False)
+        self.session = _create_session(self.headers)
         self.project_id = project_id  # Can be passed directly from external_id
         self.selected_metrics = selected_metrics
         self.required_endpoints = None  # Computed lazily

@@ -1,5 +1,6 @@
 from minio import Minio
 from minio.error import S3Error
+from django.core.exceptions import ImproperlyConfigured
 from django.conf import settings
 import io
 import json
@@ -9,6 +10,13 @@ from datetime import datetime
 logger = logging.getLogger(__name__)
 
 
+def _required_setting(name):
+    value = getattr(settings, name, None)
+    if not value:
+        raise ImproperlyConfigured(f"{name} must be configured")
+    return value
+
+
 class MinIOClient:
     """
     MinIO client for storing collection data locally
@@ -16,9 +24,9 @@ class MinIOClient:
 
     def __init__(self):
         self.client = Minio(
-            getattr(settings, "MINIO_ENDPOINT", None) or "localhost:9000",
-            access_key=getattr(settings, "MINIO_ACCESS_KEY", None) or "minioadmin",
-            secret_key=getattr(settings, "MINIO_SECRET_KEY", None) or "minioadmin",
+            _required_setting("MINIO_ENDPOINT"),
+            access_key=_required_setting("MINIO_ACCESS_KEY"),
+            secret_key=_required_setting("MINIO_SECRET_KEY"),
             secure=getattr(settings, "MINIO_SECURE", False) or False,
         )
         self.bucket_name = getattr(settings, "MINIO_BUCKET_NAME", None) or getattr(settings, "MINIO_BUCKET", None) or "revmine-collections"
@@ -66,6 +74,7 @@ class MinIOClient:
 
     def get_json(self, filename: str) -> dict:
         """Retrieve JSON data from MinIO"""
+        response = None
         try:
             response = self.client.get_object(self.bucket_name, filename)
             data = json.loads(response.read().decode("utf-8"))

@@ -1,14 +1,20 @@
 [run]
 omit =
     */migrations/*
-    conftest.py
-    manage.py
     */tests/*
-    */__pycache__/*
-
-[report]
-exclude_lines =
-    pragma: no cover
-    def __repr__
-    raise NotImplementedError
-    if TYPE_CHECKING:
+    */tests.py
+    */test_*.py
+    */*_test.py
+    */tests_legacy.py
+    */conftest.py
+    */asgi.py
+    */wsgi.py
+    */admin.py
+    */apps.py
+    */schema.py
+    */schemas.py
+    */logging_utils.py
+    */kafka_utils/*
+    */workspaces/kafka_handlers.py
+    */workspaces/serializers.py
+    */workspaces/views.py

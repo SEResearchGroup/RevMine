@@ -14,6 +14,8 @@ logger = logging.getLogger(__name__)
 
 class OllamaParserService:
     def __init__(self) -> None:
+        if not settings.OLLAMA_HOST:
+            raise RuntimeError("OLLAMA_HOST is required for Ollama inference")
         self.client = Client(host=settings.OLLAMA_HOST)
 
     def parse_user_request(

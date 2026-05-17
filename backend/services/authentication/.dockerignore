@@ -1,0 +1,10 @@
+.env
+.coverage
+.pytest_cache/
+__pycache__/
+**/__pycache__/
+coverage.xml
+junit-report.xml
+test.sqlite3
+users/tests.py
+conftest.py

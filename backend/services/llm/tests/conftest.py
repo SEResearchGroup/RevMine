@@ -1,7 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from main import app, get_parser_service
+from main import app, get_openrouter_service, get_parser_service
 
 
 class FakeParserService:
@@ -34,6 +34,7 @@ class FakeParserService:
 @pytest.fixture
 def client():
     app.dependency_overrides[get_parser_service] = lambda: FakeParserService()
+    app.dependency_overrides[get_openrouter_service] = lambda: FakeParserService()
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()

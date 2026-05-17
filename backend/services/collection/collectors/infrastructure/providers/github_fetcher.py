@@ -1,28 +1,20 @@
 import requests
-from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
 from datetime import datetime
 import logging
 import re
+
+from .http_client import create_retry_session
 
 logger = logging.getLogger(__name__)
 
 
 def _create_session(headers, max_retries=5, backoff_factor=1):
     """Create a requests.Session with retry + exponential backoff."""
-    session = requests.Session()
-    session.headers.update(headers)
-    retry = Retry(
-        total=max_retries,
+    return create_retry_session(
+        headers,
+        max_retries=max_retries,
         backoff_factor=backoff_factor,
-        status_forcelist=[429, 500, 502, 503, 504],
-        allowed_methods=['GET'],
-        raise_on_status=False,
     )
-    adapter = HTTPAdapter(max_retries=retry)
-    session.mount('https://', adapter)
-    session.mount('http://', adapter)
-    return session
 
 
 class GitHubCollector:
