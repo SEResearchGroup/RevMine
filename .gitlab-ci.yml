@@ -3,9 +3,9 @@
 # ══════════════════════════════════════════════════════════════════════════════
 #
 #  Stages :
-#    1. test    → run_tests.sh (tous les services, un seul job)
+#    1. test    → un job par service, déclenché par rules:changes
 #    2. quality → analyse SonarQube (quality gate bloquante)
-#    3. build   → images Docker (uniquement sur main/master)
+#    3. build   → images Docker du service modifié (main/master)
 #
 #  Variables CI/CD requises (GitLab > Settings > CI/CD > Variables) :
 #    SONAR_TOKEN    — token SonarQube (ex: sqp_xxx)   [masquée]
@@ -37,7 +37,7 @@ cache:
 # ══════════════════════════════════════════════════════════════════════════════
 #  STAGE 1 — TEST
 # ══════════════════════════════════════════════════════════════════════════════
-test:all:
+.python_test: &python_test
   stage: test
   image: python:3.11-slim
   services:
@@ -49,77 +49,102 @@ test:all:
   before_script:
     - apt-get update -qq && apt-get install -y -qq gcc libpq-dev postgresql-client
     - until pg_isready -h postgres -U postgres; do echo "waiting..."; sleep 1; done
-    - PGPASSWORD=postgres psql -h postgres -U postgres -c "CREATE DATABASE gateway_db;" postgres
-    - PGPASSWORD=postgres psql -h postgres -U postgres -c "CREATE DATABASE analyze_db;" postgres
-    - PGPASSWORD=postgres psql -h postgres -U postgres -c "CREATE DATABASE configuration_db;" postgres
-    - PGPASSWORD=postgres psql -h postgres -U postgres -c "CREATE DATABASE collection_db;" postgres
-    - |
-      printf '%s\n' \
-        'SECRET_KEY=ci-secret-key-not-for-production' \
-        'DEBUG=True' \
-        'ALLOWED_HOSTS=localhost,127.0.0.1' \
-        'CORS_ALLOWED_ORIGINS=http://localhost:5173' \
-        'FRONTEND_URL=http://localhost:5173' \
-        'DATABASE_USER=postgres' \
-        'DATABASE_PASSWORD=postgres' \
-        'APIGATEWAY_DATABASE_NAME=gateway_db' \
-        'APIGATEWAY_DATABASE_HOST=postgres' \
-        'APIGATEWAY_DATABASE_PORT=5432' \
-        'ANALYZE_DATABASE_NAME=analyze_db' \
-        'ANALYZE_DATABASE_HOST=postgres' \
-        'ANALYZE_DATABASE_PORT=5432' \
-        'CONFIGURATION_DATABASE_NAME=configuration_db' \
-        'CONFIGURATION_DATABASE_HOST=postgres' \
-        'CONFIGURATION_DATABASE_PORT=5432' \
-        'COLLECTION_DATABASE_NAME=collection_db' \
-        'COLLECTION_DATABASE_HOST=postgres' \
-        'COLLECTION_DATABASE_PORT=5432' \
-        'CELERY_BROKER_URL=memory://' \
-        'CELERY_RESULT_BACKEND=cache+memory://' \
-        'KAFKA_BOOTSTRAP_SERVERS=localhost:9092' \
-        'ENCRYPTION_KEY=nk1hNYEsLfbfxri5VX7PG6p_le60MEDyom1TXLlcWpY=' \
-        'MINIO_ENDPOINT=localhost:9000' \
-        'MINIO_ACCESS_KEY=minioadmin' \
-        'MINIO_SECRET_KEY=minioadmin' \
-        'MINIO_BUCKET_NAME=revmine-collections' \
-        'MINIO_SECURE=False' \
-        'GITHUB_CLIENT_ID=ci' \
-        'GITHUB_CLIENT_SECRET=ci' \
-        'GITHUB_REDIRECT_URI=http://localhost:5173/auth/github/callback' \
-        'GITLAB_CLIENT_ID=ci' \
-        'GITLAB_CLIENT_SECRET=ci' \
-        'GITLAB_REDIRECT_URI=http://localhost:5173/auth/gitlab/callback' \
-        'GOOGLE_CLIENT_ID=ci' \
-        'GOOGLE_CLIENT_SECRET=ci' \
-        'GOOGLE_REDIRECT_URI=http://localhost:5173/auth/google/callback' \
-        > .env
+    - PGPASSWORD=postgres createdb -h postgres -U postgres gateway_db || true
+    - PGPASSWORD=postgres createdb -h postgres -U postgres analyze_db || true
+    - PGPASSWORD=postgres createdb -h postgres -U postgres configuration_db || true
+    - PGPASSWORD=postgres createdb -h postgres -U postgres collection_db || true
+    - python -m pip install --quiet --upgrade pip
   script:
-    - bash run_tests.sh
+    - bash scripts/ci/test_python_service.sh "$SERVICE_DIR"
   artifacts:
     when: always
     reports:
       junit:
-        - backend/api-gateway/junit-report.xml
-        - backend/services/analyze/junit-report.xml
-        - backend/services/configuration/junit-report.xml
-        - backend/services/collection/junit-report.xml
-        - backend/services/llm/junit-report.xml
+        - $SERVICE_DIR/junit-report.xml
       coverage_report:
         coverage_format: cobertura
-        path: backend/api-gateway/coverage.xml
+        path: $SERVICE_DIR/coverage.xml
     paths:
-      - backend/api-gateway/coverage.xml
-      - backend/api-gateway/junit-report.xml
-      - backend/services/analyze/coverage.xml
-      - backend/services/analyze/junit-report.xml
-      - backend/services/configuration/coverage.xml
-      - backend/services/configuration/junit-report.xml
-      - backend/services/collection/coverage.xml
-      - backend/services/collection/junit-report.xml
-      - backend/services/llm/coverage.xml
-      - backend/services/llm/junit-report.xml
+      - $SERVICE_DIR/coverage.xml
+      - $SERVICE_DIR/junit-report.xml
     expire_in: 1 week
   allow_failure: false
+
+test:api-gateway:
+  <<: *python_test
+  variables:
+    SERVICE_DIR: backend/api-gateway
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"'
+    - changes:
+        - .gitlab-ci.yml
+        - scripts/ci/**/*
+        - backend/api-gateway/**/*
+        - backend/shared/**/*
+
+test:authentication:
+  <<: *python_test
+  variables:
+    SERVICE_DIR: backend/services/authentication
+    USE_SQLITE_FOR_TESTS: "True"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"'
+    - changes:
+        - .gitlab-ci.yml
+        - scripts/ci/**/*
+        - backend/services/authentication/**/*
+        - backend/shared/**/*
+        - infrastructure/keycloak/**/*
+
+test:analyze:
+  <<: *python_test
+  variables:
+    SERVICE_DIR: backend/services/analyze
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"'
+    - changes:
+        - .gitlab-ci.yml
+        - scripts/ci/**/*
+        - backend/services/analyze/**/*
+        - backend/shared/**/*
+
+test:configuration:
+  <<: *python_test
+  variables:
+    SERVICE_DIR: backend/services/configuration
+    USE_SQLITE_FOR_TESTS: "True"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"'
+    - changes:
+        - .gitlab-ci.yml
+        - scripts/ci/**/*
+        - backend/services/configuration/**/*
+        - backend/shared/**/*
+
+test:collection:
+  <<: *python_test
+  variables:
+    SERVICE_DIR: backend/services/collection
+    USE_SQLITE_FOR_TESTS: "True"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"'
+    - changes:
+        - .gitlab-ci.yml
+        - scripts/ci/**/*
+        - backend/services/collection/**/*
+        - backend/shared/**/*
+
+test:llm:
+  <<: *python_test
+  variables:
+    SERVICE_DIR: backend/services/llm
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"'
+    - changes:
+        - .gitlab-ci.yml
+        - scripts/ci/**/*
+        - backend/services/llm/**/*
+        - backend/shared/**/*
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  STAGE 2 — QUALITY (SonarQube — quality gate bloquante)
@@ -161,26 +186,81 @@ test:all:
     DOCKER_TLS_CERTDIR: "/certs"
   before_script:
     - docker info
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"'
   allow_failure: false
 
 build:api-gateway:
   <<: *build_docker
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"'
+      changes:
+        - .gitlab-ci.yml
+        - backend/api-gateway/**/*
+        - backend/shared/**/*
   script:
     - docker build -t revmine/api-gateway:$CI_COMMIT_SHORT_SHA backend/api-gateway/
 
+build:authentication:
+  <<: *build_docker
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"'
+      changes:
+        - .gitlab-ci.yml
+        - backend/services/authentication/**/*
+        - backend/shared/**/*
+        - infrastructure/keycloak/**/*
+  script:
+    - docker build -t revmine/authentication:$CI_COMMIT_SHORT_SHA backend/services/authentication/
+
 build:analyze:
   <<: *build_docker
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"'
+      changes:
+        - .gitlab-ci.yml
+        - backend/services/analyze/**/*
+        - backend/shared/**/*
   script:
     - docker build -t revmine/analyze:$CI_COMMIT_SHORT_SHA backend/services/analyze/
 
 build:configuration:
   <<: *build_docker
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"'
+      changes:
+        - .gitlab-ci.yml
+        - backend/services/configuration/**/*
+        - backend/shared/**/*
   script:
     - docker build -t revmine/configuration:$CI_COMMIT_SHORT_SHA backend/services/configuration/
 
 build:collection:
   <<: *build_docker
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"'
+      changes:
+        - .gitlab-ci.yml
+        - backend/services/collection/**/*
+        - backend/shared/**/*
   script:
     - docker build -t revmine/collection:$CI_COMMIT_SHORT_SHA backend/services/collection/
+
+build:llm:
+  <<: *build_docker
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"'
+      changes:
+        - .gitlab-ci.yml
+        - backend/services/llm/**/*
+        - backend/shared/**/*
+  script:
+    - docker build -t revmine/llm:$CI_COMMIT_SHORT_SHA backend/services/llm/
+
+build:notification:
+  <<: *build_docker
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"'
+      changes:
+        - .gitlab-ci.yml
+        - backend/services/notification/**/*
+  script:
+    - docker build -t revmine/notification:$CI_COMMIT_SHORT_SHA backend/services/notification/

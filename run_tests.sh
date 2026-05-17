@@ -142,6 +142,8 @@ for entry in "${SERVICES[@]}"; do
     # Les coverage.xml générés ici ont des chemins locaux absolus (usage local).
     # Pour SonarQube, les coverage.xml sont regénérés avec les bons chemins
     # (/usr/src/...) par le service test-runner dans docker-compose.sonar.yml.
+    rm -f "$svcdir/.coverage" "$svcdir/coverage.xml" "$svcdir/junit-report.xml"
+    rm -rf "$svcdir/.pytest_cache" || true
     if (cd "$svcdir" && python -m pytest); then
         ok "Tous les tests passent ✅  →  ${BOLD}$name${NC}"
         PASSED_SERVICES+=("$name")
