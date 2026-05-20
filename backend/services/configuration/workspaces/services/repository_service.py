@@ -144,6 +144,9 @@ class RepositoryService:
         if normalizer is None:
             normalizer = get_normalizer(workspace.platform)
         normalised = normalizer.normalize_for_db(repo_data)
+        if not normalised.get("owner"):
+            label = normalised.get("full_name") or normalised.get("name") or repo_data.get("id")
+            raise ValueError(f"Repository owner could not be determined for {label}")
         repository, _ = Repository.objects.update_or_create(
             workspace=workspace,
             external_id=normalised["external_id"],

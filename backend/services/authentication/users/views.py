@@ -15,6 +15,7 @@ from .serializers import (
 )
 import requests
 from django.conf import settings
+from urllib.parse import urlencode
 
 from .schemas import (
     register_view_schema,
@@ -31,6 +32,10 @@ from .schemas import (
 )
 
 User = get_user_model()
+
+
+def build_oauth_url(base_url, params):
+    return f"{base_url}?{urlencode(params)}"
 
 
 class RegisterView(generics.CreateAPIView):
@@ -201,11 +206,13 @@ class GitHubLoginView(APIView):
 
     @github_login_schema
     def get(self, request):
-        github_auth_url = (
-            f"https://github.com/login/oauth/authorize"
-            f"?client_id={settings.GITHUB_CLIENT_ID}"
-            f"&redirect_uri={settings.GITHUB_REDIRECT_URI}"
-            f"&scope=user:email,read:user"
+        github_auth_url = build_oauth_url(
+            "https://github.com/login/oauth/authorize",
+            {
+                "client_id": settings.GITHUB_CLIENT_ID,
+                "redirect_uri": settings.GITHUB_REDIRECT_URI,
+                "scope": "user:email read:user",
+            },
         )
         return Response({"url": github_auth_url})
 
@@ -351,12 +358,14 @@ class GitLabLoginView(APIView):
 
     @gitlab_login_schema
     def get(self, request):
-        gitlab_auth_url = (
-            f"https://gitlab.com/oauth/authorize"
-            f"?client_id={settings.GITLAB_CLIENT_ID}"
-            f"&redirect_uri={settings.GITLAB_REDIRECT_URI}"
-            f"&response_type=code"
-            f"&scope=read_user+read_api"
+        gitlab_auth_url = build_oauth_url(
+            "https://gitlab.com/oauth/authorize",
+            {
+                "client_id": settings.GITLAB_CLIENT_ID,
+                "redirect_uri": settings.GITLAB_REDIRECT_URI,
+                "response_type": "code",
+                "scope": "read_user read_api",
+            },
         )
         return Response({"url": gitlab_auth_url})
 
@@ -479,12 +488,15 @@ class GoogleLoginView(APIView):
 
     @google_login_schema
     def get(self, request):
-        google_auth_url = (
-            f"https://accounts.google.com/o/oauth2/v2/auth"
-            f"?client_id={settings.GOOGLE_CLIENT_ID}"
-            f"&redirect_uri={settings.GOOGLE_REDIRECT_URI}"
-            f"&response_type=code"
-            f"&scope=openid email profile"
+        google_auth_url = build_oauth_url(
+            "https://accounts.google.com/o/oauth2/v2/auth",
+            {
+                "client_id": settings.GOOGLE_CLIENT_ID,
+                "redirect_uri": settings.GOOGLE_REDIRECT_URI,
+                "response_type": "code",
+                "scope": "openid email profile",
+                "prompt": "select_account",
+            },
         )
         return Response({"url": google_auth_url})
 

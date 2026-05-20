@@ -18,11 +18,13 @@ from unittest.mock import MagicMock, patch
 
 import pandas as pd
 from django.test import TestCase, Client, override_settings
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.urls import reverse
 from rest_framework.test import APIClient
 from rest_framework import status
 
 from analytics.models import Dataset, MetricDefinition, Analysis, AnalysisResult
+from analytics.services.dataset_service import DatasetStorageError
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -60,6 +62,36 @@ class DatasetListViewTests(TestCase):
         resp = self.client.get("/api/analysis/datasets/")
         self.assertIn(resp.status_code, [200, 401, 403])
 
+    def test_list_filters_by_user_id(self):
+        Dataset.objects.create(
+            user_id=1,
+            workspace_id=1,
+            repository_id=1,
+            platform="gitlab",
+            filename="owned.csv",
+            file_path="datasets/owned.csv",
+            rows_count=1,
+            columns_count=1,
+            columns_metadata={},
+        )
+        Dataset.objects.create(
+            user_id=2,
+            workspace_id=2,
+            repository_id=2,
+            platform="github",
+            filename="other.csv",
+            file_path="datasets/other.csv",
+            rows_count=1,
+            columns_count=1,
+            columns_metadata={},
+        )
+
+        resp = self.client.get("/api/analysis/datasets/")
+
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.data["count"], 1)
+        self.assertEqual(resp.data["results"][0]["filename"], "owned.csv")
+
     @patch("analytics.api.views.DatasetService")
     def test_upload_csv(self, MockDatasetService):
         svc_instance = MockDatasetService.return_value
@@ -88,6 +120,31 @@ class DatasetListViewTests(TestCase):
         )
         # 201 Created or 400/403 depending on auth middleware
         self.assertIn(resp.status_code, [201, 200, 400, 401, 403])
+
+    @patch("analytics.api.serializers.DatasetService")
+    def test_upload_storage_error_returns_json_503(self, MockDatasetService):
+        svc_instance = MockDatasetService.return_value
+        svc_instance.create_dataset.side_effect = DatasetStorageError(
+            "Dataset storage is not writable"
+        )
+
+        resp = self.client.post(
+            "/api/analysis/datasets/upload/",
+            {
+                "file": SimpleUploadedFile(
+                    "test.csv",
+                    SAMPLE_CSV,
+                    content_type="text/csv",
+                ),
+                "workspace_id": 1,
+                "repository_id": 1,
+                "platform": "gitlab",
+            },
+            format="multipart",
+        )
+
+        self.assertEqual(resp.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
+        self.assertEqual(resp.data["error"], "Dataset storage unavailable")
 
 
 # ---------------------------------------------------------------------------
@@ -126,6 +183,7 @@ class GenerateChartViewTests(TestCase):
             },
         )
         self.dataset = Dataset.objects.create(
+            user_id=1,
             workspace_id=1,
             repository_id=1,
             platform="gitlab",
@@ -211,6 +269,7 @@ class AnalysisViewTests(TestCase):
             },
         )
         self.dataset = Dataset.objects.create(
+            user_id=1,
             workspace_id=1,
             repository_id=1,
             platform="gitlab",

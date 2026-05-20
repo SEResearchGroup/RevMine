@@ -514,6 +514,8 @@ class TestMinIOClient:
 
     @patch("collectors.infrastructure.storage.minio_client.Minio")
     def test_creates_bucket_when_missing(self, mock_minio_cls):
+        from django.conf import settings
+
         mock_client = MagicMock()
         mock_client.bucket_exists.return_value = False
         mock_minio_cls.return_value = mock_client
@@ -522,7 +524,12 @@ class TestMinIOClient:
 
         MinIOClient()
 
-        mock_client.make_bucket.assert_called_once_with("revmine-test")
+        expected_bucket = (
+            getattr(settings, "MINIO_BUCKET_NAME", None)
+            or getattr(settings, "MINIO_BUCKET", None)
+            or "revmine-collections"
+        )
+        mock_client.make_bucket.assert_called_once_with(expected_bucket)
 
     @patch("collectors.infrastructure.storage.minio_client.Minio")
     def test_save_json_returns_false_on_s3_error(self, mock_minio_cls, monkeypatch):

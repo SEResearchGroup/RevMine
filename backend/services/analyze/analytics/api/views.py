@@ -41,7 +41,14 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 
 from analytics.models import Dataset, MetricDefinition, Analysis, AnalysisResult
-from analytics.services.dataset_service import DatasetService
+from analytics.api.access import (
+    filter_analysis_queryset_for_request,
+    filter_dataset_queryset_for_request,
+    get_analysis_for_request,
+    get_dataset_for_request,
+    get_request_user_id,
+)
+from analytics.services.dataset_service import DatasetService, DatasetStorageError
 from analytics.services.analysis_service import AnalysisService
 from analytics.api.serializers import (
     DatasetSerializer,
@@ -65,7 +72,7 @@ class DatasetListView(APIView):
         repository_id = request.query_params.get('repository_id')
         source_type = request.query_params.get('source_type')
 
-        queryset = Dataset.objects.all()
+        queryset = filter_dataset_queryset_for_request(Dataset.objects.all(), request)
 
         if workspace_id:
             queryset = queryset.filter(workspace_id=workspace_id)
@@ -95,7 +102,17 @@ class DatasetUploadView(APIView):
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         
-        dataset = serializer.save()
+        try:
+            dataset = serializer.save(user_id=get_request_user_id(request))
+        except DatasetStorageError as exc:
+            return Response(
+                {
+                    "error": "Dataset storage unavailable",
+                    "detail": str(exc),
+                },
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
         return Response(DatasetSerializer(dataset).data, status=status.HTTP_201_CREATED)
 
 
@@ -103,12 +120,12 @@ class DatasetDetailView(APIView):
     """GET, DELETE /datasets/<pk>/"""
 
     def get(self, request, pk):
-        dataset = get_object_or_404(Dataset, pk=pk)
+        dataset = get_dataset_for_request(request, pk)
         serializer = DatasetSerializer(dataset)
         return Response(serializer.data)
 
     def delete(self, request, pk):
-        dataset = get_object_or_404(Dataset, pk=pk)
+        dataset = get_dataset_for_request(request, pk)
         service = DatasetService()
         service.delete_dataset(dataset)
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -121,7 +138,7 @@ class DatasetColumnsView(APIView):
     """
 
     def get(self, request, pk):
-        dataset = get_object_or_404(Dataset, pk=pk)
+        dataset = get_dataset_for_request(request, pk)
         
         columns = []
         for col_name, meta in dataset.columns_metadata.items():
@@ -147,7 +164,7 @@ class DatasetPreviewView(APIView):
     """
 
     def get(self, request, pk):
-        dataset = get_object_or_404(Dataset, pk=pk)
+        dataset = get_dataset_for_request(request, pk)
         n = int(request.query_params.get("rows", 10))
         n = min(n, 100)  # Cap at 100 rows
         
@@ -182,7 +199,7 @@ class DatasetAvailableMetricsView(APIView):
     """
 
     def get(self, request, pk):
-        dataset = get_object_or_404(Dataset, pk=pk)
+        dataset = get_dataset_for_request(request, pk)
         service = DatasetService()
         
         result = service.get_available_metrics(dataset)
@@ -209,7 +226,7 @@ class DatasetCompatibleAxesView(APIView):
     """
 
     def get(self, request, pk):
-        dataset = get_object_or_404(Dataset, pk=pk)
+        dataset = get_dataset_for_request(request, pk)
         
         x_axis_options = []
         y_axis_options = []
@@ -397,7 +414,7 @@ class GenerateChartView(APIView):
             )
 
         # Get dataset
-        dataset = get_object_or_404(Dataset, pk=dataset_id)
+        dataset = get_dataset_for_request(request, dataset_id)
         
         # Determine mode and validate
         if metric_code:
@@ -536,7 +553,10 @@ class AnalysisListView(APIView):
         status_filter = request.query_params.get('status')
         metric_code = request.query_params.get('metric_code')
         
-        queryset = Analysis.objects.select_related('dataset').prefetch_related('result')
+        queryset = filter_analysis_queryset_for_request(
+            Analysis.objects.select_related('dataset').prefetch_related('result'),
+            request,
+        )
         
         if dataset_id:
             queryset = queryset.filter(dataset_id=dataset_id)
@@ -584,7 +604,7 @@ class AnalysisBulkCreateView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        dataset = get_object_or_404(Dataset, pk=dataset_id)
+        dataset = get_dataset_for_request(request, dataset_id)
         
         created_analyses = []
         errors = []
@@ -648,14 +668,17 @@ class AnalysisDetailView(APIView):
 
     def get(self, request, pk):
         analysis = get_object_or_404(
-            Analysis.objects.select_related('dataset').prefetch_related('result'),
-            pk=pk
+            filter_analysis_queryset_for_request(
+                Analysis.objects.select_related('dataset').prefetch_related('result'),
+                request,
+            ),
+            pk=pk,
         )
         serializer = AnalysisSerializer(analysis)
         return Response(serializer.data)
 
     def delete(self, request, pk):
-        analysis = get_object_or_404(Analysis, pk=pk)
+        analysis = get_analysis_for_request(request, pk)
         analysis.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -668,8 +691,11 @@ class AnalysisResultView(APIView):
 
     def get(self, request, pk):
         analysis = get_object_or_404(
-            Analysis.objects.select_related('dataset').prefetch_related('result'),
-            pk=pk
+            filter_analysis_queryset_for_request(
+                Analysis.objects.select_related('dataset').prefetch_related('result'),
+                request,
+            ),
+            pk=pk,
         )
         
         if analysis.status == 'pending':
@@ -723,7 +749,7 @@ class AnalysisRetryView(APIView):
     """
 
     def post(self, request, pk):
-        analysis = get_object_or_404(Analysis, pk=pk)
+        analysis = get_analysis_for_request(request, pk)
         
         if analysis.status not in ['failed', 'completed']:
             return Response(
@@ -789,7 +815,10 @@ class AnalysisHistoryView(APIView):
     def get(self, request):
         workspace_id = request.query_params.get('workspace_id')
         
-        datasets_qs = Dataset.objects.prefetch_related('analyses').all()
+        datasets_qs = filter_dataset_queryset_for_request(
+            Dataset.objects.prefetch_related('analyses').all(),
+            request,
+        )
         
         if workspace_id:
             datasets_qs = datasets_qs.filter(workspace_id=workspace_id)
@@ -845,7 +874,7 @@ class DatasetSummaryView(APIView):
     """
 
     def get(self, request, pk):
-        dataset = get_object_or_404(Dataset, pk=pk)
+        dataset = get_dataset_for_request(request, pk)
         
         service = DatasetService()
         try:

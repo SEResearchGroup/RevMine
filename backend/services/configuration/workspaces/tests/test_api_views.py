@@ -191,6 +191,28 @@ class TestRepositoryImport:
         )
         assert resp.status_code == status.HTTP_400_BAD_REQUEST
 
+    @patch.object(
+        RepositoryService,
+        "import_repositories",
+        return_value=(
+            [],
+            [{"repository": "My-Portfolio", "error": "Repository owner could not be determined"}],
+        ),
+    )
+    def test_import_with_only_errors_returns_400_and_success_false(
+        self, _mock_import, api_client, workspace
+    ):
+        resp = api_client.post(
+            f"/api/workspaces/{workspace.id}/repositories/import/",
+            {"repository_ids": ["709287984"]},
+            format="json",
+        )
+
+        assert resp.status_code == status.HTTP_400_BAD_REQUEST
+        assert resp.data["success"] is False
+        assert resp.data["imported_count"] == 0
+        assert resp.data["errors"][0]["repository"] == "My-Portfolio"
+
 
 # ---------------------------------------------------------------------------
 # Connection test endpoint

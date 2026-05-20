@@ -3,12 +3,14 @@ package db
 import (
 	"database/sql"
 	"log"
+	"net/url"
+	"strings"
 
 	_ "github.com/lib/pq"
 )
 
 func Connect(databaseURL string) (*sql.DB, error) {
-	db, err := sql.Open("postgres", databaseURL)
+	db, err := sql.Open("postgres", withDefaultSSLMode(databaseURL))
 	if err != nil {
 		return nil, err
 	}
@@ -22,6 +24,22 @@ func Connect(databaseURL string) (*sql.DB, error) {
 
 	log.Println("Connected to database")
 	return db, nil
+}
+
+func withDefaultSSLMode(databaseURL string) string {
+	if strings.Contains(databaseURL, "sslmode=") {
+		return databaseURL
+	}
+
+	parsed, err := url.Parse(databaseURL)
+	if err != nil || (parsed.Scheme != "postgres" && parsed.Scheme != "postgresql") {
+		return databaseURL
+	}
+
+	query := parsed.Query()
+	query.Set("sslmode", "disable")
+	parsed.RawQuery = query.Encode()
+	return parsed.String()
 }
 
 func Migrate(db *sql.DB) error {

@@ -90,6 +90,39 @@ class TestStartCollectionView:
         assert resp.data["success"] is True
         assert resp.data["is_existing"] is False
 
+    @patch(
+        "collectors.api.views.resolve_repository_metadata",
+        return_value={
+            "workspace_id": 4,
+            "repository_id": 9,
+            "repository_name": "repo",
+            "repository_full_name": "owner/repo",
+            "platform": "github",
+            "repository_url": "https://github.com/owner/repo",
+            "default_branch": "main",
+            "external_id": "123",
+        },
+    )
+    @patch("collectors.services.CollectionService.get_or_create_collection")
+    @patch("collectors.services.MetricsService.get_available_metrics", return_value=[])
+    def test_start_resolves_repository_metadata_from_ids(
+        self, _metrics, mock_create, mock_repository, create_collection
+    ):
+        fake_collection = create_collection()
+        mock_create.return_value = (fake_collection, False)
+
+        resp = _auth_client().post(
+            "/api/collections/start/",
+            {"workspace_id": 4, "repository_id": 9},
+            format="json",
+        )
+
+        assert resp.status_code == status.HTTP_201_CREATED
+        mock_repository.assert_called_once_with(user_id=1, workspace_id=4, repository_id=9)
+        validated = mock_create.call_args.kwargs["validated_data"]
+        assert validated["platform"] == "github"
+        assert validated["repository_full_name"] == "owner/repo"
+
     @patch("collectors.services.CollectionService.get_or_create_collection")
     @patch("collectors.services.MetricsService.get_available_metrics", return_value=[])
     def test_existing_collection_returns_200(self, _metrics, mock_create, create_collection):
@@ -110,6 +143,119 @@ class TestStartCollectionView:
         )
         assert resp.status_code == status.HTTP_200_OK
         assert resp.data["is_existing"] is True
+
+
+# ---------------------------------------------------------------------------
+# Automation preview
+# ---------------------------------------------------------------------------
+
+@pytest.mark.django_db
+class TestAutomationPreviewView:
+    @patch(
+        "collectors.automation.resolve_repository_metadata",
+        return_value={
+            "workspace_id": 4,
+            "repository_id": 9,
+            "repository_name": "repo",
+            "repository_full_name": "owner/repo",
+            "platform": "github",
+            "repository_url": "https://github.com/owner/repo",
+            "default_branch": "main",
+            "external_id": "123",
+        },
+    )
+    @patch("collectors.automation.requests.post")
+    def test_generates_collection_draft(self, mock_post, mock_repository):
+        mock_post.return_value.status_code = 200
+        mock_post.return_value.json.return_value = {
+            "model": "openai/gpt-4o-mini",
+            "result": {
+                "intent": "collect",
+                "branch": ["main"],
+                "metrics": ["creation_date", "commit_messages"],
+                "basic_filters": {
+                    "date_range": {
+                        "start_date": "2026-01-01",
+                        "end_date": "2026-02-01",
+                    },
+                    "pr_status": ["merged"],
+                },
+                "cleaning_filters": {
+                    "refined_date_range": None,
+                    "file_extensions": ["py"],
+                    "authors": ["alice"],
+                    "keywords": {
+                        "fields": ["title"],
+                        "terms": ["bug"],
+                    },
+                },
+                "features": ["lead_time"],
+            },
+        }
+
+        resp = _auth_client().post(
+            "/api/collections/automation/preview/",
+            {
+                "workspace_id": 4,
+                "repository_id": 9,
+                "prompt": "Collect merged bug PRs on main",
+                "llm_provider": "openrouter",
+                "model": "openai/gpt-4o-mini",
+            },
+            format="json",
+        )
+
+        assert resp.status_code == status.HTTP_200_OK
+        assert resp.data["success"] is True
+        draft = resp.data["draft"]
+        assert draft["collection"]["branch_name"] == "main"
+        assert draft["collection"]["status"] == ["merged"]
+        assert "pr_creation_date" in draft["collection"]["selected_metrics"]
+        assert "commit_message" in draft["collection"]["selected_metrics"]
+        assert "pr_merge_date" in draft["collection"]["selected_metrics"]
+        assert draft["cleaning"]["filters"]["file_extensions"] == [".py"]
+        assert draft["cleaning"]["filters"]["authors"] == ["alice"]
+        assert draft["cleaning"]["filters"]["keyword_filters"] == [
+            {"field": "title", "keywords": ["bug"]}
+        ]
+        assert draft["cleaning"]["selected_features"] == ["Lead_Time"]
+        mock_repository.assert_called_once_with(user_id=1, workspace_id=4, repository_id=9)
+        assert mock_post.call_args.kwargs["json"]["model"] == "openai/gpt-4o-mini"
+
+    def test_requires_prompt(self):
+        resp = _auth_client().post(
+            "/api/collections/automation/preview/",
+            {"workspace_id": 4, "repository_id": 9, "prompt": ""},
+            format="json",
+        )
+
+        assert resp.status_code == status.HTTP_400_BAD_REQUEST
+        assert resp.data["error"] == "prompt is required"
+
+    @patch(
+        "collectors.automation.resolve_repository_metadata",
+        return_value={
+            "workspace_id": 4,
+            "repository_id": 9,
+            "repository_name": "repo",
+            "repository_full_name": "owner/repo",
+            "platform": "github",
+            "default_branch": "main",
+        },
+    )
+    @patch("collectors.automation.requests.post")
+    def test_llm_error_returns_502(self, mock_post, _mock_repository):
+        mock_post.return_value.status_code = 502
+        mock_post.return_value.json.return_value = {"detail": "model unavailable"}
+
+        resp = _auth_client().post(
+            "/api/collections/automation/preview/",
+            {"workspace_id": 4, "repository_id": 9, "prompt": "Collect PRs"},
+            format="json",
+        )
+
+        assert resp.status_code == status.HTTP_502_BAD_GATEWAY
+        assert "model unavailable" in resp.data["error"]
 
 
 # ---------------------------------------------------------------------------
@@ -191,6 +337,36 @@ class TestBranchesViews:
         assert resp.status_code == status.HTTP_200_OK
         mock_token.assert_called_once_with(user_id=1, workspace_id=4, platform="gitlab")
         assert mock_fetch.call_args.kwargs["token"] == "resolved-token"
+
+    @patch(
+        "collectors.api.views.resolve_repository_metadata",
+        return_value={
+            "workspace_id": 4,
+            "repository_id": 9,
+            "repository_name": "repo",
+            "repository_full_name": "owner/repo",
+            "platform": "github",
+            "default_branch": "main",
+        },
+    )
+    @patch("collectors.api.views.resolve_workspace_token", return_value="resolved-token")
+    @patch("collectors.api.views.BranchService.fetch_date_range", return_value={})
+    @patch("collectors.api.views.BranchService.fetch_branches", return_value=[{"name": "main"}])
+    def test_repository_branches_resolves_metadata_from_ids(
+        self, mock_fetch, _range, mock_token, mock_repository
+    ):
+        resp = _auth_client().post(
+            "/api/collections/branches/",
+            {"workspace_id": 4, "repository_id": 9},
+            format="json",
+        )
+
+        assert resp.status_code == status.HTTP_200_OK
+        assert resp.data["branches"] == [{"name": "main"}]
+        assert resp.data["default_branch"] == "main"
+        mock_repository.assert_called_once_with(user_id=1, workspace_id=4, repository_id=9)
+        mock_token.assert_called_once_with(user_id=1, workspace_id=4, platform="github")
+        assert mock_fetch.call_args.kwargs["repo_full_name"] == "owner/repo"
 
     @patch("collectors.api.views.BranchService.fetch_branches", side_effect=CollectionServiceError("boom"))
     def test_repository_branches_wraps_service_error(self, _mock_fetch):

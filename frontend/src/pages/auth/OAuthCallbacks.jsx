@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Loader2, AlertCircle } from "lucide-react";
 import { useAuth } from "../../hooks/useAuth";
+import { authService, getApiErrorMessage } from "../../services/api";
 
 // GitHub Callback Component
 export const GitHubCallback = () => {
@@ -32,29 +33,12 @@ export const GitHubCallback = () => {
       }
 
       try {
-        const response = await fetch(
-          `http://localhost:8000/api/auth/oauth/github/callback?code=${code}`,
-          {
-            method: "GET",
-            headers: {
-              "Content-Type": "application/json",
-            },
-          }
-        );
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(
-            errorData.error || "Failed to authenticate with GitHub"
-          );
-        }
-
-        const data = await response.json();
-        login(data.access, data.refresh);
+        const response = await authService.completeOAuth("github", code);
+        login(response.data.access, response.data.refresh);
         navigate("/workspaces");
       } catch (err) {
         console.error("GitHub callback error:", err);
-        setError(err.message || "Authentication failed");
+        setError(getApiErrorMessage(err, "Failed to authenticate with GitHub"));
       }
     };
 
@@ -117,29 +101,12 @@ export const GitLabCallback = () => {
       }
 
       try {
-        const response = await fetch(
-          `http://localhost:8000/api/auth/oauth/gitlab/callback?code=${code}`,
-          {
-            method: "GET",
-            headers: {
-              "Content-Type": "application/json",
-            },
-          }
-        );
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(
-            errorData.error || "Failed to authenticate with GitLab"
-          );
-        }
-
-        const data = await response.json();
-        login(data.access, data.refresh);
+        const response = await authService.completeOAuth("gitlab", code);
+        login(response.data.access, response.data.refresh);
         navigate("/workspaces");
       } catch (err) {
         console.error("GitLab callback error:", err);
-        setError(err.message || "Authentication failed");
+        setError(getApiErrorMessage(err, "Failed to authenticate with GitLab"));
       }
     };
 
@@ -202,29 +169,12 @@ export const GoogleCallback = () => {
       }
 
       try {
-        const response = await fetch(
-          `http://localhost:8000/api/auth/oauth/google/callback?code=${code}`,
-          {
-            method: "GET",
-            headers: {
-              "Content-Type": "application/json",
-            },
-          }
-        );
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(
-            errorData.error || "Failed to authenticate with Google"
-          );
-        }
-
-        const data = await response.json();
-        login(data.access, data.refresh);
+        const response = await authService.completeOAuth("google", code);
+        login(response.data.access, response.data.refresh);
         navigate("/workspaces");
       } catch (err) {
         console.error("Google callback error:", err);
-        setError(err.message || "Authentication failed");
+        setError(getApiErrorMessage(err, "Failed to authenticate with Google"));
       }
     };
 

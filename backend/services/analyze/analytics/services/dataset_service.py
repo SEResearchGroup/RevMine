@@ -30,6 +30,10 @@ from analytics.infrastructure.storage.dataset_loader import DatasetLoader
 logger = logging.getLogger(__name__)
 
 
+class DatasetStorageError(Exception):
+    """Raised when the dataset file storage cannot be written or read."""
+
+
 class DatasetService:
     """
     Application service for dataset lifecycle management.
@@ -40,6 +44,18 @@ class DatasetService:
 
     def __init__(self) -> None:
         self.storage_path: str = getattr(settings, "DATASET_STORAGE_PATH", "datasets/")
+
+    def _ensure_storage_directory(self) -> None:
+        media_root = getattr(settings, "MEDIA_ROOT", None)
+        if not media_root:
+            return
+
+        try:
+            os.makedirs(os.path.join(media_root, self.storage_path), exist_ok=True)
+        except OSError as exc:
+            raise DatasetStorageError(
+                f"Dataset storage directory is not writable: {exc}"
+            ) from exc
 
     # ------------------------------------------------------------------
     # Compatibility shims so callers that used DatasetService._read_csv_safe
@@ -57,7 +73,14 @@ class DatasetService:
     # Public API
     # ------------------------------------------------------------------
 
-    def create_dataset(self, file, workspace_id=None, repository_id=None, platform="gitlab"):
+    def create_dataset(
+        self,
+        file,
+        workspace_id=None,
+        repository_id=None,
+        platform="gitlab",
+        user_id=None,
+    ):
         """
         Persist an uploaded CSV file and create a Dataset record.
 
@@ -66,18 +89,27 @@ class DatasetService:
         from analytics.models import Dataset
 
         file_id = str(uuid.uuid4())
-        filename = f"{file_id}_{file.name}"
+        safe_name = self.sanitize_filename(file.name)
+        filename = f"{file_id}_{safe_name}"
         file_path = os.path.join(self.storage_path, filename)
 
-        saved_path = default_storage.save(file_path, ContentFile(file.read()))
-        df = DatasetLoader.read_csv_safe(default_storage.open(saved_path))
+        self._ensure_storage_directory()
+        try:
+            saved_path = default_storage.save(file_path, ContentFile(file.read()))
+            with default_storage.open(saved_path) as saved_file:
+                df = DatasetLoader.read_csv_safe(saved_file)
+        except OSError as exc:
+            logger.exception("Dataset upload storage failed")
+            raise DatasetStorageError(f"Dataset storage is not writable: {exc}") from exc
+
         columns_metadata = self._extract_columns_metadata(df)
 
         return Dataset.objects.create(
+            user_id=user_id,
             workspace_id=workspace_id,
             repository_id=repository_id,
             platform=platform,
-            filename=file.name,
+            filename=safe_name,
             file_path=saved_path,
             rows_count=len(df),
             columns_count=len(df.columns),
@@ -108,6 +140,7 @@ class DatasetService:
         workspace_id=None,
         repository_id=None,
         platform: str = "github",
+        user_id=None,
     ):
         """
         Persist an in-memory DataFrame as CSV and create a Dataset record.
@@ -125,13 +158,19 @@ class DatasetService:
 
         buffer = StringIO()
         df.to_csv(buffer, index=False)
-        saved_path = default_storage.save(
-            file_path, ContentFile(buffer.getvalue().encode("utf-8"))
-        )
+        self._ensure_storage_directory()
+        try:
+            saved_path = default_storage.save(
+                file_path, ContentFile(buffer.getvalue().encode("utf-8"))
+            )
+        except OSError as exc:
+            logger.exception("Dataset dataframe storage failed")
+            raise DatasetStorageError(f"Dataset storage is not writable: {exc}") from exc
 
         columns_metadata = self._extract_columns_metadata(df)
 
         return Dataset.objects.create(
+            user_id=user_id,
             workspace_id=workspace_id,
             repository_id=repository_id,
             platform=platform,

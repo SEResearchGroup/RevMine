@@ -131,6 +131,7 @@ def _create_dataset(job: DevOpsCollectionJob, df):
         workspace_id=job.workspace_id,
         repository_id=job.repository_id,
         platform=job.provider,
+        user_id=job.user_id,
     )
     save_duration = round(time.monotonic() - save_started_at, 3)
     return dataset, save_duration

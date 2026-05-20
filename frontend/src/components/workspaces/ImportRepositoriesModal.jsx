@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { workspaceService } from "../../services/api";
+import { getApiErrorMessage, workspaceService } from "../../services/api";
 
 const ImportRepositoriesModal = ({ workspaceId, onClose }) => {
   const [activeTab, setActiveTab] = useState("workspace");
@@ -10,7 +10,9 @@ const ImportRepositoriesModal = ({ workspaceId, onClose }) => {
   const [isLoadingRepos, setIsLoadingRepos] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [importComplete, setImportComplete] = useState(false);
+  const [importSucceeded, setImportSucceeded] = useState(false);
   const [importedCount, setImportedCount] = useState(0);
+  const [importErrors, setImportErrors] = useState([]);
 
   useEffect(() => {
     loadData();
@@ -76,13 +78,24 @@ const ImportRepositoriesModal = ({ workspaceId, onClose }) => {
       const response = await workspaceService.importRepositories(workspaceId, {
         repository_ids: repositoryIdsToImport,
       });
+      const errors = response.data?.errors || [];
       setImportedCount(
         response.data?.imported_count ?? repositoryIdsToImport.length
       );
+      setImportErrors(errors);
+      setImportSucceeded(response.data?.success !== false && errors.length === 0);
       setImportComplete(true);
     } catch (error) {
       console.error("Error importing repositories:", error);
-      alert(error.response?.data?.message || "Error importing repositories");
+      const data = error.response?.data;
+      if (data?.errors || data?.imported_count !== undefined) {
+        setImportedCount(data.imported_count || 0);
+        setImportErrors(data.errors || []);
+        setImportSucceeded(false);
+        setImportComplete(true);
+      } else {
+        alert(getApiErrorMessage(error, "Error importing repositories"));
+      }
     } finally {
       setIsImporting(false);
     }
@@ -140,13 +153,32 @@ const ImportRepositoriesModal = ({ workspaceId, onClose }) => {
       : 0;
 
   if (importComplete) {
+    const hasImportedRepositories = importedCount > 0;
+    const title = importSucceeded
+      ? "Import successful!"
+      : hasImportedRepositories
+      ? "Import completed with errors"
+      : "Import failed";
+    const tone = importSucceeded
+      ? "green"
+      : hasImportedRepositories
+      ? "yellow"
+      : "red";
+    const toneClasses = {
+      green: { bg: "bg-green-100", text: "text-green-600" },
+      yellow: { bg: "bg-yellow-100", text: "text-yellow-600" },
+      red: { bg: "bg-red-100", text: "text-red-600" },
+    }[tone];
+
     return (
       <div className="fixed inset-0 bg-black bg-opacity-20 flex items-center justify-center z-50 p-4">
         <div className="bg-white rounded-xl shadow-2xl w-full max-w-md">
           <div className="p-6 sm:p-8 text-center">
-            <div className="w-16 h-16 sm:w-20 sm:h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 sm:mb-6">
+            <div
+              className={`w-16 h-16 sm:w-20 sm:h-20 ${toneClasses.bg} rounded-full flex items-center justify-center mx-auto mb-4 sm:mb-6`}
+            >
               <svg
-                className="w-10 h-10 sm:w-12 sm:h-12 text-green-600"
+                className={`w-10 h-10 sm:w-12 sm:h-12 ${toneClasses.text}`}
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -155,17 +187,43 @@ const ImportRepositoriesModal = ({ workspaceId, onClose }) => {
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   strokeWidth={2}
-                  d="M5 13l4 4L19 7"
+                  d={
+                    importSucceeded
+                      ? "M5 13l4 4L19 7"
+                      : "M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"
+                  }
                 />
               </svg>
             </div>
             <h3 className="text-xl sm:text-2xl font-semibold mb-3">
-              Import successful!
+              {title}
             </h3>
             <p className="text-sm sm:text-base text-gray-600 mb-6">
               <strong>{importedCount}</strong> repository(s) imported
-              successfully
+              {importErrors.length > 0 && (
+                <>
+                  {" "}
+                  and <strong>{importErrors.length}</strong> failed
+                </>
+              )}
             </p>
+            {importErrors.length > 0 && (
+              <div className="mb-6 text-left rounded-lg border border-red-200 bg-red-50 p-4">
+                <p className="text-sm font-medium text-red-800 mb-2">
+                  Import errors
+                </p>
+                <ul className="space-y-2 text-sm text-red-700">
+                  {importErrors.map((item, index) => (
+                    <li key={`${item.repository || "repo"}-${index}`}>
+                      <span className="font-medium">
+                        {item.repository || "Repository"}:
+                      </span>{" "}
+                      {item.error || "Unknown error"}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
             <button
               onClick={handleClose}
               className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700"

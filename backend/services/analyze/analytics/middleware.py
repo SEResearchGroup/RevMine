@@ -7,8 +7,6 @@ class UserInjectionMiddleware:
 
     def __call__(self, request):
         user_id = request.headers.get("X-User-ID")
-        # user_id = 1
-        print(f"UserInjectionMiddleware: Extracted user_id: {user_id}")
 
         if not user_id:
             return JsonResponse({"error": "Authentication required"}, status=401)

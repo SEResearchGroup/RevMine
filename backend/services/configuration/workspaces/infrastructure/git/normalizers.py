@@ -32,6 +32,17 @@ class BaseNormalizer:
         """Return a full dict suitable for database storage."""
         raise NotImplementedError
 
+    @staticmethod
+    def owner_from_full_name(repo: Dict) -> Optional[str]:
+        full_name = (
+            repo.get("full_name")
+            or repo.get("path_with_namespace")
+            or ""
+        )
+        if "/" not in full_name:
+            return None
+        return full_name.split("/", 1)[0]
+
 
 class GitHubNormalizer(BaseNormalizer):
     """Normalizes GitHub API repository payloads."""
@@ -55,7 +66,9 @@ class GitHubNormalizer(BaseNormalizer):
 
     def normalize_for_db(self, repo: Dict) -> Dict:
         """Full format for database storage."""
-        owner = repo.get("owner", {})
+        owner = repo.get("owner") or {}
+        owner_login = owner.get("login") if isinstance(owner, dict) else owner
+        owner_type = owner.get("type") if isinstance(owner, dict) else None
         return {
             "external_id": str(repo["id"]),
             "name": repo["name"],
@@ -63,16 +76,8 @@ class GitHubNormalizer(BaseNormalizer):
             "description": repo.get("description"),
             "url": repo.get("url") or repo.get("clone_url"),
             "web_url": repo.get("html_url") or repo.get("url"),
-            "owner": (
-                owner.get("login")
-                if isinstance(owner, dict)
-                else repo.get("full_name", "").split("/")[0]
-            ),
-            "owner_type": (
-                owner.get("type")
-                if isinstance(owner, dict)
-                else "User"
-            ),
+            "owner": owner_login or self.owner_from_full_name(repo),
+            "owner_type": owner_type or "User",
             "default_branch": repo.get("default_branch", "main"),
             "language": repo.get("language"),
             "stars_count": repo.get("stargazers_count", 0),
@@ -113,7 +118,13 @@ class GitLabNormalizer(BaseNormalizer):
 
     def normalize_for_db(self, repo: Dict) -> Dict:
         """Full format for database storage."""
-        namespace = repo.get("namespace", {})
+        namespace = repo.get("namespace") or {}
+        owner = (
+            namespace.get("full_path")
+            if isinstance(namespace, dict)
+            else namespace
+        )
+        owner_type = namespace.get("kind") if isinstance(namespace, dict) else None
         return {
             "external_id": str(repo["id"]),
             "name": repo["name"],
@@ -125,16 +136,8 @@ class GitLabNormalizer(BaseNormalizer):
                 or repo.get("clone_url")
             ),
             "web_url": repo.get("web_url"),
-            "owner": (
-                namespace.get("full_path")
-                if isinstance(namespace, dict)
-                else repo.get("full_name", "").split("/")[0]
-            ),
-            "owner_type": (
-                namespace.get("kind")
-                if isinstance(namespace, dict)
-                else "user"
-            ),
+            "owner": owner or self.owner_from_full_name(repo),
+            "owner_type": owner_type or "user",
             "default_branch": repo.get("default_branch", "main"),
             "language": None,
             "stars_count": repo.get("star_count", 0),

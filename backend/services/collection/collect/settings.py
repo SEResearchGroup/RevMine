@@ -154,7 +154,12 @@ FILE_UPLOAD_HANDLERS = [
     'django.core.files.uploadhandler.TemporaryFileUploadHandler',
 ]
 # Logging Configuration
-_LOG_HANDLERS = ["console"] if _CI_MODE else ["console", "file"]
+_FILE_LOGGING_ENABLED = (
+    not _CI_MODE
+    and os.getenv("COLLECTION_ENABLE_FILE_LOGGING", "false").lower()
+    in ("true", "1", "yes")
+)
+_LOG_HANDLERS = ["console", "file"] if _FILE_LOGGING_ENABLED else ["console"]
 
 LOGGING = {
     "version": 1,
@@ -170,7 +175,7 @@ LOGGING = {
             "class": "logging.StreamHandler",
             "formatter": "json",
         },
-        **({} if _CI_MODE else {
+        **({} if not _FILE_LOGGING_ENABLED else {
             "file": {
                 "class": "logging.FileHandler",
                 "filename": os.getenv("COLLECTION_LOG_FILE", str(BASE_DIR / "collection.log")),

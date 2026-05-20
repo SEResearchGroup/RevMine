@@ -21,6 +21,35 @@ const processQueue = (error, token = null) => {
   failedQueue = [];
 };
 
+const trimTrailingSlash = (value) => value.replace(/\/+$/, "");
+
+export const API_BASE_URL = trimTrailingSlash(
+  import.meta.env.VITE_API_URL || "http://localhost:8000/api"
+);
+
+const serviceUrl = (path) => `${API_BASE_URL}/${path.replace(/^\/+/, "")}`;
+
+export const AUTH_API_URL = serviceUrl("auth");
+
+export const getApiErrorMessage = (error, fallback = "An unexpected error occurred") => {
+  const data = error?.response?.data;
+
+  if (!data || typeof data === "string") {
+    return fallback;
+  }
+
+  if (data.error || data.message || data.detail) {
+    return data.error || data.message || data.detail;
+  }
+
+  const fieldErrors = Object.values(data)
+    .flat()
+    .filter(Boolean)
+    .join(" ");
+
+  return fieldErrors || fallback;
+};
+
 const createApiInstance = (baseURL) => {
   const instance = axios.create({
     baseURL,
@@ -47,6 +76,10 @@ const createApiInstance = (baseURL) => {
     (response) => response,
     async (error) => {
       const originalRequest = error.config;
+
+      if (!originalRequest) {
+        return Promise.reject(error);
+      }
 
       if (originalRequest._retry) {
         clearTokens();
@@ -90,7 +123,7 @@ const createApiInstance = (baseURL) => {
         }
 
         try {
-          const response = await axios.post("http://localhost:8000/api/auth/refresh", {
+          const response = await axios.post(`${AUTH_API_URL}/refresh`, {
             refresh: refreshToken
           });
 
@@ -120,20 +153,12 @@ const createApiInstance = (baseURL) => {
   return instance;
 };
 
-export const authApi = createApiInstance("http://localhost:8000/api/auth");
-export const api = createApiInstance(import.meta.env.VITE_API_URL || 'http://localhost:8000/api');
-export const workspaceApi = createApiInstance(
-  "http://localhost:8000/api/workspaces"
-);
-export const collectionApi = createApiInstance(
-  "http://localhost:8000/api/collections"
-);
-export const analysisApi = createApiInstance(
-  "http://localhost:8000/api/analysis"
-);
-export const notificationApi = createApiInstance(
-  "http://localhost:8000/api/notifications"
-);
+export const authApi = createApiInstance(AUTH_API_URL);
+export const api = createApiInstance(API_BASE_URL);
+export const workspaceApi = createApiInstance(serviceUrl("workspaces"));
+export const collectionApi = createApiInstance(serviceUrl("collections"));
+export const analysisApi = createApiInstance(serviceUrl("analysis"));
+export const notificationApi = createApiInstance(serviceUrl("notifications"));
 
 export const authService = {
   register: (email, password, sendUpdates, firstName, lastName, position) => {
@@ -148,6 +173,12 @@ export const authService = {
   },
   login: (email, password) => {
     return authApi.post("/login", { email, password });
+  },
+  getOAuthUrl: (provider) => {
+    return authApi.get(`/oauth/${provider}`);
+  },
+  completeOAuth: (provider, code) => {
+    return authApi.get(`/oauth/${provider}/callback`, { params: { code } });
   },
   logout: () => {
     return authApi.post("/logout");
@@ -231,7 +262,7 @@ export const collectionService = {
 
   // Start/create collection plan (only called when user clicks "Go to collect plan")
   startCollection: (workspaceId, repositoryId) => {
-    return collectionApi.post("/start", {
+    return collectionApi.post("/start/", {
       workspace_id: workspaceId,
       repository_id: repositoryId,
     });
@@ -359,7 +390,7 @@ export const collectionService = {
 };
 
 export const analyzeApi = createApiInstance(
-  "http://localhost:8000/api/analysis"
+  serviceUrl("analysis")
 );
 
 export const analyzeService = {

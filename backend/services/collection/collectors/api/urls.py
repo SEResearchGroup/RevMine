@@ -3,6 +3,7 @@ from collectors.api.views import (
     GetAvailableMetricsView,
     GetBranchesForRepositoryView,
     StartCollectionView,
+    AutomationPreviewView,
     GetBranchesView,
     ConfigureMetricsView,
     UserDatasetsView,
@@ -34,6 +35,11 @@ urlpatterns = [
     ),
     # Collection workflow
     path("start/", StartCollectionView.as_view(), name="collection-start"),
+    path(
+        "automation/preview/",
+        AutomationPreviewView.as_view(),
+        name="collection-automation-preview",
+    ),
     path(
         "plans/<int:plan_id>/configure/",
         ConfigureMetricsView.as_view(),

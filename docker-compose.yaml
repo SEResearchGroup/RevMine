@@ -279,7 +279,7 @@ services:
       COLLECTION_SERVICE_URL: http://collection-service:8002/api/collections
       ANALYZE_SERVICE_URL: http://analyze-service:8003/api/analysis
       LLM_SERVICE_URL: http://llm-service:8004
-      NOTIFICATION_SERVICE_URL: http://notification-service:8005
+      NOTIFICATION_SERVICE_URL: http://notification-service:8005/api/notifications
       RATE_LIMIT_REQUESTS: "120"
       RATE_LIMIT_WINDOW_SECONDS: "60"
     depends_on:
@@ -341,6 +341,7 @@ services:
       COLLECTION_DATABASE_PORT: 5432
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       LLM_SERVICE_URL: http://llm-service:8004
+      CONFIGURATION_SERVICE_URL: http://configuration-service:8001/api/workspaces
     depends_on:
       collection-db:
         condition: service_healthy
@@ -373,6 +374,7 @@ services:
       ANALYZE_DATABASE_PORT: 5432
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       LLM_SERVICE_URL: http://llm-service:8004
+      CONFIGURATION_SERVICE_URL: http://configuration-service:8001/api/workspaces
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/0
     depends_on:
@@ -405,6 +407,7 @@ services:
       DATABASE_USER: ${POSTGRES_USER:-postgres}
       DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       ANALYZE_DATABASE_PORT: 5432
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/0
     depends_on:

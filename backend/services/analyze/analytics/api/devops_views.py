@@ -17,7 +17,6 @@ import pandas as pd
 from django.conf import settings
 from django.core.files.storage import default_storage
 from django.http import HttpResponse
-from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -34,6 +33,11 @@ from analytics.infrastructure.collectors.devops_collectors import (
 from analytics.infrastructure.tasks.devops_tasks import start_job
 from analytics.models import Dataset, DevOpsCollectionJob
 from analytics.api.serializers import DatasetSerializer
+from analytics.api.access import (
+    filter_dataset_queryset_for_request,
+    get_dataset_for_request,
+    get_devops_job_for_request,
+)
 from analytics.workspace_tokens import WorkspaceTokenError, resolve_workspace_token
 
 logger = logging.getLogger(__name__)
@@ -300,7 +304,7 @@ class DevOpsJobStatusView(APIView):
     """
 
     def get(self, request, pk):
-        job = get_object_or_404(DevOpsCollectionJob, pk=pk)
+        job = get_devops_job_for_request(request, pk)
         return Response(_serialize_job(job))
 
 
@@ -432,7 +436,7 @@ class DevOpsDatasetDownloadView(APIView):
     """
 
     def get(self, request, pk):
-        dataset = get_object_or_404(Dataset, pk=pk)
+        dataset = get_dataset_for_request(request, pk)
         if dataset.source_type not in ('kanban', 'cicd'):
             return Response(
                 {'error': f'This endpoint only serves kanban / cicd datasets '
@@ -534,7 +538,7 @@ class DevOpsComputeMetricsView(APIView):
     """
 
     def post(self, request, pk):
-        dataset = get_object_or_404(Dataset, pk=pk)
+        dataset = get_dataset_for_request(request, pk)
         if dataset.source_type not in ('kanban', 'cicd'):
             return Response(
                 {'error': 'compute-metrics only supports kanban / cicd datasets.'},
@@ -569,7 +573,7 @@ class DevOpsComputeMetricsCSVView(APIView):
     """
 
     def post(self, request, pk):
-        dataset = get_object_or_404(Dataset, pk=pk)
+        dataset = get_dataset_for_request(request, pk)
         if dataset.source_type not in ('kanban', 'cicd'):
             return Response(
                 {'error': 'compute-metrics only supports kanban / cicd datasets.'},
@@ -716,7 +720,10 @@ class DevOpsDatasetsView(APIView):
                 {'error': 'source_type must be "kanban" or "cicd".'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        queryset = Dataset.objects.filter(source_type=source_type).order_by('-uploaded_at')
+        queryset = filter_dataset_queryset_for_request(
+            Dataset.objects.filter(source_type=source_type).order_by('-uploaded_at'),
+            request,
+        )
         return Response({
             'count': queryset.count(),
             'results': DatasetSerializer(queryset, many=True).data,

@@ -8,10 +8,9 @@ import {
   CheckCircle,
   AlertCircle,
 } from "lucide-react";
-import { authService } from "../../services/api";
+import { authService, getApiErrorMessage } from "../../services/api";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../../hooks/useAuth";
-import axios from "axios";
 
 const Login = () => {
   const [email, setEmail] = useState("");
@@ -24,21 +23,11 @@ const Login = () => {
 
   const handleSocialLogin = async (provider) => {
     try {
-      let response;
-      if (provider === "GitHub") {
-        // response = await authService.getGitHubAuthUrl();
-        response = await axios.get('http://localhost:8000/api/auth/oauth/github');
-      } else if (provider === "GitLab") {
-        // response = await authService.getGitLabAuthUrl();
-        response = await axios.get('http://localhost:8000/api/auth/oauth/gitlab');
-      } else {
-        // response = await authService.getGoogleAuthUrl();
-        response = await axios.get('http://localhost:8000/api/auth/oauth/google');
-      }
+      const response = await authService.getOAuthUrl(provider.toLowerCase());
       window.location.href = response.data.url;
     } catch (error) {
       console.error(`Error initiating ${provider} login:`, error);
-      setError(`Failed to connect to ${provider}`);
+      setError(getApiErrorMessage(error, `Failed to connect to ${provider}`));
     }
   };
 
@@ -65,7 +54,7 @@ const Login = () => {
       login(access, refresh);
       navigate("/workspaces");
     } catch (err) {
-      setError(err.response?.data?.message || "Incorrect email or password");
+      setError(getApiErrorMessage(err, "Incorrect email or password"));
     } finally {
       setLoading(false);
     }

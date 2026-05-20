@@ -18,9 +18,20 @@ from decouple import config
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
+def csv_config(name, default=""):
+    return [
+        value.strip()
+        for value in config(name, default=default).split(",")
+        if value.strip()
+    ]
+
+
 SECRET_KEY = config("SECRET_KEY")
 DEBUG = config("DEBUG", default=False, cast=bool)
-ALLOWED_HOSTS = config("ALLOWED_HOSTS", default="").split(",")
+ALLOWED_HOSTS = csv_config(
+    "ALLOWED_HOSTS",
+    default="localhost,127.0.0.1,[::1],auth-service,api-gateway",
+)
 
 GITHUB_CLIENT_ID = config("GITHUB_CLIENT_ID", default="")
 GITHUB_CLIENT_SECRET = config("GITHUB_CLIENT_SECRET", default="")
@@ -101,13 +112,13 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    "corsheaders.middleware.CorsMiddleware",
 ]
 
 ROOT_URLCONF = "authentication.urls"
@@ -201,7 +212,7 @@ SIMPLE_JWT = {
 }
 
 
-CORS_ALLOWED_ORIGINS = config("CORS_ALLOWED_ORIGINS", default="").split(",")
+CORS_ALLOWED_ORIGINS = csv_config("CORS_ALLOWED_ORIGINS")
 
 AUTH_USER_MODEL = "users.User"
 

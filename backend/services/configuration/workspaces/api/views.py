@@ -296,16 +296,28 @@ class RepositoryImportView(APIView):
             imported_repos, errors = RepositoryService.import_repositories(
                 workspace, repository_ids
             )
+            imported_count = len(imported_repos)
+            response_status = status.HTTP_201_CREATED
+            if errors and imported_count == 0:
+                response_status = status.HTTP_400_BAD_REQUEST
+            elif errors:
+                response_status = status.HTTP_207_MULTI_STATUS
+
             return Response(
                 {
-                    "success": True,
-                    "imported_count": len(imported_repos),
+                    "success": not errors,
+                    "imported_count": imported_count,
                     "repositories": RepositorySerializer(
                         imported_repos, many=True
                     ).data,
                     "errors": errors,
+                    "message": (
+                        f"{imported_count} repositories imported, {len(errors)} failed"
+                        if errors
+                        else f"{imported_count} repositories imported successfully"
+                    ),
                 },
-                status=status.HTTP_201_CREATED,
+                status=response_status,
             )
         except ValueError as e:
             return Response({"error": str(e)}, status=status.HTTP_404_NOT_FOUND)
@@ -322,7 +334,16 @@ class RepositoryListView(APIView):
     @repository_list_schema
     def get(self, request, workspace_id):
         """List all imported repositories with optional filtering."""
-        queryset = Repository.objects.filter(workspace_id=workspace_id)
+        if not request.user_id:
+            return Response(
+                {"error": "Authentication required"},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        queryset = Repository.objects.filter(
+            workspace_id=workspace_id,
+            workspace__user=request.user_id,
+        )
 
         is_active = request.query_params.get("is_active")
         if is_active is not None:
@@ -343,20 +364,34 @@ class RepositoryListView(APIView):
 class RepositoryDetailView(APIView):
     """Detailed operations on a repository."""
 
+    def _get_repository(self, request, workspace_id, repository_id):
+        return get_object_or_404(
+            Repository,
+            id=repository_id,
+            workspace_id=workspace_id,
+            workspace__user=request.user_id,
+        )
+
     @repository_detail_schema
     def get(self, request, workspace_id, repository_id):
         """Retrieve the details of a repository."""
-        repository = get_object_or_404(
-            Repository, id=repository_id, workspace_id=workspace_id
-        )
+        if not request.user_id:
+            return Response(
+                {"error": "Authentication required"},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+        repository = self._get_repository(request, workspace_id, repository_id)
         return Response(RepositorySerializer(repository).data)
 
     @repository_detail_schema
     def patch(self, request, workspace_id, repository_id):
         """Update allowed fields of a repository (is_active, description)."""
-        repository = get_object_or_404(
-            Repository, id=repository_id, workspace_id=workspace_id
-        )
+        if not request.user_id:
+            return Response(
+                {"error": "Authentication required"},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+        repository = self._get_repository(request, workspace_id, repository_id)
         allowed_fields = ["is_active", "description"]
         for key, value in request.data.items():
             if key in allowed_fields:
@@ -367,9 +402,12 @@ class RepositoryDetailView(APIView):
     @repository_delete_schema
     def delete(self, request, workspace_id, repository_id):
         """Delete a repository."""
-        repository = get_object_or_404(
-            Repository, id=repository_id, workspace_id=workspace_id
-        )
+        if not request.user_id:
+            return Response(
+                {"error": "Authentication required"},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+        repository = self._get_repository(request, workspace_id, repository_id)
         repository.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 

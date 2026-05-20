@@ -49,6 +49,19 @@ FETCH_BY_ID_FAIL = {
     "repository": None,
 }
 
+LIGHTWEIGHT_GITHUB_REPO = {
+    "id": 709287984,
+    "name": "My-Portfolio",
+    "full_name": "ousscher/My-Portfolio",
+    "description": "Portfolio website",
+    "url": "https://github.com/ousscher/My-Portfolio",
+    "clone_url": "https://github.com/ousscher/My-Portfolio.git",
+    "default_branch": "main",
+    "private": False,
+    "language": "JavaScript",
+    "updated_at": "2026-03-30T16:42:57Z",
+}
+
 
 @pytest.mark.django_db
 class TestImportRepositories:
@@ -61,6 +74,24 @@ class TestImportRepositories:
         assert errors == []
         assert imported[0].external_id == "123456"
         assert Repository.objects.filter(workspace=workspace, external_id="123456").exists()
+
+    @patch.object(
+        RepositoryService,
+        "fetch_repositories",
+        return_value={
+            "success": True,
+            "message": "1 repositories found",
+            "repositories": [LIGHTWEIGHT_GITHUB_REPO],
+        },
+    )
+    def test_imports_from_lightweight_listing_derives_owner_from_full_name(
+        self, mock_fetch, workspace
+    ):
+        imported, errors = RepositoryService.import_repositories(workspace, ["709287984"])
+
+        assert errors == []
+        assert len(imported) == 1
+        assert imported[0].owner == "ousscher"
 
     @patch.object(RepositoryService, "fetch_repository_by_id", return_value=FETCH_BY_ID_SUCCESS)
     @patch.object(RepositoryService, "fetch_repositories", return_value=FETCH_ALL_EMPTY)

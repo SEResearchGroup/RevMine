@@ -10,12 +10,12 @@ class DatasetSerializer(serializers.ModelSerializer):
     class Meta:
         model = Dataset
         fields = [
-            'id', 'workspace_id', 'repository_id', 'platform',
+            'id', 'user_id', 'workspace_id', 'repository_id', 'platform',
             'source_type', 'source_config', 'collection_id',
             'filename', 'file_path', 'rows_count', 'columns_count',
             'columns_metadata', 'uploaded_at', 'updated_at'
         ]
-        read_only_fields = ["id", "uploaded_at", "updated_at"]
+        read_only_fields = ["id", "user_id", "uploaded_at", "updated_at"]
 
 
 class DatasetUploadSerializer(serializers.Serializer):

@@ -21,6 +21,7 @@ from collectors.services import (
     MetricsService,
     BranchService,
     resolve_workspace_token,
+    resolve_repository_metadata,
     CollectionService,
     CollectedDataService,
     DataCleaningService,
@@ -31,6 +32,7 @@ from collectors.services import (
     StorageError,
     UserDatasetsService,
 )
+from collectors.automation import CollectionAutomationService
 from collectors.schema import (
     available_metrics_schema,
     branches_for_repository_schema,
@@ -141,25 +143,64 @@ class GetBranchesForRepositoryView(UserIdRequiredMixin, APIView):
         platform = request.data.get('platform')
         token = request.data.get('token')
         workspace_id = request.data.get('workspace_id')
+        repository_id = request.data.get('repository_id')
         repo_full_name = request.data.get('repository_full_name')
         default_branch = request.data.get('default_branch')
 
+        if (not platform or not repo_full_name) and workspace_id and repository_id:
+            try:
+                repository = resolve_repository_metadata(
+                    user_id=user_id,
+                    workspace_id=int(workspace_id),
+                    repository_id=int(repository_id),
+                )
+            except (TypeError, ValueError):
+                return Response(
+                    {'error': 'workspace_id and repository_id must be valid integers'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            except CollectionValidationError as exc:
+                return Response(
+                    {'error': str(exc), 'branches': []},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            platform = platform or repository["platform"]
+            repo_full_name = repo_full_name or repository["repository_full_name"]
+            default_branch = default_branch or repository.get("default_branch")
+
         if not all([platform, repo_full_name]):
             return Response(
-                {'error': 'platform and repository_full_name are required'},
+                {
+                    'error': (
+                        'platform and repository_full_name are required '
+                        '(or provide workspace_id and repository_id)'
+                    )
+                },
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        if not token:
-            if not workspace_id:
-                return Response(
-                    {'error': 'workspace_id is required when token is not provided'},
-                    status=status.HTTP_400_BAD_REQUEST,
+        try:
+            if not token:
+                if not workspace_id:
+                    return Response(
+                        {'error': 'workspace_id is required when token is not provided'},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+                token = resolve_workspace_token(
+                    user_id=user_id,
+                    workspace_id=int(workspace_id),
+                    platform=platform,
                 )
-            token = resolve_workspace_token(
-                user_id=user_id,
-                workspace_id=int(workspace_id),
-                platform=platform,
+        except (TypeError, ValueError):
+            return Response(
+                {'error': 'workspace_id must be a valid integer'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except CollectionValidationError as exc:
+            return Response(
+                {'success': False, 'error': str(exc), 'branches': []},
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
         try:
@@ -231,7 +272,39 @@ class StartCollectionView(UserIdRequiredMixin, APIView):
         if not user_id:
             return self.user_id_error_response()
 
-        serializer = StartCollectionSerializer(data=request.data)
+        request_data = request.data.copy()
+        workspace_id = request_data.get("workspace_id")
+        repository_id = request_data.get("repository_id")
+        required_metadata = (
+            "repository_name",
+            "repository_full_name",
+            "platform",
+        )
+        if workspace_id and repository_id and any(
+            not request_data.get(field) for field in required_metadata
+        ):
+            try:
+                repository = resolve_repository_metadata(
+                    user_id=user_id,
+                    workspace_id=int(workspace_id),
+                    repository_id=int(repository_id),
+                )
+            except (TypeError, ValueError):
+                return Response(
+                    {"error": "workspace_id and repository_id must be valid integers"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            except CollectionValidationError as exc:
+                return Response(
+                    {"error": str(exc)},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            for key, value in repository.items():
+                if value is not None and not request_data.get(key):
+                    request_data[key] = value
+
+        serializer = StartCollectionSerializer(data=request_data)
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -268,6 +341,27 @@ class StartCollectionView(UserIdRequiredMixin, APIView):
             },
             status=status.HTTP_201_CREATED,
         )
+
+
+class AutomationPreviewView(UserIdRequiredMixin, APIView):
+    """Generate a reviewable collection and cleaning draft from a prompt."""
+
+    def post(self, request):
+        user_id = self.get_user_id(request)
+        if not user_id:
+            return self.user_id_error_response()
+
+        try:
+            preview = CollectionAutomationService.generate_preview(
+                user_id=user_id,
+                payload=request.data,
+            )
+        except CollectionValidationError as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        except CollectionServiceError as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
+
+        return Response(preview, status=status.HTTP_200_OK)
 
 
 class ConfigureMetricsView(UserIdRequiredMixin, APIView):

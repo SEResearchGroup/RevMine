@@ -9,8 +9,7 @@ import {
   AlertCircle,
   User,
 } from "lucide-react";
-import { authService } from "../../services/api";
-import axios from "axios";
+import { authService, getApiErrorMessage } from "../../services/api";
 
 const Register = () => {
   const [firstName, setFirstName] = useState("");
@@ -55,8 +54,7 @@ const Register = () => {
       navigate("/login?registered=true");
     } catch (err) {
       setError(
-        err.response?.data?.message ||
-          "An error occurred while creating the account"
+        getApiErrorMessage(err, "An error occurred while creating the account")
       );
     } finally {
       setLoading(false);
@@ -65,18 +63,11 @@ const Register = () => {
 
   const handleSocialRegister = async (provider) => {
     try {
-      let response;
-      if (provider === "GitHub") {
-        response = await axios.get('http://localhost:8000/api/auth/oauth/github');
-      } else if (provider === "GitLab") {
-        response = await axios.get('http://localhost:8000/api/auth/oauth/gitlab');
-      } else {
-        response = await axios.get('http://localhost:8000/api/auth/oauth/google');
-      }
+      const response = await authService.getOAuthUrl(provider.toLowerCase());
       window.location.href = response.data.url;
     } catch (err) {
       console.error(`Error initiating ${provider} registration:`, err);
-      setError(`Failed to connect to ${provider}`);
+      setError(getApiErrorMessage(err, `Failed to connect to ${provider}`));
     }
   };
 

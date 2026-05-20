@@ -1,9 +1,11 @@
 """Collection Services Layer - Business logic for the collection service."""
 
 import logging
+import os
 from datetime import datetime, timedelta
 from typing import Optional, Dict, List, Any, Tuple
 
+import requests
 from django.utils import timezone
 from django.db import transaction
 from kafka_utils.request_reply import RequestReplyClient
@@ -61,6 +63,61 @@ def resolve_workspace_token(user_id: int, workspace_id: int, platform: str) -> s
         )
 
     return token
+
+
+def resolve_repository_metadata(
+    user_id: int,
+    workspace_id: int,
+    repository_id: int,
+) -> Dict[str, Any]:
+    """Retrieve imported repository metadata from the configuration service."""
+    base_url = os.getenv(
+        "CONFIGURATION_SERVICE_URL",
+        "http://configuration-service:8001/api/workspaces",
+    ).rstrip("/")
+    timeout = float(os.getenv("CONFIGURATION_SERVICE_TIMEOUT", "10"))
+
+    try:
+        response = requests.get(
+            f"{base_url}/{workspace_id}/repositories/{repository_id}/",
+            headers={"X-User-ID": str(user_id)},
+            timeout=timeout,
+        )
+    except requests.RequestException as exc:
+        raise CollectionValidationError(
+            f"Could not retrieve repository metadata from configuration service: {exc}"
+        ) from exc
+
+    if response.status_code == 404:
+        raise CollectionValidationError("Repository not found in this workspace")
+    if response.status_code == 401:
+        raise CollectionValidationError("Authentication required to resolve repository")
+
+    try:
+        response.raise_for_status()
+        repository = response.json()
+    except (requests.RequestException, ValueError) as exc:
+        raise CollectionValidationError(
+            f"Invalid repository metadata response from configuration service: {exc}"
+        ) from exc
+
+    platform = repository.get("platform")
+    full_name = repository.get("full_name")
+    if not platform or not full_name:
+        raise CollectionValidationError(
+            "Repository metadata is missing platform or full_name"
+        )
+
+    return {
+        "workspace_id": workspace_id,
+        "repository_id": repository_id,
+        "repository_name": repository.get("name") or full_name.rsplit("/", 1)[-1],
+        "repository_full_name": full_name,
+        "platform": platform,
+        "repository_url": repository.get("web_url") or repository.get("url"),
+        "default_branch": repository.get("default_branch") or "main",
+        "external_id": repository.get("external_id"),
+    }
 
 
 def _normalize_raw_data(raw_data, platform: str):

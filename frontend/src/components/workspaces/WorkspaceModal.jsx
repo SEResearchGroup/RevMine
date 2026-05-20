@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { workspaceService } from "../../services/api";
+import { getApiErrorMessage, workspaceService } from "../../services/api";
 
 const WorkspaceModal = ({ workspace, onClose }) => {
   const isEditMode = !!workspace;
@@ -131,12 +131,22 @@ const WorkspaceModal = ({ workspace, onClose }) => {
 
     setIsImporting(true);
     try {
-      await workspaceService.importRepositories(createdWorkspaceId, {
+      const response = await workspaceService.importRepositories(createdWorkspaceId, {
         repository_ids: selectedRepos,
       });
+      if (response.data?.success === false || response.data?.errors?.length > 0) {
+        alert(
+          response.data?.message ||
+            "Some repositories could not be imported. Please review the import errors."
+        );
+        if ((response.data?.imported_count || 0) === 0) {
+          return;
+        }
+      }
       setStep(4);
     } catch (error) {
-      alert(error.response?.data?.message || "Error importing repositories");
+      const data = error.response?.data;
+      alert(data?.message || getApiErrorMessage(error, "Error importing repositories"));
     } finally {
       setIsImporting(false);
     }
