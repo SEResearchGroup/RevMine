@@ -2,7 +2,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from django.shortcuts import get_object_or_404
-from django.db.models import Q
+from django.db.models import Count, Q
 from django.core.paginator import Paginator
 
 from workspaces.models import Workspace, Repository
@@ -44,7 +44,9 @@ class WorkspaceListCreateView(APIView):
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 
-        queryset = Workspace.objects.filter(user=request.user_id)
+        queryset = Workspace.objects.filter(user=request.user_id).annotate(
+            projects_count=Count("repositories")
+        )
 
         platform = request.query_params.get("platform")
         if platform:

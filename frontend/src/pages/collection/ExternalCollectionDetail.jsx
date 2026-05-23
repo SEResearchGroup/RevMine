@@ -380,7 +380,7 @@ function ExternalCollectionDetail() {
 
       {/* Delete Cleaned Data Confirmation Modal */}
       {showDeleteCleaningModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 app-modal-backdrop flex items-center justify-center z-50">
           <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4">
             <h3 className="text-xl font-semibold text-gray-900 mb-4">Delete Cleaned Data</h3>
             <p className="text-gray-600 mb-2">

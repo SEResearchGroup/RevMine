@@ -33,7 +33,7 @@ const NewAnalysisModal = ({ isOpen, onClose, onChoice }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-6">
+    <div className="fixed inset-0 z-50 app-modal-backdrop flex items-center justify-center p-6">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
         <div className="flex items-center justify-between p-5 border-b border-gray-100">
           <h2 className="text-lg font-bold text-gray-800">New Analysis</h2>

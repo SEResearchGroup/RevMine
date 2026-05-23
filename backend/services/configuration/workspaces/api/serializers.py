@@ -64,6 +64,8 @@ class WorkspaceSerializer(serializers.ModelSerializer):
 class WorkspaceListSerializer(serializers.ModelSerializer):
     """Lightweight workspace serializer for list responses."""
 
+    projects_count = serializers.SerializerMethodField()
+
     class Meta:
         model = Workspace
         fields = [
@@ -73,10 +75,17 @@ class WorkspaceListSerializer(serializers.ModelSerializer):
             "platform",
             "url",
             "is_active",
+            "projects_count",
             "created_at",
             "updated_at",
             "last_sync",
         ]
+
+    def get_projects_count(self, obj):
+        annotated_count = getattr(obj, "projects_count", None)
+        if annotated_count is not None:
+            return annotated_count
+        return obj.repositories.count()
 
 
 class TestConnectionSerializer(serializers.Serializer):

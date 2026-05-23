@@ -38,7 +38,7 @@ const FullscreenOverlay = ({ result, activeType, onChartTypeChange, onClose }) =
     "Chart";
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-6">
+    <div className="fixed inset-0 z-50 app-modal-backdrop-strong flex items-center justify-center p-6">
       <div className="bg-white rounded-3xl shadow-2xl w-full max-w-6xl max-h-[90vh] overflow-auto">
         <div className="flex items-center justify-between p-6 border-b border-gray-100">
           <h2 className="text-lg font-bold text-gray-800">{title}</h2>

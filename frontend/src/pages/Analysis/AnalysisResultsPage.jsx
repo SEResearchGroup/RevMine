@@ -543,7 +543,7 @@ const AnalysisResultsPage = () => {
 
       {/* Fullscreen Modal */}
       {fullscreenChart && (
-        <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50">
+        <div className="fixed inset-0 app-modal-backdrop-strong flex items-center justify-center z-50">
           <button
             onClick={closeFullscreen}
             className="absolute top-6 right-6 p-3 bg-white/10 hover:bg-white/20 rounded-full transition-colors"

@@ -12,9 +12,7 @@ import {
   GitBranch,
   FolderGit2,
   CheckCircle2,
-  Clock,
   AlertCircle,
-  BarChart3,
   Layers,
   Github,
   FileSpreadsheet,
@@ -23,6 +21,33 @@ import {
   X,
 } from "lucide-react";
 import { collectionService, workspaceService } from "../../services/api";
+
+const WORKSPACES_PAGE_SIZE = 100;
+
+const listFromResponse = (data) => {
+  if (Array.isArray(data)) {
+    return data;
+  }
+  return Array.isArray(data?.results) ? data.results : [];
+};
+
+const fetchAllWorkspaces = async () => {
+  let page = 1;
+  let hasNext = true;
+  const workspaces = [];
+
+  while (hasNext) {
+    const response = await workspaceService.getAll({
+      page,
+      page_size: WORKSPACES_PAGE_SIZE,
+    });
+    workspaces.push(...listFromResponse(response.data));
+    hasNext = Boolean(response.data?.has_next);
+    page += 1;
+  }
+
+  return workspaces;
+};
 
 function DataCleaningList() {
   const navigate = useNavigate();
@@ -61,9 +86,7 @@ function DataCleaningList() {
       // API returns array directly, not wrapped in { plans: [...] }
       const allPlans = Array.isArray(plansResponse.data)
         ? plansResponse.data
-        : (plansResponse.data.plans || []);
-
-      console.log("All plans fetched:", allPlans);
+        : (plansResponse.data?.plans || listFromResponse(plansResponse.data));
 
       // Filter collections that have data (completed, paused, or interrupted)
       const validStatuses = ["completed", "paused", "in_progress", "failed"];
@@ -71,33 +94,7 @@ function DataCleaningList() {
         (plan) => validStatuses.includes(plan.status)
       );
 
-      console.log("Collections with valid status:", collectionsWithData);
-
-      // Get all workspaces
-      const workspacesResponse = await workspaceService.getAll();
-      const workspacesList = workspacesResponse.data || [];
-
-      // Create workspace map
-      const workspaceMap = {};
-      workspacesList.forEach((ws) => {
-        workspaceMap[ws.id] = ws;
-      });
-      setWorkspaces(workspaceMap);
-
-      // Get repositories for each workspace
-      const repoMap = {};
-      for (const ws of workspacesList) {
-        try {
-          const reposResponse = await workspaceService.getRepositories(ws.id);
-          const repos = reposResponse.data || [];
-          repos.forEach((repo) => {
-            repoMap[repo.id] = { ...repo, workspace_id: ws.id };
-          });
-        } catch (err) {
-          console.error(`Error fetching repos for workspace ${ws.id}:`, err);
-        }
-      }
-      setRepositories(repoMap);
+      await enrichCollectionsWithWorkspaceDetails();
 
       // Fetch cleaned data count for each collection
       const collectionsWithCleanedData = await Promise.all(
@@ -130,9 +127,6 @@ function DataCleaningList() {
       setCollections(collectionsWithCleanedData);
 
       // Calculate stats
-      const cleanedCount = collectionsWithCleanedData.filter(
-        (c) => c.is_cleaned
-      ).length;
       const completedCount = collectionsWithCleanedData.filter(
         (c) => c.status === "completed"
       ).length;
@@ -157,15 +151,46 @@ function DataCleaningList() {
     }
   };
 
+  const enrichCollectionsWithWorkspaceDetails = async () => {
+    try {
+      const workspacesList = await fetchAllWorkspaces();
+
+      const workspaceMap = {};
+      workspacesList.forEach((ws) => {
+        workspaceMap[ws.id] = ws;
+      });
+      setWorkspaces(workspaceMap);
+
+      const repoMap = {};
+      for (const ws of workspacesList) {
+        try {
+          const reposResponse = await workspaceService.getRepositories(ws.id);
+          const repos = listFromResponse(reposResponse.data);
+          repos.forEach((repo) => {
+            repoMap[repo.id] = { ...repo, workspace_id: ws.id };
+          });
+        } catch (err) {
+          console.error(`Error fetching repos for workspace ${ws.id}:`, err);
+        }
+      }
+      setRepositories(repoMap);
+    } catch (err) {
+      console.error("Error fetching workspace details:", err);
+      setWorkspaces({});
+      setRepositories({});
+    }
+  };
+
   const filteredCollections = collections.filter((collection) => {
     const repo = repositories[collection.repository_id];
-    const workspace = repo ? workspaces[repo.workspace_id] : null;
+    const workspaceId = repo?.workspace_id || collection.workspace_id;
+    const workspace = workspaceId ? workspaces[workspaceId] : null;
 
     const searchLower = searchTerm.toLowerCase();
     const repoName = (repo?.name || collection.repository_name || "").toLowerCase();
     const workspaceName = (workspace?.name || "").toLowerCase();
     const platform = (workspace?.platform || collection.platform || "").toLowerCase();
-    
+
     return (
       repoName.includes(searchLower) ||
       workspaceName.includes(searchLower) ||
@@ -207,17 +232,12 @@ function DataCleaningList() {
       return;
     }
     const repo = repositories[collection.repository_id];
-    if (repo) {
+    const workspaceId = repo?.workspace_id || collection.workspace_id;
+    if (workspaceId && collection.repository_id) {
       navigate(
-        `/workspaces/${repo.workspace_id}/repositories/${collection.repository_id}/collection/${collection.id}`
+        `/workspaces/${workspaceId}/repositories/${collection.repository_id}/collection/${collection.id}`
       );
     }
-  };
-
-  const getSelectedMetricsCount = (collection) => {
-    if (!collection.configuration?.selected_metrics) return 0;
-    const metrics = collection.configuration.selected_metrics;
-    return Object.values(metrics).flat().length;
   };
 
   const getPlatformIcon = (platform) => {
@@ -242,7 +262,9 @@ function DataCleaningList() {
         uploadName.trim(),
         (progressEvent) => {
           if (progressEvent.total) {
-            setUploadProgress(Math.round((progressEvent.loaded * 100) / progressEvent.total));
+            setUploadProgress(
+              Math.round((progressEvent.loaded * 100) / progressEvent.total)
+            );
           }
         }
       );
@@ -253,7 +275,9 @@ function DataCleaningList() {
       setUploadProgress(0);
       fetchAllCollections();
     } catch (err) {
-      setUploadError(err.response?.data?.error || "Upload failed. Please try again.");
+      setUploadError(
+        err.response?.data?.error || "Upload failed. Please try again."
+      );
     } finally {
       setUploading(false);
     }
@@ -386,8 +410,8 @@ function DataCleaningList() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5">
             {filteredCollections.map((collection) => {
               const repo = repositories[collection.repository_id];
-              const workspace = repo ? workspaces[repo.workspace_id] : null;
-              const metricsCount = getSelectedMetricsCount(collection);
+              const workspaceId = repo?.workspace_id || collection.workspace_id;
+              const workspace = workspaceId ? workspaces[workspaceId] : null;
 
               return (
                 <div
@@ -408,14 +432,14 @@ function DataCleaningList() {
                         <div className="flex items-center gap-1 text-xs text-gray-500">
                           {getPlatformIcon(workspace?.platform || collection.platform)}
                           <span className="truncate">
-                            {workspace?.name || (collection.is_external ? "External Upload" : "Unknown Workspace")}
+                            {workspace?.name ||
+                              (collection.is_external
+                                ? "External Upload"
+                                : "Unknown Workspace")}
                           </span>
                         </div>
                       </div>
                     </div>
-
-
-
                   </div>
 
                   {/* Collection info */}
@@ -425,14 +449,13 @@ function DataCleaningList() {
                       <span>{formatDate(collection.created_at)}</span>
                     </div>
 
-
-
-
                     <div className="flex items-center gap-2">
                       <Layers className="w-4 h-4 text-gray-400" />
                       <span>
                         {collection.total_items || 0}{" "}
-                        {(workspace?.platform || collection.platform) === "github" ? "PRs" : "MRs"}
+                        {(workspace?.platform || collection.platform) === "github"
+                          ? "PRs"
+                          : "MRs"}
                       </span>
                     </div>
 
@@ -492,7 +515,7 @@ function DataCleaningList() {
 
         {/* Upload External Data Modal */}
         {showUploadModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="fixed inset-0 z-50 app-modal-backdrop flex items-center justify-center">
             <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 relative">
               <button
                 onClick={() => setShowUploadModal(false)}

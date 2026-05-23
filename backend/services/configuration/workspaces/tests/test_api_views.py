@@ -30,6 +30,20 @@ class TestWorkspaceListCreate:
         resp = api_client.get("/api/workspaces/")
         assert resp.status_code == status.HTTP_200_OK
 
+    def test_list_includes_imported_repository_count(
+        self, api_client, workspace, create_repository
+    ):
+        create_repository(workspace=workspace, external_id="repo-1", name="repo-1")
+        create_repository(workspace=workspace, external_id="repo-2", name="repo-2")
+
+        resp = api_client.get("/api/workspaces/")
+
+        assert resp.status_code == status.HTTP_200_OK
+        listed_workspace = next(
+            item for item in resp.data["results"] if item["id"] == workspace.id
+        )
+        assert listed_workspace["projects_count"] == 2
+
     @patch(
         "workspaces.services.workspace_service.ConnectionService.test_connection",
         return_value=CONN_OK,
