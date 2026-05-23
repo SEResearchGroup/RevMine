@@ -1,0 +1,99 @@
+\documentclass[a4paper,12pt]{report}
+
+\usepackage{fontspec}        
+\usepackage{xcolor,graphicx} 
+\usepackage[top=0.6in,bottom=0.6in,right=1in,left=1in]{geometry} 
+\graphicspath{{images/}{assets/}} 
+\usepackage{polyglossia}    
+\setmainlanguage{french}
+\setotherlanguage{arabic}
+\newfontfamily\arabicfont[Script=Arabic,Scale=1.1]{Scheherazade}
+
+\begin{document}
+
+% ===========================
+% Page de titre
+% ===========================
+\begin{titlepage}
+    \centering
+
+    {\small République Algérienne Démocratique et Populaire}\\
+    \begin{Arabic}
+    الجمهورية الجزائرية الديمقراطية الشعبية \\
+    \end{Arabic}
+
+    {\small Ministère de l'Enseignement Supérieur et de la Recherche Scientifique}\\
+    \begin{Arabic}
+    وزارة التعليم العالي و البحث العلمي \\
+    \end{Arabic}
+
+    \rule{\linewidth}{0.3mm} \\[0.4cm]
+
+    \begin{minipage}{5cm}
+        \begin{center}
+            \includegraphics[width=5cm]{esi_logo.png}
+        \end{center}
+    \end{minipage}\hfill
+    \begin{minipage}{10cm}
+        \begin{flushright}
+        \begin{Arabic}
+        المدرسة الوطنية العليا للإعلام الآلي \\
+        (المعهد الوطني للتكوين في الإعلام الآلي سابقا)
+        \end{Arabic}\\
+        {\small École nationale Supérieure d'Informatique}\\[0.1cm]
+        {\small ex. INI (Institut National de formation en Informatique)}\\[0.1cm]
+        \end{flushright}
+    \end{minipage}\\
+
+    \vspace{20mm}
+    {\large \bfseries Mémoire de fin d’études}\\[0.5cm]
+    {\large Pour l'obtention du diplôme d'Ingénieur d'État en Informatique}\\[0.5cm]
+    \begin{center}
+    \begin{minipage}{0.7\textwidth}
+    \raggedright
+    {\large \bfseries Option : Systèmes Intelligents et Données}\\
+    \vspace{2mm}
+    {\large \bfseries Option : Systèmes Informatiques}
+    \end{minipage}
+    \end{center}
+    \vspace{10mm}
+
+    % Titre du projet
+    \rule{\linewidth}{0.3mm} \\[0.4cm]
+    {\huge \bfseries RevMine : Conception et Validation d'un Outil LLM pour l'analyse des Revues de Code \\[0.4cm]}
+    \rule{\linewidth}{0.3mm} \\[1cm]
+    \vspace{10mm}
+
+    \noindent
+\begin{minipage}{0.48\textwidth}
+    \begin{flushleft} \large
+        \textbf{Réalisé par :}\\
+        M. \textsc{Cherguelaine} Oussama (ESI)\\
+        M. \textsc{Merabet} Mohamed Riad (ESI)
+    \end{flushleft}
+\end{minipage}
+\hfill
+\begin{minipage}{0.48\textwidth}
+    \begin{flushright} \large
+        \textbf{Encadré par :} \\
+        Mme. \textsc{Abdellaoui} Sabrina (ESI)\\
+        Mme. \textsc{Kansab} Samah (ETS)\\
+        M. \textsc{Bordelau} Fransis (ETS)
+    \end{flushright}
+\end{minipage}\\[1cm]
+
+    {\large \textit{Soutenu le xx yy 2026, Devant le jury composé de : }}\\[0.5cm]
+
+    \centering
+    \begin{tabular}{lll}
+        \large xxx \textsc{YYY} : & \large ESI & \large - Présidente \\[0.1cm]
+        \large xxx \textsc{YYY} : & \large ESI & \large - Examinateur \\[0.1cm]
+        \large www \textsc{yyy} : & \large ESI & \large - Rapporteur
+    \end{tabular}
+
+    \vspace{15mm}
+    {\large Promotion : 2025/2026}
+
+\end{titlepage}
+
+\end{document}

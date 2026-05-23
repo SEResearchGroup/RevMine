@@ -73,5 +73,5 @@ data/
 *.http
 
 
-memoire/
-memoire*
+# memoire/
+# memoire*

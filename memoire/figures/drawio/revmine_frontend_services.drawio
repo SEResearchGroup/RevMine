@@ -1,0 +1,115 @@
+<mxfile host="app.diagrams.net" modified="2026-05-17T00:00:00.000Z" agent="Codex" version="24.7.17" type="device">
+  <diagram id="revmine-frontend-services" name="Frontend et services">
+    <mxGraphModel dx="1422" dy="794" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="800" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="front" value="Frontend React / Vite" style="swimlane;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="40" width="260" height="520" as="geometry"/>
+        </mxCell>
+        <mxCell id="s1" value="Auth / Profile" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="front">
+          <mxGeometry x="35" y="60" width="190" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="s2" value="Workspaces / Settings" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="front">
+          <mxGeometry x="35" y="135" width="190" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="s3" value="Collection / Import" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="front">
+          <mxGeometry x="35" y="210" width="190" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="s4" value="Analysis / Kanban / CI-CD" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="front">
+          <mxGeometry x="35" y="285" width="190" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="s5" value="Notifications" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="front">
+          <mxGeometry x="35" y="360" width="190" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="gw" value="API Gateway&lt;br&gt;FastAPI : CORS, proxy, rate limit, introspection JWT" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="370" y="240" width="230" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="auth" value="auth-service&lt;br&gt;Django / DRF" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="680" y="60" width="190" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="config" value="configuration-service&lt;br&gt;workspaces, tokens, repos" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="680" y="145" width="210" height="65" as="geometry"/>
+        </mxCell>
+        <mxCell id="collection" value="collection-service&lt;br&gt;plans, collecte, nettoyage" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="680" y="235" width="210" height="65" as="geometry"/>
+        </mxCell>
+        <mxCell id="analyze" value="analyze-service&lt;br&gt;datasets, metriques, Celery" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="680" y="325" width="210" height="65" as="geometry"/>
+        </mxCell>
+        <mxCell id="llm" value="llm-service&lt;br&gt;plans JSON LLM" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="680" y="415" width="210" height="65" as="geometry"/>
+        </mxCell>
+        <mxCell id="notif" value="notification-service&lt;br&gt;REST + WebSocket" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="680" y="505" width="210" height="65" as="geometry"/>
+        </mxCell>
+        <mxCell id="db1" value="auth-db" style="shape=cylinder3d;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="1040" y="55" width="120" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="db2" value="configuration-db&lt;br&gt;tokens chiffres" style="shape=cylinder3d;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="1040" y="135" width="150" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="minio" value="MinIO&lt;br&gt;JSON / CSV" style="shape=cylinder3d;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="1040" y="225" width="150" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="redis" value="Redis&lt;br&gt;Celery broker" style="shape=cylinder3d;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="1040" y="315" width="150" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="kafka" value="Kafka&lt;br&gt;events" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1040" y="415" width="150" height="65" as="geometry"/>
+        </mxCell>
+        <mxCell id="db3" value="notification-db" style="shape=cylinder3d;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="1040" y="505" width="150" height="75" as="geometry"/>
+        </mxCell>
+        <mxCell id="f1" value="REST via Gateway" style="endArrow=block;html=1;rounded=0;strokeWidth=2;" edge="1" parent="1" source="front" target="gw">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="g1" value="" style="endArrow=block;html=1;rounded=0;" edge="1" parent="1" source="gw" target="auth">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="g2" value="" style="endArrow=block;html=1;rounded=0;" edge="1" parent="1" source="gw" target="config">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="g3" value="" style="endArrow=block;html=1;rounded=0;" edge="1" parent="1" source="gw" target="collection">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="g4" value="" style="endArrow=block;html=1;rounded=0;" edge="1" parent="1" source="gw" target="analyze">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="g5" value="" style="endArrow=block;html=1;rounded=0;" edge="1" parent="1" source="gw" target="llm">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="g6" value="REST" style="endArrow=block;html=1;rounded=0;" edge="1" parent="1" source="gw" target="notif">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="ws" value="WS direct dev : localhost:8005" style="endArrow=block;html=1;rounded=0;dashed=1;strokeColor=#d79b00;" edge="1" parent="1" source="s5" target="notif">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="i1" value="" style="endArrow=block;html=1;rounded=0;" edge="1" parent="1" source="auth" target="db1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="i2" value="" style="endArrow=block;html=1;rounded=0;" edge="1" parent="1" source="config" target="db2">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="i3" value="" style="endArrow=block;html=1;rounded=0;" edge="1" parent="1" source="collection" target="minio">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="i4" value="" style="endArrow=block;html=1;rounded=0;" edge="1" parent="1" source="analyze" target="redis">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="i5" value="" style="endArrow=block;html=1;rounded=0;dashed=1;" edge="1" parent="1" source="collection" target="kafka">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="i6" value="" style="endArrow=block;html=1;rounded=0;dashed=1;" edge="1" parent="1" source="analyze" target="kafka">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="i7" value="" style="endArrow=block;html=1;rounded=0;dashed=1;" edge="1" parent="1" source="kafka" target="notif">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="i8" value="" style="endArrow=block;html=1;rounded=0;" edge="1" parent="1" source="notif" target="db3">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

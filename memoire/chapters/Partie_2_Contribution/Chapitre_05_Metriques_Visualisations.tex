@@ -1,0 +1,200 @@
+\section{Introduction}
+
+Dans le cadre de RevMine, l’analyse des données de revue de code repose sur l’identification d’un ensemble de données, de métriques et d’analyses permettant de mieux comprendre les dynamiques du processus de revue. L’objectif est de transformer les informations extraites depuis les plateformes GitHub et GitLab en indicateurs exploitables pour les chercheurs, les praticiens DevOps et les managers.
+
+Ce chapitre présente les données retenues dans la plateforme RevMine. Nous commençons par définir les informations générales extraites des PR/MR, qui constituent la base nécessaire au calcul des métriques. Ensuite, nous présentons les différentes catégories de métriques retenues, puis les analyses et visualisations proposées à partir de ces indicateurs.
+
+
+\section{Critères de sélection des métriques}
+
+La sélection des métriques intégrées dans RevMine s’appuie sur trois critères principaux :
+
+\begin{itemize}
+    \item \textbf{Pertinence scientifique :} les métriques retenues sont alignées avec les indicateurs couramment utilisés dans les études empiriques sur la revue de code, notamment les mesures temporelles, les métriques de collaboration, les métriques liées aux changements de code et les mesures d’interaction dans les discussions \cite{chouchen2023reviewcompletion,bosu2014developerreputation,bavota2015four,rahman2017revhelper,turzo2023usefulcomments}.
+
+    \item \textbf{Exploitabilité multi-plateformes :} les métriques doivent pouvoir être calculées à partir des données disponibles sur GitHub et GitLab, malgré les différences entre leurs modèles de données. Les plateformes fournissent notamment des informations sur les PR/MR, les commits, les commentaires, les fichiers modifiés et les décisions de revue \cite{kansab2025revmine,kansab2025devopsmr}.
+
+    \item \textbf{Capacité d’analyse :} les métriques doivent permettre de produire des visualisations et analyses utiles pour les chercheurs, les praticiens DevOps et les managers, en facilitant l’identification des retards, des contributions importantes, de la complexité des changements ou des anomalies dans le processus de revue \cite{chouchen2023reviewcompletion,hassan2009predicting,kansab2025devopsmr}.
+\end{itemize}
+
+Certaines métriques, telles que le \textit{code churn}, l’entropie historique ou la diversité des committers, ne sont pas directement fournies comme métriques prêtes à l’emploi par les API. Elles doivent être calculées en combinant plusieurs champs collectés, ce qui justifie la nécessité d’un catalogue structuré de données et de métriques \cite{hassan2009predicting,bavota2015four,thongtanunam2015reviewer}.
+
+\section{Données générales collectées}
+Avant de calculer les métriques, RevMine doit extraire un ensemble d’informations générales relatives aux projets, aux dépôts et aux PR/MR. Ces informations ne sont pas toujours considérées comme des métriques d’analyse à part entière, mais elles sont indispensables pour identifier les entités collectées, structurer les datasets et calculer les indicateurs avancés.
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|p{3.5cm}|p{5cm}|p{6cm}|}
+\hline
+\textbf{Donnée} & \textbf{Description} & \textbf{Utilisation} \\
+\hline
+\textbf{Project ID} & Identifiant du projet ou dépôt analysé & Permet de rattacher chaque PR/MR à son projet d’origine \\
+\hline
+\textbf{Repository Name} & Nom du dépôt analysé & Facilite l’identification du projet dans les datasets \\
+\hline
+\textbf{Platform} & Plateforme source : GitHub ou GitLab & Permet de distinguer l’origine des données \\
+\hline
+\textbf{PR/MR ID} & Identifiant unique de la Pull Request ou Merge Request & Permet d’identifier chaque unité de revue \\
+\hline
+\textbf{PR/MR Title} & Titre de la PR/MR & Peut être utilisé pour des analyses textuelles ou des filtres par mots-clés \\
+\hline
+\textbf{PR/MR Description} & Description associée à la PR/MR & Sert à comprendre le contexte de la modification \\
+\hline
+\textbf{Author} & Auteur ayant créé la PR/MR & Utilisé pour les analyses de contribution \\
+\hline
+\textbf{Created At} & Date de création de la PR/MR & Sert au calcul des métriques temporelles \\
+\hline
+\textbf{Updated At} & Date de dernière mise à jour & Permet de suivre l’évolution de la PR/MR \\
+\hline
+\textbf{Merged At} & Date de fusion, si applicable & Sert au calcul du lead time \\
+\hline
+\textbf{Closed At} & Date de fermeture, si applicable & Permet d’analyser les PR/MR non fusionnées \\
+\hline
+\textbf{State} & État de la PR/MR : ouverte, fermée ou fusionnée & Permet d’analyser l’issue des contributions \\
+\hline
+\textbf{Source Branch} & Branche source de la PR/MR & Donne le contexte de développement \\
+\hline
+\textbf{Target Branch} & Branche cible de la PR/MR & Permet d’identifier la branche d’intégration \\
+\hline
+\textbf{Labels} & Labels associés à la PR/MR & Permettent des analyses par catégorie ou priorité \\
+\hline
+\textbf{URL} & Lien vers la PR/MR sur la plateforme source & Facilite la traçabilité des données collectées \\
+\hline
+\end{tabular}
+\end{table}
+
+Ces données permettent de conserver la traçabilité des éléments collectés et servent d’entrée au calcul des métriques temporelles, collaboratives et liées au code.
+
+
+
+\section{Métriques utilisées}
+
+Les métriques sélectionnées dans RevMine sont organisées en plusieurs catégories afin de faciliter leur interprétation.
+
+\subsection{Métriques temporelles}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|l|p{5cm}|p{6cm}|}
+\hline
+\textbf{Métrique} & \textbf{Description} & \textbf{Justification} \\
+\hline
+Lead Time & Temps entre la création et la fermeture (ou fusion) d’une PR/MR & Indicateur clé de performance DevOps permettant d’évaluer la rapidité du processus de revue \\
+\hline
+Temps moyen entre commits & Intervalle moyen entre deux commits successifs & Permet d’analyser le rythme de développement et l’activité des contributeurs \\
+\hline
+Delta Time & Temps entre la création du projet et la création de la PR/MR & Donne un contexte temporel sur la maturité du projet \\
+\hline
+\end{tabular}
+\caption{Métriques temporelles}
+\end{table}
+
+\subsection{Métriques de collaboration}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|l|p{5cm}|p{6cm}|}
+\hline
+\textbf{Métrique} & \textbf{Description} & \textbf{Justification} \\
+\hline
+Nombre de commentaires & Total des commentaires dans la PR/MR & Reflète le niveau d’interaction et la profondeur de la revue \\
+\hline
+Nombre de discussions & Nombre de threads de discussion & Permet d’évaluer la complexité des échanges \\
+\hline
+Nombre de réviseurs & Nombre de personnes impliquées dans la revue & Indique le niveau de collaboration et de validation \\
+\hline
+Nombre de participants & Nombre total d’acteurs impliqués & Mesure globale de la collaboration \\
+\hline
+Nombre de committers & Nombre de contributeurs ayant effectué des commits & Permet d’analyser la distribution du travail \\
+\hline
+Auteurs majeurs / mineurs & Classification des contributeurs selon leur contribution & Permet d’identifier la concentration ou la dispersion du travail \\
+\hline
+\end{tabular}
+\caption{Métriques de collaboration}
+\end{table}
+
+\subsection{Métriques de code}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|p{4cm}|p{5cm}|p{6cm}|}
+\hline
+\textbf{Métrique} & \textbf{Description} & \textbf{Justification} \\
+\hline
+Code churn (additions/suppressions) & Nombre total de lignes ajoutées et supprimées & Indicateur de l’effort de développement et de la taille des modifications \\
+\hline
+Nombre de fichiers modifiés & Total des fichiers impactés & Permet d’évaluer la portée des changements \\
+\hline
+Types de fichiers & Nombre de types de fichiers modifiés & Indique la diversité technique des modifications \\
+\hline
+Taille initiale & Taille des modifications avant la création de la PR/MR & Donne une idée de la préparation du travail \\
+\hline
+Rework size & Modifications effectuées après les retours de revue & Indicateur de l’effort de correction suite aux feedbacks \\
+\hline
+Entropie historique & Mesure de la dispersion des modifications dans le code & Permet d’évaluer la complexité et la dispersion des changements \\
+\hline
+\end{tabular}
+\caption{Métriques liées au code}
+\end{table}
+
+\subsection{Métriques générales}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|l|p{5cm}|p{6cm}|}
+\hline
+\textbf{Métrique} & \textbf{Description} & \textbf{Justification} \\
+\hline
+Nombre de commits & Total des commits dans la PR/MR & Indicateur de granularité des modifications \\
+\hline
+État de la PR/MR & Statut (ouverte, fusionnée, fermée) & Permet d’analyser l’issue des contributions \\
+\hline
+\end{tabular}
+\caption{Métriques générales}
+\end{table}
+
+\section{Analyses proposées}
+
+À partir des données collectées et des métriques calculées, RevMine propose un ensemble d’analyses permettant d’explorer les pratiques de revue de code. Ces visualisations facilitent l’interprétation des résultats et permettent d’identifier des tendances ou anomalies dans les projets étudiés.
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|p{4cm}|p{5cm}|p{6cm}|}
+\hline
+\textbf{Analyse} & \textbf{Description} & \textbf{Justification} \\
+\hline
+Commits over time & Évolution du nombre de commits dans le temps & Permet d’identifier les périodes d’activité intense \\
+\hline
+Timeline des PR/MR & Distribution temporelle des créations de PR/MR & Donne une vision globale de l’activité du projet \\
+\hline
+Distribution du lead time & Répartition des temps de revue & Permet d’identifier les retards ou inefficacités \\
+\hline
+Distribution des commits & Répartition du nombre de commits par PR/MR & Analyse la granularité du travail \\
+\hline
+Analyse des committers & Contribution des différents développeurs & Permet d’identifier les principaux contributeurs \\
+\hline
+Code churn & Analyse des ajouts et suppressions de code & Évalue l’effort de développement \\
+\hline
+Analyse des discussions & Étude des interactions dans les PR/MR & Permet d’évaluer la qualité des échanges \\
+\hline
+Analyse des fichiers modifiés & Distribution des fichiers impactés & Donne une idée de la portée des modifications \\
+\hline
+Distribution des types de fichiers & Répartition des extensions de fichiers & Permet d’identifier les technologies dominantes \\
+\hline
+Analyse d’entropie & Mesure de la dispersion des changements & Évalue la complexité des modifications \\
+\hline
+Matrice de corrélation & Relations entre différentes métriques & Permet d’identifier des dépendances entre variables \\
+\hline
+Analyse de complexité des PR/MR & Évaluation globale de la complexité & Fournit une vue synthétique du travail effectué \\
+\hline
+Top contributeurs & Classement des auteurs, reviewers et committers & Permet d’identifier les acteurs clés du projet \\
+\hline
+\end{tabular}
+\caption{Analyses proposées dans RevMine}
+\end{table}
+
+\section{Conclusion}
+
+Les données, métriques et analyses retenues permettent de structurer la logique analytique de RevMine. Les informations générales assurent l’identification et la traçabilité des PR/MR collectées, tandis que les métriques fournissent des indicateurs quantitatifs sur le temps, la collaboration et la complexité des changements.
+
+Les analyses proposées exploitent ces métriques afin de générer des visualisations et des résultats interprétables par les utilisateurs. Ce chapitre constitue ainsi la base fonctionnelle du service de collecte et du service d’analyse, qui seront détaillés dans les chapitres de conception et de réalisation.

@@ -1,0 +1,277 @@
+% !TeX program = xelatex
+\documentclass[french,a4paper,12pt]{report}
+
+% =========================
+% Encodage et langue
+% =========================
+\usepackage{iftex}
+\ifPDFTeX
+    \usepackage[utf8]{inputenc}
+    \usepackage[T1]{fontenc}
+    \usepackage[main=french, english]{babel}
+\else
+    \usepackage{fontspec}
+    \usepackage[main=french, english]{babel}
+    \babelprovide[import]{arabic}
+    \babelfont{rm}{Latin Modern Roman}
+    \babelfont[arabic]{rm}{Amiri}
+\fi
+\usepackage{xspace}
+\usepackage{csquotes}
+
+% =========================
+% Mise en page
+% =========================
+\usepackage[margin=1in]{geometry}
+\setlength{\parskip}{1em}
+
+% =========================
+% Liens hypertextes
+% =========================
+\usepackage{hyperref}
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    filecolor=magenta,
+    urlcolor=cyan,
+    citecolor=blue,
+    pdftitle={RevMine : Conception et Validation d'un Outil LLM pour l'analyse des Revues de Code},
+    pdfpagemode=FullScreen,
+}
+
+% =========================
+% Bibliographie
+% =========================
+\usepackage[backend=biber, style=authoryear, sortcites, pagetracker=false]{biblatex}
+\addbibresource{ref.bib}
+\usepackage[nottoc]{tocbibind}
+
+% =========================
+% Figures, tableaux et algorithmes
+% =========================
+\usepackage{graphicx}
+\graphicspath{{./figures/}}
+
+\usepackage{array}
+\usepackage{float}
+\usepackage{lscape}
+\usepackage{wrapfig}
+\usepackage{framed}
+\usepackage{caption}
+\usepackage{placeins}
+\usepackage{makecell}
+\usepackage{tabularx}
+\usepackage{booktabs}
+\usepackage{tablefootnote}
+\usepackage{ltablex}
+\keepXColumns
+\usepackage[table]{xcolor}
+\usepackage{algorithm}
+
+\newcolumntype{Y}{>{\centering\arraybackslash}X}
+
+% =========================
+% Mathématiques
+% =========================
+\usepackage{amsmath}
+\usepackage{amssymb}
+
+% =========================
+% Insertion PDF
+% =========================
+\usepackage[final]{pdfpages}
+
+% =========================
+% Code blocks
+% =========================
+\usepackage{listings}
+
+\definecolor{javared}{rgb}{0.6,0,0}
+\definecolor{javagreen}{rgb}{0.25,0.5,0.35}
+\definecolor{javapurple}{rgb}{0.5,0,0.35}
+\definecolor{javadocblue}{rgb}{0.25,0.35,0.75}
+\definecolor{lightgrey}{rgb}{0.9,0.9,0.9}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+
+\lstset{
+    numbers=left,
+    backgroundcolor=\color{lightgrey},
+    commentstyle=\color{javagreen},
+    keywordstyle=\color{javapurple},
+    numberstyle=\tiny\color{codegray},
+    stringstyle=\color{javadocblue},
+    basicstyle=\ttfamily\footnotesize,
+    captionpos=b,
+    showspaces=false,
+    showstringspaces=false
+}
+
+% =========================
+% Profondeur de numérotation
+% =========================
+\setcounter{tocdepth}{4}
+\setcounter{secnumdepth}{4}
+
+% =========================
+% En-têtes et pieds de page
+% =========================
+\usepackage{fancyhdr}
+
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{\bfseries\nouppercase{\leftmark}}
+\rfoot{\bfseries\thepage}
+\setlength{\headheight}{15.3pt}
+
+\fancypagestyle{plain}{
+  \fancyhead{}
+  \fancyfoot[R]{\bfseries\thepage}
+  \renewcommand{\headrulewidth}{1pt}
+}
+
+\let\headruleORIG\headrule
+\renewcommand{\headrule}{\color{black}\headruleORIG}
+\renewcommand{\headrulewidth}{1.0pt}
+
+% =========================
+% Informations du document
+% =========================
+\title{RevMine : Conception et Validation d'un Outil LLM pour l'analyse des Revues de Code}
+\author{Cherguelaine Oussama \\ Merabet Mohamed Riad}
+\date{2026}
+
+% =========================
+% Listes personnalisées
+% =========================
+\usepackage{tocloft}
+
+\renewcommand{\listalgorithmname}{Liste des Algorithmes}
+
+\newcommand{\listequationsname}{Liste des Equations}
+\newlistof{myequations}{equ}{\listequationsname}
+\newcommand{\myequations}[1]{%
+\addcontentsline{equ}{myequations}{\protect\numberline{\theequation}#1}\par}
+
+% =========================
+% Configuration des parties
+% (numérotation des chapitres globale et continue — pas de reset par partie)
+% =========================
+\newlength\mylen
+\renewcommand\thepart{\Roman{part}}
+\renewcommand\cftpartpresnum{}
+\settowidth\mylen{\bfseries\cftpartpresnum\cftpartaftersnum}
+\addtolength\cftpartnumwidth{\mylen}
+
+% =========================
+% Commande pour chapitres non numérotés
+% Usage : \mychapter{<numéro ignoré>}{<titre>}
+% =========================
+\newcommand{\mychapter}[2]{
+    \chapter*{#2}
+    \addcontentsline{toc}{chapter}{#2}
+    \markboth{#2}{#2}
+}
+
+\begin{document}
+
+% =========================
+% Page de garde
+% =========================
+\includepdf[pages=-]{00_Page_De_Garde.pdf}
+
+% =========================
+% Pages préliminaires
+% =========================
+\pagenumbering{Roman}
+
+\input{chapters/01_Dedicace}
+\input{chapters/02_Remerciements}
+\input{chapters/03_Resume}
+% \input{chapters/04_Glossaire}
+
+\tableofcontents
+\clearpage
+
+\listoffigures
+\clearpage
+
+\listoftables
+\clearpage
+
+\addcontentsline{toc}{chapter}{\listalgorithmname}
+\listofalgorithms
+\clearpage
+
+\addcontentsline{toc}{chapter}{\listequationsname}
+\listofmyequations
+\clearpage
+
+% =========================
+% Début du mémoire (chiffres arabes)
+% =========================
+\pagenumbering{arabic}
+
+% =========================
+% Introduction générale
+% =========================
+\let\oldthesection\thesection
+
+\mychapter{}{Introduction générale}
+\renewcommand{\thesection}{\arabic{section}}
+\input{chapters/05_Introduction_Generale}
+\let\thesection\oldthesection
+% =========================================================
+% PARTIE I : Fondements et analyse de l'existant
+% =========================================================
+\part{État de l'art et étude des solutions commerciales existantes}
+
+\chapter{État de l'art}
+\input{chapters/Partie_1_Etude/Chapitre_01_Etat_De_Lart}
+
+\chapter{Étude des outils commerciaux et solutions académiques}
+\input{chapters/Partie_1_Etude/Chapitre_02_Etude_Existant}
+
+% =========================================================
+% PARTIE II : Contribution — conception, réalisation et validation
+% =========================================================
+\part{Contribution : analyse, conception, réalisation et validation de RevMine}
+
+\chapter{Analyse des besoins}
+\input{chapters/Partie_2_Contribution/Chapitre_03_Analyse_Besoins}
+
+\chapter{Spécification des données, métriques et analyses retenues}
+\input{chapters/Partie_2_Contribution/Chapitre_05_Metriques_Visualisations}
+
+\chapter{Conception}
+\input{chapters/Partie_2_Contribution/Chapitre_04_Conception}
+
+\chapter{Réalisation}
+\input{chapters/Partie_2_Contribution/Chapitre_06_Realisation2}
+
+% =========================================================
+% PARTIE III : Tests, validation et perspectives
+% =========================================================
+\part{Tests, validation et perspectives}
+
+\chapter{Validation expérimentale de RevMine}
+\input{chapters/Partie_3_Tests_Validation/Chapitre_07_Tests_Validation}
+
+\chapter{Démonstration}
+\input{chapters/Partie_3_Tests_Validation/Chapitre_09_Demonstration}
+
+% =========================
+% Conclusion générale
+% =========================
+\mychapter{0}{Conclusion générale}
+\input{chapters/Conclusion_Generale}
+
+\appendix
+\chapter{Documentation open source de RevMine}
+\input{chapters/Annexes/Annexe_Documentation_Open_Source}
+
+% =========================
+% Bibliographie
+% =========================
+\printbibliography
+
+\end{document}

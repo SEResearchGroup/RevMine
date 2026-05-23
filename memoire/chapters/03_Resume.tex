@@ -1,0 +1,65 @@
+\mychapter{0}{Résumé}
+
+La revue de code est une étape clé du développement logiciel moderne. Elle contribue à détecter les défauts, à améliorer la qualité du code, à renforcer la collaboration et à diffuser les bonnes pratiques. L’analyse des données issues des revues de code, notamment les requêtes de fusion, les commentaires et les commits, permet d’évaluer le processus de revue et d’étudier des aspects tels que la productivité des développeurs, l’adaptation des équipes et la charge de révision.
+
+Ces analyses offrent des leviers concrets pour améliorer les pratiques DevOps, en identifiant les causes des ralentissements, des défauts et des problèmes de qualité de code. En effet, lorsqu’elle est mal maîtrisée, la revue de code peut devenir un goulot d’étranglement dans le pipeline DevOps, en retardant les livraisons, en bloquant l’intégration des changements ou en affectant la prise de décision. Une meilleure compréhension des dynamiques de revue permet d’optimiser les priorités et de fluidifier le cycle de développement.
+
+Cependant, l’exploitation de ces données reste complexe. Elle nécessite la maîtrise des interfaces de programmation des plateformes, de l’authentification, de la pagination, des limitations de requêtes et de l’hétérogénéité des formats. Les données collectées doivent ensuite être nettoyées, filtrées, normalisées et transformées en métriques fiables, ce qui rend le processus long, technique et difficilement reproductible.
+
+Ce mémoire présente RevMine, une plateforme à code source ouvert dédiée à la collecte, au nettoyage, au filtrage, à l’analyse et à la visualisation des données de revue de code issues de GitHub et GitLab. RevMine calcule automatiquement des métriques liées aux délais de traitement, aux changements de code, à l’historique des contributions et à l’engagement des réviseurs, puis génère des visualisations interactives.
+
+La plateforme intègre une assistance par modèles de langage, permettant aux utilisateurs d’exprimer leurs besoins en langage naturel. Ce travail contribue ainsi à rendre l’analyse des données de revue de code plus accessible et reproductible pour les chercheurs en génie logiciel empirique ainsi que pour les praticiens DevOps.
+
+\vspace{1em}
+\noindent\rule[2pt]{\textwidth}{0.5pt}
+
+\noindent\textbf{Mots clés :} Revue de code, Mining Software Repositories, DevOps, GitHub/GitLab, LLM
+
+\noindent\rule[2pt]{\textwidth}{0.9pt}
+
+\clearpage
+
+\selectlanguage{english}
+\section*{Abstract}
+
+Code review is a key activity in modern software development. It helps detect defects, improve code quality, strengthen collaboration, and promote the sharing of best practices. The analysis of code review data, including pull/merge requests, comments, and commits, makes it possible to evaluate the review process and study important aspects such as developer productivity, team adaptability, and review workload.
+
+Such analyses provide valuable insights for improving DevOps practices by identifying the causes of delays, defects, and code quality issues. When not properly managed, code review may become a bottleneck in the DevOps pipeline, delaying deliveries, blocking the integration of changes, or affecting decision-making. A better understanding of review dynamics can therefore help optimize priorities and improve the overall development cycle.
+
+However, exploiting these data remains challenging. It requires knowledge of platform APIs, authentication mechanisms, pagination, request limits, and heterogeneous data formats. In addition, the collected data must be cleaned, filtered, normalized, and transformed into reliable metrics, which makes the process time-consuming, technical, and difficult to reproduce.
+
+This dissertation presents RevMine, an open-source platform dedicated to the collection, cleaning, filtering, analysis, and visualization of code review data from GitHub and GitLab. RevMine automatically computes metrics related to processing time, code changes, contribution history, and reviewer engagement, then generates interactive visualizations to support analysis.
+
+The platform also integrates language-model assistance, allowing users to express their needs in natural language. This work therefore contributes to making code review data analysis more accessible and reproducible for both empirical software engineering researchers and DevOps practitioners.
+
+\vspace{1em}
+\noindent\rule[2pt]{\textwidth}{0.5pt}
+
+\noindent\textbf{Keywords:} Code Review, Mining Software Repositories, DevOps, GitHub/GitLab, LLM
+
+\noindent\rule[2pt]{\textwidth}{0.9pt}
+
+\selectlanguage{french}
+\clearpage
+
+\begin{otherlanguage*}{arabic}
+\section*{ملخص}
+
+تُعد مراجعة الشيفرة مرحلة أساسية في تطوير البرمجيات الحديثة، إذ تساعد على اكتشاف العيوب، وتحسين جودة الشيفرة، وتعزيز التعاون بين المطورين، ونشر الممارسات الجيدة داخل فرق العمل. ويسمح تحليل البيانات الناتجة عن مراجعات الشيفرة، مثل طلبات الدمج، والتعليقات، والالتزامات البرمجية، بفهم سير عملية المراجعة وقياس جوانب مهمة مثل زمن المعالجة، وعبء المراجعة، ومشاركة المراجعين.
+
+غير أن استغلال هذه البيانات يبقى عملية معقدة، لأنه يتطلب التعامل مع واجهات برمجة التطبيقات الخاصة بمنصات GitHub وGitLab، وآليات المصادقة، وترقيم الصفحات، وحدود الطلبات، واختلاف صيغ البيانات بين المنصات. كما يجب تنظيف البيانات المجمعة، وترشيحها، وتوحيدها، وتحويلها إلى مقاييس قابلة للاستعمال، مما يجعل العملية طويلة وصعبة التكرار.
+
+يقدم هذا العمل منصة RevMine، وهي منصة مفتوحة المصدر مخصصة لجمع بيانات مراجعة الشيفرة من GitHub وGitLab، وتنظيفها، وتحليلها، وعرض نتائجها بصريا. تحسب المنصة مجموعة من المقاييس المتعلقة بزمن المراجعة، وحجم التغييرات، وتاريخ المساهمات، وتفاعل المراجعين، ثم تولد تصورات تفاعلية تساعد الباحثين والممارسين في مجال DevOps على فهم عملية المراجعة وتحسينها.
+
+كما تدمج المنصة مساعدة قائمة على نماذج اللغة الكبيرة، مما يسمح للمستخدم بالتعبير عن احتياجاته باللغة الطبيعية وتحويلها إلى خطة جمع وتحليل منظمة. وبذلك يساهم هذا المشروع في جعل تحليل بيانات مراجعة الشيفرة أكثر سهولة، وقابلية للتكرار، وفائدة للبحث في هندسة البرمجيات التجريبية ولممارسات DevOps.
+
+\vspace{1em}
+\noindent\rule[2pt]{\textwidth}{0.5pt}
+
+\noindent\textbf{الكلمات المفتاحية:} مراجعة الشيفرة، تنقيب مستودعات البرمجيات، DevOps، GitHub/GitLab، نماذج اللغة الكبيرة
+
+\noindent\rule[2pt]{\textwidth}{0.9pt}
+\end{otherlanguage*}
+
+\selectlanguage{french}
+\clearpage

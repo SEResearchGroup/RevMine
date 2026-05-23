@@ -1,0 +1,204 @@
+% ============================================================
+% Annexe : documentation open source de RevMine
+% ============================================================
+
+\section{Guide d'installation}
+
+RevMine peut etre execute localement avec Docker Compose. Les prerequis minimaux sont Git,
+Docker Desktop ou Docker Engine avec le plugin Compose, et un espace memoire suffisant pour
+executer les bases PostgreSQL, Kafka, MinIO, Grafana/Loki et les services applicatifs. Pour un
+developpement hors conteneur, Node.js est necessaire pour le frontend, Python 3.11 pour les
+services Python et Go pour le service de notification.
+
+La configuration de depart est fournie par \texttt{.env.example}. Le fichier doit etre copie
+vers \texttt{.env}, puis complete avec les secrets de l'environnement local.
+
+\begin{lstlisting}[caption={Initialisation de l'environnement local RevMine},label={lst:annexe-install-env},breaklines=true]
+cp .env.example .env
+# renseigner SECRET_KEY, ENCRYPTION_KEY, POSTGRES_USER,
+# POSTGRES_PASSWORD, les credentials OAuth et les tokens LLM si besoin
+docker compose up --build
+\end{lstlisting}
+
+Les variables les plus sensibles sont \texttt{SECRET\_KEY}, \texttt{ENCRYPTION\_KEY}, les
+identifiants PostgreSQL, les credentials OAuth GitHub/GitLab/Google, les parametres MinIO
+(\texttt{MINIO\_ROOT\_USER}, \texttt{MINIO\_ROOT\_PASSWORD}, \texttt{MINIO\_BUCKET\_NAME}) et les
+cles eventuelles pour OpenRouter. La cle \texttt{ENCRYPTION\_KEY} protege les tokens Git stockes
+par le service de configuration; elle doit donc etre traitee comme un secret d'application.
+
+\begin{table}[H]
+\centering
+\small
+\caption{Acces locaux principaux}
+\label{tab:annexe-acces-locaux}
+\begin{tabular}{|>{\raggedright\arraybackslash}p{4cm}
+                |>{\raggedright\arraybackslash}p{5cm}
+                |>{\raggedright\arraybackslash}p{5cm}|}
+\hline
+\textbf{Composant} & \textbf{URL locale} & \textbf{Usage} \\
+\hline
+Frontend & \texttt{http://localhost:5173} & Interface React/Vite. \\
+\hline
+API Gateway & \texttt{http://localhost:8000} & Point d'entree REST principal. \\
+\hline
+MinIO Console & \texttt{http://localhost:9001} & Consultation des objets JSON et CSV. \\
+\hline
+Grafana & \texttt{http://localhost:3001} & Dashboards et requetes Loki. \\
+\hline
+Loki & \texttt{http://localhost:3100} & API de stockage des logs. \\
+\hline
+SonarQube & \texttt{http://localhost:9090} & Pile separee via \texttt{docker-compose.sonar.yml}. \\
+\hline
+\end{tabular}
+\end{table}
+
+Si l'inference locale est utilisee, un modele Ollama doit etre disponible dans le conteneur
+\texttt{ollama-service}. Le service LLM peut aussi utiliser OpenRouter lorsque la cle
+correspondante est fournie dans l'environnement.
+
+\section{Guide developpeur}
+
+Le depot est organise autour d'une separation claire entre frontend, gateway et microservices :
+
+\begin{itemize}
+    \item \texttt{frontend/} : application React/Vite, routes protegees, services Axios,
+          visualisations ECharts et contexte de notifications.
+    \item \texttt{backend/api-gateway/} : gateway FastAPI, routage, CORS, introspection JWT,
+          propagation de \texttt{X-User-ID} et rate limiting.
+    \item \texttt{backend/services/authentication/} : comptes utilisateurs, JWT SimpleJWT,
+          refresh token, introspection et OAuth GitHub/GitLab/Google.
+    \item \texttt{backend/services/configuration/} : workspaces, tokens chiffres, import de depots
+          GitHub/GitLab et reponse aux demandes Kafka de token.
+    \item \texttt{backend/services/collection/} : plans de collecte, collecte GitHub/GitLab,
+          stockage MinIO, nettoyage, CSV et evenements Kafka.
+    \item \texttt{backend/services/analyze/} : datasets, catalogue de metriques, calculs
+          analytiques, taches Celery et modules DevOps Kanban/CI-CD.
+    \item \texttt{backend/services/llm/} : normalisation JSON des demandes utilisateur via
+          Ollama ou OpenRouter.
+    \item \texttt{backend/services/notification/} : service Go/Fiber consommant Kafka et diffusant
+          les notifications REST/WebSocket.
+\end{itemize}
+
+Les tests peuvent etre lances service par service. Le pipeline GitLab utilise ces memes
+separations afin de ne tester que les services modifies.
+
+\begin{lstlisting}[caption={Commandes de test par famille de services},label={lst:annexe-tests},breaklines=true]
+# Services Python
+cd backend/api-gateway && python -m pytest
+cd backend/services/authentication && python -m pytest
+cd backend/services/configuration && python -m pytest
+cd backend/services/collection && python -m pytest
+cd backend/services/analyze && python -m pytest
+cd backend/services/llm && python -m pytest
+
+# Service Go
+cd backend/services/notification && go test ./...
+
+# Frontend
+cd frontend && npm test
+cd frontend && npm run cypress:run
+\end{lstlisting}
+
+Pour ajouter un endpoint dans un service Django/DRF, la demarche recommandee est d'ajouter le
+serializer ou le cas d'usage, d'exposer la vue DRF, de declarer la route dans \texttt{urls.py},
+puis de couvrir le comportement par des tests \texttt{pytest-django}. Pour un endpoint FastAPI,
+le changement doit etre accompagne d'un schema de requete/reponse Pydantic et d'un test HTTP.
+
+Pour ajouter une metrique, il faut completer le catalogue \texttt{MetricDefinition}, implementer
+la fonction de calcul dans le moteur de metriques, declarer les contraintes de colonnes et d'axes
+compatibles, puis ajouter le mapping frontend lorsque la visualisation necessite un traitement
+specifique.
+
+\section{Guide API}
+
+La documentation API est exposee differemment selon les technologies utilisees. Les URLs ci-dessous
+sont des acces de developpement directs aux services; dans l'architecture cible, les appels
+applicatifs passent par l'API Gateway.
+
+\begin{table}[H]
+\centering
+\small
+\caption{Documentation API disponible par service}
+\label{tab:annexe-doc-api}
+\begin{tabular}{|>{\raggedright\arraybackslash}p{4cm}
+                |>{\raggedright\arraybackslash}p{5cm}
+                |>{\raggedright\arraybackslash}p{5cm}|}
+\hline
+\textbf{Service} & \textbf{Documentation} & \textbf{Observation} \\
+\hline
+API Gateway & \texttt{/docs}, \texttt{/redoc}, \texttt{/openapi.json} & Documentation FastAPI du gateway. \\
+\hline
+Authentication & \texttt{/api/docs/}, \texttt{/api/redoc/}, \texttt{/api/schema/} & Documentation DRF Spectacular. \\
+\hline
+Configuration & \texttt{/api/docs/}, \texttt{/api/redoc/}, \texttt{/api/schema/} & Workspaces, tokens et depots. \\
+\hline
+Collection & \texttt{/api/docs/}, \texttt{/api/redoc/}, \texttt{/api/schema/} & Plans, nettoyage et datasets collectes. \\
+\hline
+LLM & \texttt{/docs}, \texttt{/redoc}, \texttt{/openapi.json} & Documentation FastAPI du parser LLM. \\
+\hline
+Analyze & Non declare dans \texttt{analyze\_service/urls.py} & Routes disponibles sous \texttt{/api/analysis/}. \\
+\hline
+Notification & Non declare & API Go/Fiber REST et WebSocket documentee par le code. \\
+\hline
+\end{tabular}
+\end{table}
+
+\section{Guide des metriques}
+
+Le catalogue des metriques est porte par le service d'analyse, principalement autour du modele
+\texttt{MetricDefinition}, des migrations de donnees du module \texttt{analytics} et du moteur de
+calcul situe dans le domaine analytique. Ce catalogue separe le nom fonctionnel de la metrique,
+sa categorie, ses contraintes de colonnes et la fonction de calcul appelee au moment de generer
+une analyse.
+
+\begin{table}[H]
+\centering
+\small
+\caption{Exemples de metriques presentes dans le catalogue RevMine}
+\label{tab:annexe-metrics}
+\begin{tabular}{|>{\raggedright\arraybackslash}p{3.8cm}
+                |>{\raggedright\arraybackslash}p{4.2cm}
+                |>{\raggedright\arraybackslash}p{6cm}|}
+\hline
+\textbf{Metrique} & \textbf{Famille} & \textbf{Objectif analytique} \\
+\hline
+\texttt{lead\_time\_distribution} & Revue de code & Mesurer le temps entre creation et integration d'une PR/MR. \\
+\hline
+\texttt{code\_churn} & Evolution du code & Suivre les lignes ajoutees, supprimees et modifiees. \\
+\hline
+\texttt{entropy\_analysis} & Dispersion historique & Evaluer la concentration des changements sur fichiers ou modules. \\
+\hline
+\texttt{top\_reviewers} & Engagement reviewers & Identifier les reviewers les plus impliques. \\
+\hline
+\texttt{time\_to\_first\_review} & Revue de code & Quantifier le delai avant le premier retour. \\
+\hline
+\texttt{review\_duration}, \texttt{cycle\_time} & Flux de revue & Mesurer la duree de revue et le cycle complet. \\
+\hline
+\texttt{kanban\_lead\_time}, \texttt{kanban\_cycle\_time}, \texttt{kanban\_throughput} & Kanban & Analyser le flux des issues et la capacite de livraison. \\
+\hline
+\texttt{cicd\_success\_rate}, \texttt{cicd\_build\_duration}, \texttt{cicd\_mttr} & CI/CD & Suivre la fiabilite et la performance des pipelines. \\
+\hline
+\end{tabular}
+\end{table}
+
+\section{Guide d'extension}
+
+RevMine est concu pour etre etendu par ajout progressif de collecteurs, de metriques ou de vues
+frontend. L'architecture microservices limite l'impact d'une extension : un nouveau collecteur
+peut etre integre dans le service de collecte ou dans le module DevOps du service d'analyse,
+tandis qu'une nouvelle metrique peut etre ajoutee au catalogue sans modifier l'authentification
+ni la configuration des workspaces.
+
+Deux extensions sont particulierement naturelles :
+
+\begin{itemize}
+    \item \textbf{Analyse avancee des tableaux Kanban} : enrichir la collecte des issues,
+          transitions, labels et colonnes pour produire davantage d'indicateurs de flux.
+    \item \textbf{Analyse des builds et pipelines CI} : exploiter les jobs, statuts,
+          durees, echecs et reprises pour relier qualite de revue, stabilite CI et performance de
+          livraison.
+\end{itemize}
+
+Cette extensibilite repose sur quatre points : l'isolation des services, le stockage brut dans
+MinIO, le catalogue de metriques du service d'analyse et la separation frontend entre parcours,
+services API et composants de visualisation.
