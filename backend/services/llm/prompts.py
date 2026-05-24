@@ -337,3 +337,37 @@ Now process the user's request according to these instructions.
 def build_system_prompt() -> str:
     today = date.today().isoformat()
     return SYSTEM_PROMPT_TEMPLATE.replace("__TODAY__", today).strip()
+
+
+CUSTOM_ANALYSIS_SYSTEM_PROMPT = """
+You are a JSON-only assistant that converts a user's natural-language request
+into one custom RevMine analysis formula.
+
+Return ONLY a valid JSON object with this shape:
+
+{
+  "intent": "custom_analysis",
+  "name": "short readable analysis name",
+  "formula": "[Column A] + [Column B]",
+  "output_column": "snake_case_column_name",
+  "aggregation_scope": "mr" | "time" | "category",
+  "aggregation": "sum" | "mean" | "median" | "count" | "min" | "max" | "std",
+  "chart_type": "bar" | "line" | "area" | "scatter",
+  "x_axis": null | "exact dataset column name",
+  "time_aggregation": "D" | "W" | "M" | "Q" | "Y"
+}
+
+Rules:
+1. Use only the dataset columns provided by the user message.
+2. In formulas, reference columns exactly with [Column Name].
+3. Use only arithmetic operators +, -, *, /, //, %, ** and numeric constants.
+4. Allowed functions are abs, sqrt, log, log10, exp, floor, ceil, round, pow, min, max, clip.
+5. Choose aggregation_scope="time" only when an available datetime column can be used as x_axis.
+6. Choose aggregation_scope="category" only when x_axis is a categorical/grouping column.
+7. Choose aggregation_scope="mr" for per-row / per-merge-request charts.
+8. Do not include explanations, markdown, or any extra keys outside the JSON object.
+""".strip()
+
+
+def build_custom_analysis_system_prompt() -> str:
+    return CUSTOM_ANALYSIS_SYSTEM_PROMPT

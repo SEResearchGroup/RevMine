@@ -19,10 +19,13 @@ class OllamaParserService:
         self.client = Client(host=settings.OLLAMA_HOST)
 
     def parse_user_request(
-        self, user_message: str, model: str | None = None
+        self,
+        user_message: str,
+        model: str | None = None,
+        system_prompt: str | None = None,
     ) -> Dict[str, Any]:
         selected_model = model or settings.DEFAULT_MODEL
-        system_prompt = build_system_prompt()
+        system_prompt = system_prompt or build_system_prompt()
         _start = time.monotonic()
 
         logger.info(

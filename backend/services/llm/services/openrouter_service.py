@@ -19,12 +19,15 @@ class OpenRouterParserService:
         self.site_name = getattr(settings, "OPENROUTER_SITE_NAME", "")
 
     def parse_user_request(
-        self, user_message: str, model: str | None = None
+        self,
+        user_message: str,
+        model: str | None = None,
+        system_prompt: str | None = None,
     ) -> Dict[str, Any]:
         selected_model = model or settings.OPENROUTER_DEFAULT_MODEL
         if not self.api_key:
             raise RuntimeError("OPENROUTER_API_KEY is required for OpenRouter inference")
-        system_prompt = build_system_prompt()
+        system_prompt = system_prompt or build_system_prompt()
         _start = time.monotonic()
 
         headers = {

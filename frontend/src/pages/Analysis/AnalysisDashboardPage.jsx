@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { createElement, useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import {
   ArrowLeft,
@@ -35,7 +35,7 @@ const TIME_AGG_LABELS = { D: "Daily", W: "Weekly", M: "Monthly", Q: "Quarterly",
 /* ------------------------------------------------------------------ */
 /*  Summary Stat Card                                                 */
 /* ------------------------------------------------------------------ */
-const SummaryStatCard = ({ icon: Icon, label, value, color = "indigo" }) => {
+const SummaryStatCard = ({ icon, label, value, color = "indigo" }) => {
   const colorMap = {
     indigo: "bg-blue-600",
     emerald: "bg-green-600",
@@ -48,7 +48,7 @@ const SummaryStatCard = ({ icon: Icon, label, value, color = "indigo" }) => {
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-4 flex items-center gap-3">
       <div className={`w-10 h-10 rounded-xl ${colorMap[color] || colorMap.indigo} flex items-center justify-center shrink-0`}>
-        <Icon className="w-5 h-5 text-white" />
+        {createElement(icon, { className: "w-5 h-5 text-white" })}
       </div>
       <div className="min-w-0">
         <p className="text-[10px] uppercase tracking-wider text-gray-400 font-medium">{label}</p>
@@ -312,7 +312,7 @@ const AnalysisDashboardPage = () => {
   const [dataset, setDataset] = useState(location.state?.dataset || null);
   const [summary, setSummary] = useState(null);
   const [results, setResults] = useState(
-    (location.state?.results || []).filter((r) => r.metric_code !== "custom_chart")
+    location.state?.results || []
   );
   const [loading, setLoading] = useState(!location.state?.results);
   const [layout, setLayout] = useState("grid"); // grid | list
@@ -339,10 +339,14 @@ const AnalysisDashboardPage = () => {
 
       // Load results for each completed analysis
       const analyses = analysesRes.results || [];
-      // Deduplicate analyses by metric_code, keeping only the latest one
+      // Deduplicate predefined analyses by metric_code, keeping only the latest one.
+      // Custom analyses can share the same metric_code with different formulas.
       const latestByMetric = new Map();
       for (const a of analyses) {
-        const key = a.metric_code || a.id;
+        const key =
+          a.metric_code === "custom_chart" || a.metric_code === "custom_formula"
+            ? a.id
+            : a.metric_code || a.id;
         const existing = latestByMetric.get(key);
         if (!existing || new Date(a.created_at) > new Date(existing.created_at)) {
           latestByMetric.set(key, a);
@@ -352,7 +356,6 @@ const AnalysisDashboardPage = () => {
 
       const loaded = [];
       for (const a of deduplicated) {
-        if (a.metric_code === "custom_chart") continue;
         if (a.status === "completed") {
           try {
             const res = await analyzeService.getAnalysisResult(a.id);
@@ -390,7 +393,14 @@ const AnalysisDashboardPage = () => {
         dataset_id: datasetId,
         time_aggregation: newAgg,
       };
-      if (r.metric_code && r.metric_code !== "custom_chart") {
+      if (r.metric_code === "custom_formula") {
+        payload.metric_code = r.metric_code;
+        payload.chart_type = r.chart_type;
+        payload.config = {
+          ...(r.config || {}),
+          time_aggregation: newAgg,
+        };
+      } else if (r.metric_code && r.metric_code !== "custom_chart") {
         payload.metric_code = r.metric_code;
         payload.chart_type = r.chart_type;
       } else {

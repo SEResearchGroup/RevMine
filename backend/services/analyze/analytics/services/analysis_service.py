@@ -18,6 +18,11 @@ from django.utils import timezone
 
 from analytics.models import AnalysisResult, MetricDefinition
 from analytics.services.dataset_service import DatasetService
+from analytics.domain.analysis.custom_formula import (
+    CUSTOM_FORMULA_METRIC_CODE,
+    evaluate_formula,
+    slugify_output_column,
+)
 from django.core.exceptions import ObjectDoesNotExist
 
 logger = logging.getLogger(__name__)
@@ -79,8 +84,10 @@ class AnalysisService:
             )
 
             _load_start = time.monotonic()
-            df = DatasetService().load_dataframe(analysis.dataset)
+            dataset_service = DatasetService()
+            df = dataset_service.load_dataframe(analysis.dataset)
             df = self._parse_dates(df)
+            df = self._apply_custom_formula_if_needed(df, analysis, dataset_service)
             _load_duration = round(time.monotonic() - _load_start, 3)
 
             logger.info(
@@ -183,3 +190,29 @@ class AnalysisService:
             return metric.analysis_function
         except ObjectDoesNotExist:
             return metric_code
+
+    def _apply_custom_formula_if_needed(
+        self, df: pd.DataFrame, analysis, dataset_service: DatasetService
+    ) -> pd.DataFrame:
+        if analysis.metric_code != CUSTOM_FORMULA_METRIC_CODE:
+            return df
+
+        config = dict(analysis.config or {})
+        output_column = slugify_output_column(
+            config.get("output_column") or config.get("name") or "custom_metric"
+        )
+        formula_result = evaluate_formula(
+            df=df,
+            formula=config.get("formula", ""),
+            output_column=output_column,
+        )
+
+        config["output_column"] = formula_result.output_column
+        config.setdefault("y_axis", formula_result.output_column)
+        analysis.config = config
+        analysis.save(update_fields=["config", "updated_at"])
+
+        if config.get("persist_column", True):
+            dataset_service.save_dataframe(analysis.dataset, formula_result.dataframe)
+
+        return formula_result.dataframe

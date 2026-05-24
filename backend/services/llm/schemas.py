@@ -16,6 +16,7 @@ class ParseRequest(BaseModel):
         ..., min_length=1, description="Natural language user request"
     )
     model: Optional[str] = Field(None, description="Optional Ollama model override")
+    provider: Optional[str] = Field(None, description="Optional provider override")
 
 
 class ParseResponse(BaseModel):

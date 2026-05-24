@@ -199,6 +199,38 @@ class DatasetService:
 
         return df
 
+    def save_dataframe(self, dataset, df: pd.DataFrame) -> None:
+        """
+        Persist a modified dataframe back to the dataset CSV and refresh
+        metadata. Used when analyses add derived columns.
+        """
+        buffer = StringIO()
+        df.to_csv(buffer, index=False)
+        content = ContentFile(buffer.getvalue().encode("utf-8"))
+
+        self._ensure_storage_directory()
+        try:
+            if default_storage.exists(dataset.file_path):
+                default_storage.delete(dataset.file_path)
+            saved_path = default_storage.save(dataset.file_path, content)
+        except OSError as exc:
+            logger.exception("Dataset dataframe update failed")
+            raise DatasetStorageError(f"Dataset storage is not writable: {exc}") from exc
+
+        dataset.file_path = saved_path
+        dataset.rows_count = len(df)
+        dataset.columns_count = len(df.columns)
+        dataset.columns_metadata = self._extract_columns_metadata(df)
+        dataset.save(
+            update_fields=[
+                "file_path",
+                "rows_count",
+                "columns_count",
+                "columns_metadata",
+                "updated_at",
+            ]
+        )
+
     # ------------------------------------------------------------------
     # Column introspection helpers
     # ------------------------------------------------------------------

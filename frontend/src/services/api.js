@@ -480,6 +480,13 @@ export const analyzeService = {
     return response.data;
   },
 
+  suggestCustomAnalysis: async (payload) => {
+    const response = await analyzeApi.post('/custom_analyses/preview/', payload, {
+      timeout: 60000,
+    });
+    return response.data;
+  },
+
   // ========== ANALYSES ==========
   getAnalyses: async (datasetId = null) => {
     let url = '/analyses/';

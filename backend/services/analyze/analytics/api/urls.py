@@ -18,6 +18,7 @@ from analytics.api.views import (
     DatasetColumnsView,
     DatasetAvailableMetricsView,
     DatasetCompatibleAxesView,
+    CustomAnalysisPreviewView,
     DatasetPreviewView,
     DatasetSummaryView,
 
@@ -50,6 +51,7 @@ urlpatterns = [
     path('datasets/<uuid:pk>/available_metrics/',           DatasetAvailableMetricsView.as_view(),   name='dataset-available-metrics'),
     path('datasets/<uuid:pk>/compatible_axes/',             DatasetCompatibleAxesView.as_view(),     name='dataset-compatible-axes'),
     path('datasets/<uuid:pk>/summary/',                     DatasetSummaryView.as_view(),            name='dataset-summary'),
+    path('custom_analyses/preview/',                        CustomAnalysisPreviewView.as_view(),     name='custom-analysis-preview'),
 
     # Metrics  (read-only catalogue)
     path('metrics/',                                        MetricListView.as_view(),                name='metric-list'),

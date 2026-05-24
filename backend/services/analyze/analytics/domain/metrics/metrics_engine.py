@@ -85,6 +85,7 @@ class MetricsEngine:
             'cicd_runner_utilization': self.analyze_cicd_runner_utilization,
             'cicd_flaky_jobs': self.analyze_cicd_flaky_jobs,
             'custom_chart': self.analyze_custom_chart,
+            'custom_formula': self.analyze_custom_formula,
         }
     
     def _apply_config(self, df, config):
@@ -971,6 +972,185 @@ class MetricsEngine:
             
             statistics = result.describe().to_dict()
         
+        return {
+            'chart_data': chart_data,
+            'chart_image': chart_image,
+            'statistics': statistics
+        }
+
+    def _aggregate_values(self, grouped, value_col, aggregation):
+        if aggregation == 'sum':
+            return grouped[value_col].sum()
+        if aggregation == 'mean':
+            return grouped[value_col].mean()
+        if aggregation == 'median':
+            return grouped[value_col].median()
+        if aggregation == 'count':
+            return grouped.size()
+        if aggregation == 'min':
+            return grouped[value_col].min()
+        if aggregation == 'max':
+            return grouped[value_col].max()
+        if aggregation == 'std':
+            return grouped[value_col].std()
+        return grouped[value_col].sum()
+
+    def _first_available_column(self, df, candidates):
+        for column in candidates:
+            if column in df.columns:
+                return column
+        return None
+
+    def analyze_custom_formula(self, df, analysis):
+        """
+        Analyze a user-defined formula column.
+
+        The formula itself is evaluated in AnalysisService before this method
+        runs, keeping this function focused on aggregation and chart output.
+        """
+        config = analysis.config or {}
+        value_col = config.get('output_column') or config.get('y_axis')
+        if not value_col or value_col not in df.columns:
+            raise ValueError("The derived formula column was not found in the dataset")
+
+        scope = config.get('aggregation_scope', 'mr')
+        aggregation = config.get('aggregation', 'sum')
+        chart_type = analysis.chart_type or config.get('chart_type') or 'bar'
+        title = config.get('name') or value_col.replace('_', ' ').title()
+
+        df = self._apply_config(df, config)
+        df_copy = df.copy()
+        df_copy[value_col] = pd.to_numeric(df_copy[value_col], errors='coerce')
+        null_count = int(df_copy[value_col].isna().sum())
+        df_copy = df_copy.dropna(subset=[value_col])
+
+        if len(df_copy) == 0:
+            raise ValueError("No numeric values were produced by the custom formula")
+
+        if chart_type == 'scatter':
+            x_axis = config.get('x_axis')
+            if not x_axis or x_axis not in df_copy.columns:
+                raise ValueError("A numeric X axis is required for custom scatter charts")
+            df_copy[x_axis] = pd.to_numeric(df_copy[x_axis], errors='coerce')
+            df_plot = df_copy.dropna(subset=[x_axis, value_col])
+            chart_data = {
+                'type': 'scatter',
+                'data': {
+                    'datasets': [{
+                        'label': title,
+                        'data': [
+                            {'x': float(x), 'y': float(y)}
+                            for x, y in zip(df_plot[x_axis], df_plot[value_col])
+                        ],
+                    }]
+                },
+                'options': {
+                    'title': title,
+                    'xLabel': x_axis,
+                    'yLabel': value_col,
+                }
+            }
+            fig, ax = plt.subplots(figsize=(10, 8))
+            ax.scatter(df_plot[x_axis], df_plot[value_col], alpha=0.55, color='steelblue')
+            ax.set_xlabel(x_axis)
+            ax.set_ylabel(value_col)
+            ax.set_title(title)
+            ax.grid(alpha=0.25)
+            plt.tight_layout()
+            chart_image = self._generate_matplotlib_image(fig)
+        else:
+            if scope == 'time':
+                date_col = (
+                    config.get('x_axis')
+                    or config.get('date_column')
+                    or self._first_available_column(
+                        df_copy,
+                        ['Creation_Date', 'created_at', 'updated_at', 'merged_at', 'closed_at'],
+                    )
+                )
+                if not date_col or date_col not in df_copy.columns:
+                    raise ValueError("A date column is required for time aggregation")
+
+                freq = config.get('time_aggregation') or 'M'
+                df_copy[date_col] = pd.to_datetime(df_copy[date_col], errors='coerce')
+                df_copy = df_copy.dropna(subset=[date_col])
+                if len(df_copy) == 0:
+                    raise ValueError(f"No valid dates found in column '{date_col}'")
+                df_copy['period'] = df_copy[date_col].dt.to_period(freq)
+                result = self._aggregate_values(df_copy.groupby('period'), value_col, aggregation).sort_index()
+                labels = self._format_date_labels(result.index)
+                x_label = 'Period'
+            elif scope == 'category':
+                group_col = config.get('x_axis')
+                if not group_col or group_col not in df_copy.columns:
+                    raise ValueError("A grouping column is required for category aggregation")
+                result = self._aggregate_values(df_copy.groupby(group_col), value_col, aggregation)
+                result = result.sort_values(ascending=False).head(int(config.get('limit') or 30))
+                labels = [str(item) for item in result.index]
+                x_label = group_col
+            else:
+                label_col = config.get('x_axis') or self._first_available_column(
+                    df_copy,
+                    ['MR_ID', 'mr_iid', 'iid', 'number', 'pr_number', 'id', 'title'],
+                )
+                if label_col and label_col in df_copy.columns:
+                    labels = df_copy[label_col].astype(str).tolist()
+                else:
+                    labels = [f"MR {idx + 1}" for idx in range(len(df_copy))]
+                result = df_copy[value_col].reset_index(drop=True)
+                max_points = int(config.get('max_points') or 250)
+                if len(result) > max_points:
+                    result = result.head(max_points)
+                    labels = labels[:max_points]
+                x_label = label_col or 'Merge request'
+
+            values = [float(v) if pd.notna(v) else 0 for v in result.values]
+            chart_data = {
+                'type': chart_type,
+                'data': {
+                    'labels': labels,
+                    'datasets': [{
+                        'label': f'{value_col} ({aggregation})' if scope != 'mr' else value_col,
+                        'data': values,
+                    }]
+                },
+                'options': {
+                    'title': title,
+                    'xLabel': x_label,
+                    'yLabel': f'{value_col} ({aggregation})' if scope != 'mr' else value_col,
+                    'customFormula': {
+                        'formula': config.get('formula'),
+                        'output_column': value_col,
+                        'aggregation_scope': scope,
+                    },
+                }
+            }
+
+            fig, ax = plt.subplots(figsize=(12, 6))
+            x_positions = range(len(values))
+            if chart_type in ['line', 'area']:
+                ax.plot(x_positions, values, marker='o', linewidth=2, markersize=4)
+            else:
+                ax.bar(x_positions, values, color='steelblue')
+            ax.set_xlabel(x_label)
+            ax.set_ylabel(chart_data['options']['yLabel'])
+            ax.set_title(title)
+            ax.set_xticks(x_positions)
+            ax.set_xticklabels(labels, rotation=45, ha='right')
+            ax.grid(axis='y', alpha=0.3)
+            plt.tight_layout()
+            chart_image = self._generate_matplotlib_image(fig)
+
+        statistics = {
+            'count': int(df_copy[value_col].count()),
+            'mean': float(df_copy[value_col].mean()),
+            'median': float(df_copy[value_col].median()),
+            'min': float(df_copy[value_col].min()),
+            'max': float(df_copy[value_col].max()),
+            'std': float(df_copy[value_col].std()) if pd.notna(df_copy[value_col].std()) else 0,
+            'null_values': null_count,
+        }
+
         return {
             'chart_data': chart_data,
             'chart_image': chart_image,

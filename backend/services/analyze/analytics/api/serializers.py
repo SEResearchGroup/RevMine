@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from analytics.models import Dataset, MetricDefinition, Analysis, AnalysisResult, AnalysisBatch, BatchAnalysis
+from analytics.domain.analysis.custom_formula import CUSTOM_FORMULA_METRIC_CODE
 from analytics.services.dataset_service import DatasetService
 from analytics.services.analysis_service import AnalysisService
 
@@ -105,31 +106,32 @@ class AnalysisCreateSerializer(serializers.ModelSerializer):
         metric_code = data.get('metric_code')
         chart_type = data.get('chart_type')
         
-        try:
-            metric = MetricDefinition.objects.get(code=metric_code, is_active=True)
-        except MetricDefinition.DoesNotExist:
-            raise serializers.ValidationError(
-                f"Metric with code '{metric_code}' does not exist or is not active"
-            )
-        
-        if chart_type not in metric.supported_chart_types:
-            raise serializers.ValidationError(
-                f"Chart type '{chart_type}' is not supported for metric '{metric_code}'. "
-                f"Supported types: {', '.join(metric.supported_chart_types)}"
-            )
-        
-        # Validate required columns exist in dataset
-        dataset = data.get('dataset')
-        if dataset:
-            service = DatasetService()
-            available_columns = service.get_columns(dataset)
-            
-            for required_col in metric.required_columns:
-                if required_col not in available_columns:
-                    raise serializers.ValidationError(
-                        f"Required column '{required_col}' not found in dataset. "
-                        f"Available columns: {', '.join(available_columns)}"
-                    )
+        if metric_code != CUSTOM_FORMULA_METRIC_CODE:
+            try:
+                metric = MetricDefinition.objects.get(code=metric_code, is_active=True)
+            except MetricDefinition.DoesNotExist:
+                raise serializers.ValidationError(
+                    f"Metric with code '{metric_code}' does not exist or is not active"
+                )
+
+            if chart_type not in metric.supported_chart_types:
+                raise serializers.ValidationError(
+                    f"Chart type '{chart_type}' is not supported for metric '{metric_code}'. "
+                    f"Supported types: {', '.join(metric.supported_chart_types)}"
+                )
+
+            # Validate required columns exist in dataset
+            dataset = data.get('dataset')
+            if dataset:
+                service = DatasetService()
+                available_columns = service.get_columns(dataset)
+
+                for required_col in metric.required_columns:
+                    if required_col not in available_columns:
+                        raise serializers.ValidationError(
+                            f"Required column '{required_col}' not found in dataset. "
+                            f"Available columns: {', '.join(available_columns)}"
+                        )
         
         return data
     
@@ -181,7 +183,7 @@ class AnalysisListSerializer(serializers.ModelSerializer):
         model = Analysis
         fields = [
             'id', 'dataset', 'metric_code', 'chart_type',
-            'status', 'created_at', 'completed_at'
+            'config', 'status', 'created_at', 'completed_at'
         ]
         read_only_fields = fields
 

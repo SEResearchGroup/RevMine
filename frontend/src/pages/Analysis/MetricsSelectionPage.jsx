@@ -20,8 +20,11 @@ import {
   Layers,
   Sparkles,
   Bot,
+  Plus,
+  Trash2,
 } from "lucide-react";
 import { analyzeService } from "../../services/api";
+import CustomAnalysisModal from "../../components/analysis/CustomAnalysisModal";
 import {
   LLM_PROVIDERS,
   OPENROUTER_MODELS,
@@ -59,12 +62,22 @@ const MODE_META = {
   },
 };
 
+const CUSTOM_FORMULA_METRIC = "custom_formula";
+
 const buildGeneratePayload = (datasetId, analysis) => {
   const payload = {
     dataset_id: datasetId,
     metric_code: analysis.metric_code,
   };
   const config = analysis.config || {};
+
+  if (analysis.metric_code === CUSTOM_FORMULA_METRIC) {
+    return {
+      ...payload,
+      chart_type: analysis.chart_type || config.chart_type || "bar",
+      config,
+    };
+  }
 
   if (analysis.chart_type) payload.chart_type = analysis.chart_type;
   if (config.x_axis) payload.x_axis = config.x_axis;
@@ -91,7 +104,9 @@ const getErrorMessage = (error, fallback) =>
 const SECTION_TO_SOURCE = { analysis: null, kanban: "kanban", cicd: "cicd" };
 const deriveSection = (pathname) => {
   const first = (pathname || "").split("/").filter(Boolean)[0];
-  return SECTION_TO_SOURCE.hasOwnProperty(first) ? first : "analysis";
+  return Object.prototype.hasOwnProperty.call(SECTION_TO_SOURCE, first)
+    ? first
+    : "analysis";
 };
 
 const MetricsSelectionPage = () => {
@@ -110,6 +125,9 @@ const MetricsSelectionPage = () => {
   const [missingCols, setMissingCols] = useState({});
   const [selectionMode, setSelectionMode] = useState("manual");
   const [selectedMetrics, setSelectedMetrics] = useState([]);
+  const [customAnalyses, setCustomAnalyses] = useState([]);
+  const [selectedCustomAnalyses, setSelectedCustomAnalyses] = useState([]);
+  const [showCustomModal, setShowCustomModal] = useState(false);
   const [llmPrompt, setLlmPrompt] = useState("");
   const [aiPreview, setAiPreview] = useState(null);
   const [llmProvider, setLlmProvider] = useState(LLM_PROVIDERS.OPENROUTER);
@@ -163,6 +181,40 @@ const MetricsSelectionPage = () => {
     );
   };
 
+  const toggleCustomAnalysis = (clientId) => {
+    setSelectedCustomAnalyses((prev) =>
+      prev.includes(clientId)
+        ? prev.filter((item) => item !== clientId)
+        : [...prev, clientId]
+    );
+  };
+
+  const handleAddCustomAnalysis = (analysis) => {
+    const clientId = `custom-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const customAnalysis = {
+      ...analysis,
+      clientId,
+      metric_code: CUSTOM_FORMULA_METRIC,
+      chart_type: analysis.chart_type || analysis.config?.chart_type || "bar",
+    };
+    setCustomAnalyses((prev) => [...prev, customAnalysis]);
+    setSelectedCustomAnalyses((prev) => [...prev, clientId]);
+    setShowCustomModal(false);
+    setSelectionMode("manual");
+    setError(null);
+  };
+
+  const removeCustomAnalysis = (clientId) => {
+    setCustomAnalyses((prev) => prev.filter((analysis) => analysis.clientId !== clientId));
+    setSelectedCustomAnalyses((prev) => prev.filter((item) => item !== clientId));
+  };
+
+  const handleSuggestCustomAnalysis = (payload) =>
+    analyzeService.suggestCustomAnalysis({
+      dataset_id: datasetId,
+      ...payload,
+    });
+
   const toggleCategory = (cat) =>
     setExpandedCats((prev) => ({ ...prev, [cat]: !prev[cat] }));
 
@@ -211,11 +263,17 @@ const MetricsSelectionPage = () => {
 
   const handleRunAnalysis = async () => {
     const isManual = selectionMode === "manual";
-    const manualAnalyses = selectedMetrics.map((metricCode) => ({
-      metric_code: metricCode,
-      chart_type: availableMetricsMap.get(metricCode)?.default_chart_type,
-      config: {},
-    }));
+    const selectedCustomConfigs = customAnalyses.filter((analysis) =>
+      selectedCustomAnalyses.includes(analysis.clientId)
+    );
+    const manualAnalyses = [
+      ...selectedMetrics.map((metricCode) => ({
+        metric_code: metricCode,
+        chart_type: availableMetricsMap.get(metricCode)?.default_chart_type,
+        config: {},
+      })),
+      ...selectedCustomConfigs,
+    ];
 
     if (isManual && manualAnalyses.length === 0) return;
     if (!isManual && !llmPrompt.trim()) {
@@ -277,7 +335,7 @@ const MetricsSelectionPage = () => {
 
   const totalSelected =
     selectionMode === "manual"
-      ? selectedMetrics.length
+      ? selectedMetrics.length + selectedCustomAnalyses.length
       : aiPreview?.analyses?.length || 0;
 
   if (loading) {
@@ -769,6 +827,78 @@ const MetricsSelectionPage = () => {
                 })
               )}
             </div>
+
+            <div className="mt-6 bg-white rounded-xl border border-gray-200/60 overflow-hidden">
+              <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between gap-3">
+                <div>
+                  <p className="font-semibold text-gray-800">Custom analyses</p>
+                  <p className="text-xs text-gray-400">
+                    Build a formula from dataset columns and add it to this run.
+                  </p>
+                </div>
+                <span className="text-xs font-medium text-gray-400">
+                  {selectedCustomAnalyses.length}/{customAnalyses.length} selected
+                </span>
+              </div>
+              <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-3">
+                {customAnalyses.map((analysis) => {
+                  const isSelected = selectedCustomAnalyses.includes(analysis.clientId);
+                  const ChartIcon = CHART_ICONS[analysis.chart_type] || BarChart3;
+
+                  return (
+                    <div
+                      key={analysis.clientId}
+                      onClick={() => toggleCustomAnalysis(analysis.clientId)}
+                      className={`relative flex items-start gap-3 p-4 rounded-xl border-2 transition-all cursor-pointer ${
+                        isSelected
+                          ? "border-blue-400 bg-blue-50/40 shadow-sm"
+                          : "border-gray-200 bg-white hover:border-blue-200 hover:bg-blue-50/20"
+                      }`}
+                    >
+                      <div className="mt-0.5">
+                        {isSelected ? (
+                          <CheckSquare className="w-5 h-5 text-blue-600" />
+                        ) : (
+                          <Square className="w-5 h-5 text-gray-300" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <p className="font-medium text-gray-800 truncate">
+                            {analysis.name || analysis.config?.name}
+                          </p>
+                          <ChartIcon className="w-4 h-4 text-gray-400 shrink-0" />
+                        </div>
+                        <p className="text-xs font-mono text-gray-500 truncate">
+                          {analysis.config?.formula}
+                        </p>
+                        <p className="text-xs text-gray-400 mt-1">
+                          {analysis.config?.aggregation_scope} · {analysis.config?.aggregation}
+                        </p>
+                      </div>
+                      <button
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          removeCustomAnalysis(analysis.clientId);
+                        }}
+                        className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50"
+                        title="Remove"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  );
+                })}
+
+                <button
+                  onClick={() => setShowCustomModal(true)}
+                  className="min-h-32 rounded-xl border-2 border-dashed border-gray-300 bg-gray-50/60 hover:border-blue-300 hover:bg-blue-50/50 transition-all flex flex-col items-center justify-center gap-2 text-gray-500 hover:text-blue-600"
+                >
+                  <Plus className="w-7 h-7" />
+                  <span className="text-sm font-medium">Add custom analysis</span>
+                </button>
+              </div>
+            </div>
           </>
         )}
 
@@ -802,6 +932,14 @@ const MetricsSelectionPage = () => {
             )}
           </button>
         </div>
+
+        <CustomAnalysisModal
+          isOpen={showCustomModal}
+          columnsMetadata={dataset?.columns_metadata || {}}
+          onClose={() => setShowCustomModal(false)}
+          onAdd={handleAddCustomAnalysis}
+          onSuggest={handleSuggestCustomAnalysis}
+        />
       </div>
     </div>
   );

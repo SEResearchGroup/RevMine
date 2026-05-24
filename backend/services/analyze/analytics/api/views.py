@@ -41,6 +41,7 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 
 from analytics.models import Dataset, MetricDefinition, Analysis, AnalysisResult
+from analytics.domain.analysis.custom_formula import CUSTOM_FORMULA_METRIC_CODE
 from analytics.api.access import (
     filter_analysis_queryset_for_request,
     filter_dataset_queryset_for_request,
@@ -50,6 +51,11 @@ from analytics.api.access import (
 )
 from analytics.services.dataset_service import DatasetService, DatasetStorageError
 from analytics.services.analysis_service import AnalysisService
+from analytics.services.custom_analysis_service import (
+    CustomAnalysisServiceError,
+    CustomAnalysisSuggestionService,
+    CustomAnalysisValidationError,
+)
 from analytics.api.serializers import (
     DatasetSerializer,
     DatasetUploadSerializer,
@@ -272,6 +278,35 @@ class DatasetCompatibleAxesView(APIView):
         })
 
 
+class CustomAnalysisPreviewView(APIView):
+    """
+    POST /custom_analyses/preview/
+    Turns a natural-language custom analysis request into a reviewable formula.
+    """
+
+    def post(self, request):
+        dataset_id = request.data.get("dataset_id")
+        if not dataset_id:
+            return Response(
+                {"error": "'dataset_id' is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        dataset = get_dataset_for_request(request, dataset_id)
+
+        try:
+            preview = CustomAnalysisSuggestionService.generate_preview(
+                dataset=dataset,
+                payload=request.data,
+            )
+        except CustomAnalysisValidationError as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        except CustomAnalysisServiceError as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
+
+        return Response(preview, status=status.HTTP_200_OK)
+
+
 # ---------------------------------------------------------------------------
 # Metric views  (read-only catalogue)
 # ---------------------------------------------------------------------------
@@ -417,7 +452,7 @@ class GenerateChartView(APIView):
         dataset = get_dataset_for_request(request, dataset_id)
         
         # Determine mode and validate
-        if metric_code:
+        if metric_code and metric_code != CUSTOM_FORMULA_METRIC_CODE:
             # Mode A: Predefined metric
             metric = MetricDefinition.objects.filter(code=metric_code, is_active=True).first()
             if not metric:
@@ -440,7 +475,8 @@ class GenerateChartView(APIView):
                     },
                     status=status.HTTP_400_BAD_REQUEST
                 )
-                
+        elif metric_code == CUSTOM_FORMULA_METRIC_CODE:
+            chart_type = chart_type or extra_config.get("chart_type") or "bar"
         elif x_axis and y_axis:
             # Mode B: Custom axes
             metric_code = "custom_chart"
@@ -474,9 +510,10 @@ class GenerateChartView(APIView):
             "aggregation": aggregation,
             "filters": filters,
         }
-        # Merge any extra config keys (e.g. time_filter for histogram metrics)
+        # Merge any extra config keys (formula, time_filter, etc.). Explicit
+        # top-level axis params are applied below and keep precedence.
         for key, value in extra_config.items():
-            if key not in config:
+            if value is not None:
                 config[key] = value
         if x_axis is not None:
             config["x_axis"] = x_axis
@@ -511,6 +548,7 @@ class GenerateChartView(APIView):
             
             # Get result
             result = analysis.result
+            response_config = analysis.config or {}
             
             return Response(
                 {
@@ -518,10 +556,11 @@ class GenerateChartView(APIView):
                     "dataset_id": str(dataset_id),
                     "metric_code": metric_code,
                     "chart_type": chart_type,
-                    "x_axis": x_axis or config.get('x_axis'),
-                    "y_axis": y_axis or config.get('y_axis'),
-                    "aggregation": aggregation,
-                    "time_aggregation": time_aggregation,
+                    "x_axis": response_config.get('x_axis'),
+                    "y_axis": response_config.get('y_axis'),
+                    "aggregation": response_config.get("aggregation"),
+                    "time_aggregation": response_config.get("time_aggregation"),
+                    "config": response_config,
                     "chart_data": result.chart_data,
                     "image_base64": result.chart_image,
                     "statistics": result.statistics,
@@ -621,16 +660,19 @@ class AnalysisBulkCreateView(APIView):
                 })
                 continue
             
-            # Validate metric exists
-            metric = MetricDefinition.objects.filter(code=metric_code, is_active=True).first()
-            if not metric:
-                errors.append({
-                    "index": idx,
-                    "error": f"Metric '{metric_code}' not found."
-                })
-                continue
-            
-            chart_type = chart_type or metric.default_chart_type
+            # Validate metric exists unless this is an ad-hoc formula analysis.
+            if metric_code == CUSTOM_FORMULA_METRIC_CODE:
+                chart_type = chart_type or config.get("chart_type") or "bar"
+            else:
+                metric = MetricDefinition.objects.filter(code=metric_code, is_active=True).first()
+                if not metric:
+                    errors.append({
+                        "index": idx,
+                        "error": f"Metric '{metric_code}' not found."
+                    })
+                    continue
+
+                chart_type = chart_type or metric.default_chart_type
             
             # Create analysis
             analysis = Analysis.objects.create(
@@ -777,6 +819,10 @@ class AnalysisRetryView(APIView):
                 result = analysis.result
                 return Response({
                     "analysis_id": str(analysis.id),
+                    "dataset_id": str(analysis.dataset_id),
+                    "metric_code": analysis.metric_code,
+                    "chart_type": analysis.chart_type,
+                    "config": analysis.config,
                     "status": analysis.status,
                     "message": "Analysis has been re-executed successfully.",
                     "chart_data": result.chart_data,
