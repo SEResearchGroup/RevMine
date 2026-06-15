@@ -23,9 +23,17 @@ const processQueue = (error, token = null) => {
 
 const trimTrailingSlash = (value) => value.replace(/\/+$/, "");
 
-export const API_BASE_URL = trimTrailingSlash(
-  import.meta.env.VITE_API_URL || "http://localhost:8000/api"
-);
+export const normalizeApiUrl = (value) => {
+  if (!value || typeof value !== "string") {
+    return value;
+  }
+
+  return value.replace(/\/api(?=\/|$)(?!\/v\d+(?=\/|$))/, "/api/v1");
+};
+
+export const API_BASE_URL = trimTrailingSlash(normalizeApiUrl(
+  import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"
+));
 
 const serviceUrl = (path) => `${API_BASE_URL}/${path.replace(/^\/+/, "")}`;
 
@@ -61,6 +69,13 @@ const createApiInstance = (baseURL) => {
 
   instance.interceptors.request.use(
     (config) => {
+      if (config.baseURL) {
+        config.baseURL = trimTrailingSlash(normalizeApiUrl(config.baseURL));
+      }
+      if (config.url) {
+        config.url = normalizeApiUrl(config.url);
+      }
+
       const token = getToken();
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;

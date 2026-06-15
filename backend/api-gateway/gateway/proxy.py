@@ -32,8 +32,9 @@ class GatewayProxy:
                 return route
         return None
 
-    async def proxy(self, request: Request) -> Response:
-        route = self.match_route(request.url.path)
+    async def proxy(self, request: Request, route_path: str | None = None) -> Response:
+        path = route_path or request.url.path
+        route = self.match_route(path)
         if route is None:
             return JSONResponse({"error": "Route not found"}, status_code=404)
 
@@ -44,7 +45,7 @@ class GatewayProxy:
                 return auth_response
             headers["X-User-ID"] = auth_response.headers["X-User-ID"]
 
-        target_url = route.target_url(request.url.path, request.url.query.encode())
+        target_url = route.target_url(path, request.url.query.encode())
         body = await request.body()
         try:
             async with httpx.AsyncClient(timeout=self.settings.request_timeout_seconds) as client:

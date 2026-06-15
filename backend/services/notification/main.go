@@ -18,6 +18,19 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/cors"
 )
 
+func registerNotificationRoutes(api fiber.Router, h *handler.Handler) {
+	api.Get("/ws", h.WebSocketUpgrade(), h.WebSocket())
+	api.Get("/", h.ListNotifications)
+	api.Get("/unread-count", h.UnreadCount)
+	api.Patch("/:id/read", h.MarkAsRead)
+	api.Patch("/read-all", h.MarkAllAsRead)
+	api.Delete("/:id", h.DeleteNotification)
+
+	api.Get("/health", func(c *fiber.Ctx) error {
+		return c.JSON(fiber.Map{"status": "ok"})
+	})
+}
+
 func main() {
 	// Structured JSON logging via slog
 	jsonLogger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
@@ -103,18 +116,8 @@ func main() {
 
 	// Routes
 	h := handler.New(database, hub)
-	api := app.Group("/api/notifications")
-
-	api.Get("/ws", h.WebSocketUpgrade(), h.WebSocket())
-	api.Get("/", h.ListNotifications)
-	api.Get("/unread-count", h.UnreadCount)
-	api.Patch("/:id/read", h.MarkAsRead)
-	api.Patch("/read-all", h.MarkAllAsRead)
-	api.Delete("/:id", h.DeleteNotification)
-
-	api.Get("/health", func(c *fiber.Ctx) error {
-		return c.JSON(fiber.Map{"status": "ok"})
-	})
+	registerNotificationRoutes(app.Group("/api/v1/notifications"), h)
+	registerNotificationRoutes(app.Group("/api/notifications"), h)
 
 	// Graceful shutdown
 	quit := make(chan os.Signal, 1)

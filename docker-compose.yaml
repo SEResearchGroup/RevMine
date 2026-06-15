@@ -274,12 +274,12 @@ services:
     env_file:
       - ./.env
     environment:
-      AUTH_SERVICE_URL: http://auth-service:8006/api/auth
-      CONFIGURATION_SERVICE_URL: http://configuration-service:8001/api/workspaces
-      COLLECTION_SERVICE_URL: http://collection-service:8002/api/collections
-      ANALYZE_SERVICE_URL: http://analyze-service:8003/api/analysis
-      LLM_SERVICE_URL: http://llm-service:8004
-      NOTIFICATION_SERVICE_URL: http://notification-service:8005/api/notifications
+      AUTH_SERVICE_URL: http://auth-service:8006/api/v1/auth
+      CONFIGURATION_SERVICE_URL: http://configuration-service:8001/api/v1/workspaces
+      COLLECTION_SERVICE_URL: http://collection-service:8002/api/v1/collections
+      ANALYZE_SERVICE_URL: http://analyze-service:8003/api/v1/analysis
+      LLM_SERVICE_URL: http://llm-service:8004/api/v1/llm
+      NOTIFICATION_SERVICE_URL: http://notification-service:8005/api/v1/notifications
       RATE_LIMIT_REQUESTS: "120"
       RATE_LIMIT_WINDOW_SECONDS: "60"
     depends_on:
@@ -340,8 +340,8 @@ services:
       DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       COLLECTION_DATABASE_PORT: 5432
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
-      LLM_SERVICE_URL: http://llm-service:8004
-      CONFIGURATION_SERVICE_URL: http://configuration-service:8001/api/workspaces
+      LLM_SERVICE_URL: http://llm-service:8004/api/v1/llm
+      CONFIGURATION_SERVICE_URL: http://configuration-service:8001/api/v1/workspaces
     depends_on:
       collection-db:
         condition: service_healthy
@@ -373,8 +373,9 @@ services:
       DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       ANALYZE_DATABASE_PORT: 5432
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
-      LLM_SERVICE_URL: http://llm-service:8004
-      CONFIGURATION_SERVICE_URL: http://configuration-service:8001/api/workspaces
+      LLM_SERVICE_URL: http://llm-service:8004/api/v1/llm
+      CONFIGURATION_SERVICE_URL: http://configuration-service:8001/api/v1/workspaces
+      ANALYZE_MEDIA_ROOT: /var/lib/revmine/analyze/media
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/0
     depends_on:
@@ -388,6 +389,7 @@ services:
         condition: service_healthy
     volumes:
       - ./backend/services/analyze:/app
+      - analyze_media:/var/lib/revmine/analyze/media
     networks:
       - app-network
     command: sh -c "sleep 10 && python manage.py migrate --run-syncdb && python manage.py runserver 0.0.0.0:8003"
@@ -408,6 +410,7 @@ services:
       DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       ANALYZE_DATABASE_PORT: 5432
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      ANALYZE_MEDIA_ROOT: /var/lib/revmine/analyze/media
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/0
     depends_on:
@@ -417,6 +420,7 @@ services:
         condition: service_healthy
     volumes:
       - ./backend/services/analyze:/app
+      - analyze_media:/var/lib/revmine/analyze/media
     networks:
       - app-network
     command: celery -A analyze_service worker --loglevel=info
@@ -491,7 +495,7 @@ services:
     ports:
       - "5173:5173"
     environment:
-      VITE_API_URL: http://localhost:8000/api
+      VITE_API_URL: http://localhost:8000/api/v1
       CHOKIDAR_USEPOLLING: "true"
     depends_on:
       api-gateway:
@@ -510,6 +514,7 @@ volumes:
   configuration_postgres_data:
   collection_postgres_data:
   analyze_postgres_data:
+  analyze_media:
   notification_postgres_data:
   loki_data:
   grafana_data:

@@ -113,12 +113,12 @@ services:
         pip install --quiet --upgrade pip
 
         echo '=== [1/6] API Gateway ==='
-        export AUTH_SERVICE_URL=http://auth-service:8006/api/auth
-        export CONFIGURATION_SERVICE_URL=http://configuration-service:8001/api/workspaces
-        export COLLECTION_SERVICE_URL=http://collection-service:8002/api/collections
-        export ANALYZE_SERVICE_URL=http://analyze-service:8003/api/analysis
-        export LLM_SERVICE_URL=http://llm-service:8004
-        export NOTIFICATION_SERVICE_URL=http://notification-service:8005
+        export AUTH_SERVICE_URL=http://auth-service:8006/api/v1/auth
+        export CONFIGURATION_SERVICE_URL=http://configuration-service:8001/api/v1/workspaces
+        export COLLECTION_SERVICE_URL=http://collection-service:8002/api/v1/collections
+        export ANALYZE_SERVICE_URL=http://analyze-service:8003/api/v1/analysis
+        export LLM_SERVICE_URL=http://llm-service:8004/api/v1/llm
+        export NOTIFICATION_SERVICE_URL=http://notification-service:8005/api/v1/notifications
         pip install --quiet -r /usr/src/backend/api-gateway/requirements.txt
         (cd /usr/src/backend/api-gateway && python -m pytest)
 

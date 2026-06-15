@@ -27,7 +27,7 @@ def get_request_user_id(request) -> int | None:
 def get_workspace_ids_for_user(user_id: int) -> set[int]:
     base_url = os.getenv(
         "CONFIGURATION_SERVICE_URL",
-        "http://configuration-service:8001/api/workspaces",
+        "http://configuration-service:8001/api/v1/workspaces",
     ).rstrip("/")
     timeout = float(os.getenv("CONFIGURATION_SERVICE_TIMEOUT", "2"))
 

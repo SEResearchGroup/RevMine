@@ -19,7 +19,7 @@ export default defineConfig({
       TEST_USER_PASSWORD: "TestPassword123!",
       // GitHub token for testing collection flow - load from cypress.env.json (gitignored)
       // Create cypress.env.json with: {"GITHUB_TEST_TOKEN": "your_token_here"}
-      API_URL: "http://localhost:8000/api",
+      API_URL: "http://localhost:8000/api/v1",
     },
   },
 });

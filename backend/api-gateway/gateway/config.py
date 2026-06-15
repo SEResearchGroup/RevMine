@@ -1,6 +1,8 @@
 import os
 from dataclasses import dataclass
 
+API_VERSION_PREFIX = "/api/v1"
+
 
 def get_env(name: str, default: str | None = None) -> str:
     value = os.getenv(name, default)
@@ -41,12 +43,12 @@ class GatewaySettings:
 def load_settings() -> GatewaySettings:
     auth_service_url = get_env("AUTH_SERVICE_URL")
     routes = (
-        Route("/api/auth", auth_service_url, auth_required=False),
-        Route("/api/workspaces", get_env("CONFIGURATION_SERVICE_URL")),
-        Route("/api/collections", get_env("COLLECTION_SERVICE_URL")),
-        Route("/api/analysis", get_env("ANALYZE_SERVICE_URL")),
-        Route("/api/llm", get_env("LLM_SERVICE_URL"), auth_required=False),
-        Route("/api/notifications", get_env("NOTIFICATION_SERVICE_URL")),
+        Route(f"{API_VERSION_PREFIX}/auth", auth_service_url, auth_required=False),
+        Route(f"{API_VERSION_PREFIX}/workspaces", get_env("CONFIGURATION_SERVICE_URL")),
+        Route(f"{API_VERSION_PREFIX}/collections", get_env("COLLECTION_SERVICE_URL")),
+        Route(f"{API_VERSION_PREFIX}/analysis", get_env("ANALYZE_SERVICE_URL")),
+        Route(f"{API_VERSION_PREFIX}/llm", get_env("LLM_SERVICE_URL"), auth_required=False),
+        Route(f"{API_VERSION_PREFIX}/notifications", get_env("NOTIFICATION_SERVICE_URL")),
     )
     cors_origins = tuple(
         origin.strip()

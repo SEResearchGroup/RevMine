@@ -55,7 +55,7 @@ export const NotificationProvider = ({ children }) => {
       wsRef.current.close();
     }
 
-    const wsUrl = `ws://localhost:8005/api/notifications/ws?user_id=${userId}`;
+    const wsUrl = `ws://localhost:8005/api/v1/notifications/ws?user_id=${userId}`;
     const ws = new WebSocket(wsUrl);
 
     ws.onopen = () => {

@@ -73,7 +73,7 @@ def resolve_repository_metadata(
     """Retrieve imported repository metadata from the configuration service."""
     base_url = os.getenv(
         "CONFIGURATION_SERVICE_URL",
-        "http://configuration-service:8001/api/workspaces",
+        "http://configuration-service:8001/api/v1/workspaces",
     ).rstrip("/")
     timeout = float(os.getenv("CONFIGURATION_SERVICE_TIMEOUT", "10"))
 

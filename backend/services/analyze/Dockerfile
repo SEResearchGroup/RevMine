@@ -8,6 +8,8 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends netcat-traditional && rm -rf /var/lib/apt/lists/*
 
 RUN groupadd --system revmine && useradd --system --gid revmine --home-dir /app revmine
+RUN mkdir -p /var/lib/revmine/analyze/media/datasets \
+    && chown -R revmine:revmine /var/lib/revmine/analyze
 
 COPY --chmod=0444 requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt

@@ -32,7 +32,7 @@ describe('API Service', () => {
 
     it('creates instance with interceptors', () => {
       const instance = axios.create({
-        baseURL: 'http://localhost:8000/api',
+        baseURL: 'http://localhost:8000/api/v1',
       });
       
       expect(instance.interceptors).toBeDefined();

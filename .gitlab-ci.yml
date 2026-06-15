@@ -156,16 +156,21 @@ test:llm:
 
 test:notification:
   stage: test
-  image: golang:1.22-alpine
+  image: golang:1.22
   variables:
     GOCACHE: /tmp/go-cache
     GOPATH: /tmp/go
   script:
-    - cd backend/services/notification
-    - go test ./...
+    - bash scripts/ci/test_notification_service.sh
+  artifacts:
+    when: always
+    paths:
+      - backend/services/notification/coverage.out
+    expire_in: 1 week
   rules:
     - changes:
         - .gitlab-ci.yml
+        - scripts/ci/**/*
         - docker-compose*.yml
         - backend/services/notification/**/*
 

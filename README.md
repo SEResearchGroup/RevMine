@@ -140,7 +140,7 @@ docker compose down -v             # stop and wipe volumes (DBs, MinIO, Ollama m
 ### Access the services
 
 - Frontend: http://localhost:5173
-- API Gateway: http://localhost:8000/api
+- API Gateway: http://localhost:8000/api/v1
 - MinIO Console: http://localhost:9001
 - Grafana: http://localhost:3001 (admin / admin)
 

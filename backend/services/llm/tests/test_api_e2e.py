@@ -31,7 +31,7 @@ class BrokenParserService:
 
 def test_health_endpoint():
     with TestClient(app) as client:
-        response = client.get("/health")
+        response = client.get("/api/v1/llm/health")
         assert response.status_code == 200
         assert response.json() == {"status": "ok"}
 
@@ -40,7 +40,7 @@ def test_parse_endpoint_success():
     app.dependency_overrides[get_parser_service] = lambda: SuccessParserService()
     with TestClient(app) as client:
         response = client.post(
-            "/ollama",
+            "/api/v1/llm/ollama",
             json={
                 "user_message": "Collect merge requests and compute lead time",
                 "model": "deepseek-r1",
@@ -60,7 +60,7 @@ def test_parse_endpoint_invalid_model_json():
     app.dependency_overrides[get_parser_service] = lambda: BrokenParserService()
     with TestClient(app) as client:
         response = client.post(
-            "/ollama",
+            "/api/v1/llm/ollama",
             json={
                 "user_message": "Collect merge requests",
                 "model": "deepseek-r1",
@@ -76,7 +76,7 @@ def test_parse_endpoint_invalid_model_json():
 
 def test_models_endpoint_lists_providers():
     with TestClient(app) as client:
-        response = client.get("/models")
+        response = client.get("/api/v1/llm/models")
 
     assert response.status_code == 200
     body = response.json()
@@ -88,7 +88,7 @@ def test_openrouter_endpoint_success():
     app.dependency_overrides[get_openrouter_service] = lambda: SuccessParserService()
     with TestClient(app) as client:
         response = client.post(
-            "/openrouter",
+            "/api/v1/llm/openrouter",
             json={"user_message": "Collect merge requests"},
         )
 
@@ -106,7 +106,7 @@ def test_openrouter_endpoint_runtime_error_returns_502():
     app.dependency_overrides[get_openrouter_service] = lambda: RuntimeBrokenParser()
     with TestClient(app) as client:
         response = client.post(
-            "/openrouter",
+            "/api/v1/llm/openrouter",
             json={"user_message": "Collect merge requests"},
         )
 

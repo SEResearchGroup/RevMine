@@ -356,7 +356,10 @@ class CollectionAutomationService:
     @staticmethod
     def _call_llm(provider: str, model: str | None, user_message: str) -> dict[str, Any]:
         selected_provider = provider if provider in {"openrouter", "ollama"} else "openrouter"
-        base_url = os.getenv("LLM_SERVICE_URL", "http://llm-service:8004").rstrip("/")
+        base_url = os.getenv(
+            "LLM_SERVICE_URL",
+            "http://llm-service:8004/api/v1/llm",
+        ).rstrip("/")
         timeout = float(os.getenv("LLM_SERVICE_TIMEOUT", "75"))
 
         try:

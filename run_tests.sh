@@ -153,6 +153,15 @@ for entry in "${SERVICES[@]}"; do
     fi
 done
 
+section "Service : Notification Service  (backend/services/notification)"
+if bash "$SCRIPT_DIR/scripts/ci/test_notification_service.sh"; then
+    ok "Tous les tests passent ✅  →  ${BOLD}Notification Service${NC}"
+    PASSED_SERVICES+=("Notification Service")
+else
+    err "Des tests ont ÉCHOUÉ ❌  →  ${BOLD}Notification Service${NC}"
+    FAILED_SERVICES+=("Notification Service")
+fi
+
 # ── Durée d'exécution ─────────────────────────────────────────────────────────
 ELAPSED=$((SECONDS - START))
 

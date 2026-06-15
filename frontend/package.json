@@ -12,8 +12,8 @@
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "cypress:open": "cypress open",
-    "cypress:run": "cypress run",
-    "test:e2e": "cypress run"
+    "cypress:run": "../scripts/ci/test_frontend_e2e.sh",
+    "test:e2e": "../scripts/ci/test_frontend_e2e.sh"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.17",
@@ -37,7 +37,7 @@
     "@types/react-dom": "^19.2.2",
     "@vitejs/plugin-react": "^5.1.0",
     "autoprefixer": "^10.4.22",
-    "cypress": "^13.6.0",
+    "cypress": "13.6.0",
     "eslint": "^9.39.1",
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.4.24",

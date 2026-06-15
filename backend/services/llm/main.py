@@ -4,7 +4,7 @@ import time
 import traceback
 from datetime import datetime, timezone as dt_timezone
 
-from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from ollama._types import ResponseError
 
@@ -65,6 +65,7 @@ app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
 )
+router = APIRouter()
 
 
 @app.middleware("http")
@@ -94,12 +95,12 @@ def get_openrouter_service() -> OpenRouterParserService:
     return OpenRouterParserService()
 
 
-@app.get("/health")
+@router.get("/health")
 def health_check() -> dict:
     return {"status": "ok"}
 
 
-@app.get("/models")
+@router.get("/models")
 def get_available_models() -> dict:
     """Return the list of available LLM providers and their models."""
     return {
@@ -120,7 +121,7 @@ def get_available_models() -> dict:
     }
 
 
-@app.post("/openrouter", response_model=ParseResponse)
+@router.post("/openrouter", response_model=ParseResponse)
 def openrouter_parse_request(
     payload: ParseRequest,
     parser_service: OpenRouterParserService = Depends(get_openrouter_service),
@@ -152,7 +153,7 @@ def openrouter_parse_request(
         ) from exc
 
 
-@app.post("/custom-analysis", response_model=ParseResponse)
+@router.post("/custom-analysis", response_model=ParseResponse)
 def custom_analysis_parse_request(
     payload: ParseRequest,
 ):
@@ -198,7 +199,7 @@ def custom_analysis_parse_request(
         ) from exc
 
 
-@app.post("/ollama", response_model=ParseResponse)
+@router.post("/ollama", response_model=ParseResponse)
 def parse_request(
     payload: ParseRequest,
     parser_service: OllamaParserService = Depends(get_parser_service),
@@ -233,6 +234,10 @@ def parse_request(
         raise HTTPException(
             status_code=500, detail=f"Internal server error: {exc}"
         ) from exc
+
+
+app.include_router(router, prefix="/api/v1/llm")
+app.include_router(router)
 
 
 @app.exception_handler(Exception)
