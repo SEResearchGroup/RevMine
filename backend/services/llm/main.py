@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 from ollama._types import ResponseError
 
 from config import settings
-from prompts import build_custom_analysis_system_prompt
+from prompts import build_analysis_planner_system_prompt, build_custom_analysis_system_prompt
 from schemas import ParseRequest, ParseResponse
 from services.ollama_service import OllamaParserService
 from services.openrouter_service import OpenRouterParserService
@@ -197,6 +197,50 @@ def custom_analysis_parse_request(
         raise HTTPException(
             status_code=500, detail=f"Internal server error: {exc}"
         ) from exc
+
+
+@router.post("/analysis-plan", response_model=ParseResponse)
+def analysis_plan_request(payload: ParseRequest):
+    """Convert a natural-language analysis request into a structured AnalysisPlan JSON.
+
+    Uses the analysis-planner system prompt with the caller's preferred provider
+    (defaults to OpenRouter with claude-sonnet-4-6).
+    """
+    provider = payload.provider if payload.provider in {"openrouter", "ollama"} else "openrouter"
+    selected_model = payload.model
+    parser_service = (
+        OllamaParserService()
+        if provider == "ollama"
+        else OpenRouterParserService()
+    )
+
+    if not selected_model:
+        selected_model = (
+            settings.DEFAULT_MODEL
+            if provider == "ollama"
+            else "anthropic/claude-sonnet-4-6"
+        )
+
+    try:
+        result = parser_service.parse_user_request(
+            user_message=payload.user_message,
+            model=selected_model,
+            system_prompt=build_analysis_planner_system_prompt(),
+        )
+        return ParseResponse(model=selected_model, result=result)
+
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail={"error": "invalid_model_json", "message": str(exc)},
+        ) from exc
+
+    except RuntimeError as exc:
+        status_code = 502 if provider == "openrouter" else 500
+        raise HTTPException(status_code=status_code, detail=str(exc)) from exc
+
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Internal server error: {exc}") from exc
 
 
 @router.post("/ollama", response_model=ParseResponse)

@@ -18,11 +18,8 @@ from django.utils import timezone
 
 from analytics.models import AnalysisResult, MetricDefinition
 from analytics.services.dataset_service import DatasetService
-from analytics.domain.analysis.custom_formula import (
-    CUSTOM_FORMULA_METRIC_CODE,
-    evaluate_formula,
-    slugify_output_column,
-)
+from analytics.domain.metrics.providers.base import get_provider
+import analytics.domain.metrics.providers.custom_formula_provider  # noqa: F401 – triggers self-registration
 from django.core.exceptions import ObjectDoesNotExist
 
 logger = logging.getLogger(__name__)
@@ -87,7 +84,7 @@ class AnalysisService:
             dataset_service = DatasetService()
             df = dataset_service.load_dataframe(analysis.dataset)
             df = self._parse_dates(df)
-            df = self._apply_custom_formula_if_needed(df, analysis, dataset_service)
+            df = self._prepare_dataframe(df, analysis, dataset_service)
             _load_duration = round(time.monotonic() - _load_start, 3)
 
             logger.info(
@@ -191,28 +188,11 @@ class AnalysisService:
         except ObjectDoesNotExist:
             return metric_code
 
-    def _apply_custom_formula_if_needed(
+    def _prepare_dataframe(
         self, df: pd.DataFrame, analysis, dataset_service: DatasetService
     ) -> pd.DataFrame:
-        if analysis.metric_code != CUSTOM_FORMULA_METRIC_CODE:
+        """Delegate per-metric dataframe pre-processing to the registered provider."""
+        provider = get_provider(analysis.metric_code)
+        if provider is None:
             return df
-
-        config = dict(analysis.config or {})
-        output_column = slugify_output_column(
-            config.get("output_column") or config.get("name") or "custom_metric"
-        )
-        formula_result = evaluate_formula(
-            df=df,
-            formula=config.get("formula", ""),
-            output_column=output_column,
-        )
-
-        config["output_column"] = formula_result.output_column
-        config.setdefault("y_axis", formula_result.output_column)
-        analysis.config = config
-        analysis.save(update_fields=["config", "updated_at"])
-
-        if config.get("persist_column", True):
-            dataset_service.save_dataframe(analysis.dataset, formula_result.dataframe)
-
-        return formula_result.dataframe
+        return provider.prepare_dataframe(df, analysis, dataset_service)

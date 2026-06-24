@@ -10,6 +10,11 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 import uuid
 
 
+LEGACY_API_SKIP = pytest.mark.skip(
+    reason="Legacy Analyze API endpoints are obsolete; current API coverage lives in analytics/tests/."
+)
+
+
 # =============================================================================
 # Model Tests
 # =============================================================================
@@ -82,6 +87,7 @@ class TestAnalysisResultModel:
 # =============================================================================
 
 @pytest.mark.django_db
+@LEGACY_API_SKIP
 class TestAnalysisCreateEndpoint:
     """Functional tests for analysis creation endpoint."""
 
@@ -183,6 +189,7 @@ class TestAnalysisCreateEndpoint:
 
 
 @pytest.mark.django_db
+@LEGACY_API_SKIP
 class TestAnalysisListEndpoint:
     """Functional tests for analysis list endpoint."""
 
@@ -208,6 +215,7 @@ class TestAnalysisListEndpoint:
 
 
 @pytest.mark.django_db
+@LEGACY_API_SKIP
 class TestAnalysisDetailEndpoint:
     """Functional tests for analysis detail endpoint."""
 
@@ -236,6 +244,7 @@ class TestAnalysisDetailEndpoint:
 # =============================================================================
 
 @pytest.mark.django_db
+@LEGACY_API_SKIP
 class TestDatasetEndpoints:
     """Functional tests for dataset endpoints."""
 
@@ -265,6 +274,7 @@ class TestDatasetEndpoints:
 # =============================================================================
 
 @pytest.mark.django_db
+@LEGACY_API_SKIP
 class TestAnalysisResultEndpoints:
     """Functional tests for analysis result endpoints."""
 

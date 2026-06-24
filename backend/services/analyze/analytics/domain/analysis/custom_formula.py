@@ -152,15 +152,16 @@ def _build_expression_and_namespace(
     if not formula or not str(formula).strip():
         raise FormulaValidationError("Formula is required")
 
-    available_columns = set(df.columns)
+    col_lower_map = {c.lower(): c for c in df.columns}
     namespace: dict[str, Any] = {}
     expression = formula
 
     for index, column in enumerate(referenced_columns(formula)):
-        if column not in available_columns:
+        actual = col_lower_map.get(column.lower())
+        if actual is None:
             raise FormulaValidationError(f"Column '{column}' is not present in the dataset")
         variable_name = f"__col_{index}"
-        namespace[variable_name] = _as_numeric_series(df[column])
+        namespace[variable_name] = _as_numeric_series(df[actual])
         expression = expression.replace(f"[{column}]", variable_name)
         expression = expression.replace(f"`{column}`", variable_name)
 

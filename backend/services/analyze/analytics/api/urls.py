@@ -38,6 +38,9 @@ from analytics.api.views import (
 
     # Generate (core endpoint)
     GenerateChartView,
+
+    # Personalized analysis (NL → chart pipeline)
+    PersonalizedAnalysisView,
 )
 
 urlpatterns = [
@@ -52,6 +55,7 @@ urlpatterns = [
     path('datasets/<uuid:pk>/compatible_axes/',             DatasetCompatibleAxesView.as_view(),     name='dataset-compatible-axes'),
     path('datasets/<uuid:pk>/summary/',                     DatasetSummaryView.as_view(),            name='dataset-summary'),
     path('custom_analyses/preview/',                        CustomAnalysisPreviewView.as_view(),     name='custom-analysis-preview'),
+    path('personalized_analyses/',                          PersonalizedAnalysisView.as_view(),      name='personalized-analysis'),
 
     # Metrics  (read-only catalogue)
     path('metrics/',                                        MetricListView.as_view(),                name='metric-list'),

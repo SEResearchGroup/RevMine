@@ -174,7 +174,9 @@ class MetricsEngineAnalyzeMethodsTests(TestCase):
                     # Column-not-found errors are acceptable — test CSV is a minimal fixture
                     # Config-required errors (e.g. custom_chart needs x_axis/y_axis) are also acceptable
                     msg = str(exc)
-                    if ("not found in dataset" in msg or isinstance(exc, KeyError)
+                    if ("not found in dataset" in msg
+                            or "not found in the dataset" in msg
+                            or isinstance(exc, KeyError)
                             or "must be specified" in msg):
                         pass
                     else:

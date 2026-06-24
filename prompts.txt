@@ -1,0 +1,35 @@
+# RevMine — 10 Complex Personalized Analysis Prompts
+# Use these in the "Generate Chart Now" flow (Natural Language tab).
+# Each prompt is designed to test a different scenario, aggregation type, or chart form.
+# Columns available in a standard RevMine CSV dataset are referenced where relevant.
+# ──────────────────────────────────────────────────────────────────────────────────────
+
+## Prompt 1 — Review effort score per MR (csv_derived · per-MR · bar)
+Create a composite review effort score for each MR by adding the number of commits, discussions, and reviewers, then show the top 30 MRs with the highest score as a bar chart.
+
+## Prompt 2 — Monthly code churn trend (csv_existing · time · line)
+Show the total code churn (additions + deletions) aggregated by month over the full collection period as a line chart, so we can see how the codebase activity evolved.
+
+## Prompt 3 — Average lead time by author (csv_existing · category · bar)
+Display the average lead time grouped by committer (the author who made the most commits on each MR), ranked from longest to shortest, as a horizontal bar chart.
+
+## Prompt 4 — Rework ratio per MR (csv_derived · per-MR · scatter)
+Compute the rework ratio as rework_size divided by initial_mr_size for each MR, then plot it as a scatter chart against the number of commits to show whether larger MRs have more rework.
+
+## Prompt 5 — Weekly review intensity over time (csv_derived · time · area)
+Define review intensity as the sum of discussions and comments divided by the number of reviewers. Show the weekly average of this metric as an area chart to see peaks in review activity.
+
+## Prompt 6 — Entropy-weighted change size per author (csv_derived · category · bar)
+Compute an entropy-weighted change size for each MR as historical_entropy multiplied by the total change size (additions + deletions). Group by committer and show the mean per author as a bar chart.
+
+## Prompt 7 — Merge efficiency score per quarter (csv_derived · time · line)
+Define merge efficiency as the ratio of merged MRs (state == "merged") to total MRs per quarter. Show this ratio over time as a percentage line chart to track improvement trends.
+
+## Prompt 8 — People-normalized discussion load per MR (csv_derived · per-MR · bar)
+For each MR, compute the discussion load per participant as the number of discussions divided by the total number of people involved. Show the top 40 MRs by this metric as a bar chart.
+
+## Prompt 9 — Commit frequency vs lead time correlation (csv_existing · per-MR · scatter)
+Plot a scatter chart with the number of commits on the X axis and the lead time on the Y axis, so we can visually assess whether more commits correlate with longer lead times.
+
+## Prompt 10 — Monthly unique contributor growth (csv_existing · time · line)
+Show the count of unique commiters (unique_commiters column) aggregated by month as a line chart to track how the contributor base grew or shrank over time.

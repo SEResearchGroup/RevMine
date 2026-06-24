@@ -4,6 +4,7 @@ export const LLM_PROVIDERS = {
 };
 
 export const OPENROUTER_MODELS = [
+  { id: "anthropic/claude-sonnet-4-6", name: "Claude Sonnet 4.6 (Recommended)" },
   { id: "openai/gpt-4o-mini", name: "GPT-4o Mini (OpenAI)" },
   { id: "meta-llama/llama-3.1-8b-instruct", name: "Llama 3.1 8B (Free)" },
   { id: "google/gemma-3-4b-it", name: "Gemma 3 4B (Free)" },
@@ -12,7 +13,8 @@ export const OPENROUTER_MODELS = [
   { id: "deepseek/deepseek-r1", name: "DeepSeek R1 (Free)" },
 ];
 
-export const DEFAULT_OPENROUTER_MODEL = OPENROUTER_MODELS[0].id;
+export const DEFAULT_OPENROUTER_MODEL = OPENROUTER_MODELS[0].id; // Claude Sonnet 4.6
+export const DEFAULT_PERSONALIZED_MODEL = "anthropic/claude-sonnet-4-6";
 export const DEFAULT_OLLAMA_MODEL = "deepseek-r1";
 
 export const defaultModelForProvider = (provider) =>

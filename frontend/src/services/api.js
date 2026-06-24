@@ -502,6 +502,13 @@ export const analyzeService = {
     return response.data;
   },
 
+  generatePersonalizedAnalysis: async (payload) => {
+    const response = await analyzeApi.post('/personalized_analyses/', payload, {
+      timeout: 120000,
+    });
+    return response.data;
+  },
+
   // ========== ANALYSES ==========
   getAnalyses: async (datasetId = null) => {
     let url = '/analyses/';

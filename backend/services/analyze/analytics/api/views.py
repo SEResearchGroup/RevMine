@@ -56,6 +56,10 @@ from analytics.services.custom_analysis_service import (
     CustomAnalysisSuggestionService,
     CustomAnalysisValidationError,
 )
+from analytics.services.personalized_analysis_service import (
+    PersonalizedAnalysisError,
+    PersonalizedAnalysisService,
+)
 from analytics.api.serializers import (
     DatasetSerializer,
     DatasetUploadSerializer,
@@ -910,6 +914,102 @@ class AnalysisHistoryView(APIView):
             'count': len(datasets_with_analyses),
             'results': datasets_with_analyses
         })
+
+
+class PersonalizedAnalysisView(APIView):
+    """
+    POST /personalized_analyses/
+
+    End-to-end natural-language → chart pipeline.
+
+    Request body
+    ------------
+    {
+        "dataset_id": "<uuid>",
+        "prompt":     "La moyenne de changements par auteur",
+        "provider":   "openrouter",          // optional, default "openrouter"
+        "model":      "anthropic/claude-sonnet-4-6"  // optional
+    }
+
+    Response
+    --------
+    {
+        "analysis_id":  "<uuid>",
+        "dataset_id":   "<uuid>",
+        "scenario":     "csv_existing" | "csv_derived" | "raw_json",
+        "plan": {
+            "name":              "...",
+            "formula":           "...",
+            "output_column":     "...",
+            "explanation":       "...",
+            "aggregation_scope": "...",
+            "aggregation":       "...",
+            "chart_type":        "...",
+            "x_axis":            "..."
+        },
+        "chart_data":   {...},
+        "image_base64": "...",
+        "statistics":   {...},
+        "warnings":     [],
+        "generated_at": "ISO timestamp"
+    }
+    """
+
+    def post(self, request):
+        dataset_id = request.data.get("dataset_id")
+        prompt = str(request.data.get("prompt") or "").strip()
+
+        if not dataset_id:
+            return Response(
+                {"error": "'dataset_id' is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if not prompt:
+            return Response(
+                {"error": "'prompt' is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        dataset = get_dataset_for_request(request, dataset_id)
+
+        llm_provider = str(request.data.get("provider") or "openrouter").strip()
+        model = request.data.get("model") or "anthropic/claude-sonnet-4-6"
+
+        try:
+            result = PersonalizedAnalysisService().execute(
+                dataset=dataset,
+                prompt=prompt,
+                llm_provider=llm_provider,
+                model=model,
+            )
+        except PersonalizedAnalysisError as exc:
+            return Response(
+                {"error": str(exc)},
+                status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            )
+
+        return Response(
+            {
+                "analysis_id": result.analysis_id,
+                "dataset_id": result.dataset_id,
+                "scenario": result.plan.scenario,
+                "plan": {
+                    "name": result.plan.name,
+                    "formula": result.plan.formula,
+                    "output_column": result.output_column,
+                    "explanation": result.plan.explanation,
+                    "aggregation_scope": result.plan.aggregation_scope,
+                    "aggregation": result.plan.aggregation,
+                    "chart_type": result.plan.chart_type,
+                    "x_axis": result.plan.x_axis,
+                },
+                "chart_data": result.chart_data,
+                "image_base64": result.chart_image,
+                "statistics": result.statistics,
+                "warnings": result.warnings,
+            },
+            status=status.HTTP_201_CREATED,
+        )
 
 
 class DatasetSummaryView(APIView):

@@ -371,3 +371,59 @@ Rules:
 
 def build_custom_analysis_system_prompt() -> str:
     return CUSTOM_ANALYSIS_SYSTEM_PROMPT
+
+
+ANALYSIS_PLANNER_SYSTEM_PROMPT = """
+You are an analysis planning assistant for RevMine, a code-review analytics platform.
+Given a natural-language request and a dataset schema, determine the best approach to fulfil the request.
+
+Return ONLY a valid JSON object with this exact schema:
+
+{
+  "scenario": "csv_existing" | "csv_derived" | "raw_json",
+  "name": "Short display name for the chart",
+  "explanation": "One sentence explaining the analysis and why this scenario was chosen",
+  "metrics_needed": ["list", "of", "column", "names", "referenced"],
+  "formula": "[Column A] / [Column B]",
+  "output_column": "snake_case_result_column_name",
+  "aggregation_scope": "mr" | "time" | "category",
+  "aggregation": "sum" | "mean" | "median" | "count" | "min" | "max" | "std",
+  "chart_type": "bar" | "line" | "area" | "scatter",
+  "x_axis": null | "exact column name from the dataset",
+  "time_aggregation": "D" | "W" | "M" | "Q" | "Y"
+}
+
+Scenario definitions:
+- "csv_existing"  All required data already exists as columns in the CSV.
+                  Use this when you only need to aggregate or plot an existing column
+                  (formula may be null or a simple reference).
+- "csv_derived"   The metric can be computed from existing CSV columns using arithmetic.
+                  Formula creates a new derived column.
+- "raw_json"      The metric requires data NOT available in the CSV — e.g. file content,
+                  commit messages, code diffs, label text.  Set formula to null and
+                  explain what is missing in the explanation field.
+
+Rules:
+1. Use ONLY column names from the provided dataset columns list.
+2. Reference columns in formulas with [Exact Column Name] syntax.
+3. aggregation_scope="time"     → x_axis must be a datetime column from the dataset.
+4. aggregation_scope="category" → x_axis must be a categorical/string column.
+5. aggregation_scope="mr"       → per-merge-request values; x_axis is not required.
+6. Choose "csv_existing" when the user asks to aggregate or display an existing column.
+7. Choose "csv_derived"  when arithmetic on existing columns produces the requested metric.
+8. Choose "raw_json"     only when the needed data is genuinely absent from the CSV.
+9. Do not include explanations, markdown, or any extra keys outside the JSON object.
+10. CRITICAL — formula vs aggregation:
+    - "formula" is a ROW-LEVEL expression evaluated once per MR/row.
+    - "aggregation" (mean, sum, count, ...) is applied AFTER the formula, by the engine.
+    - NEVER put mean(), sum(), count(), median(), std() inside the formula field.
+    - For "csv_existing" (just display/aggregate an existing column): set formula to null.
+      Set output_column to the exact existing column name. The aggregation field handles grouping.
+    - For "csv_derived": formula must be row-level arithmetic only, e.g. [A] + [B] or [A] / max([B], 1).
+    - Allowed formula functions: abs, sqrt, log, log10, exp, floor, ceil, round, pow, min, max, clip.
+      All others (including mean, sum, count, groupby) are FORBIDDEN in formula.
+""".strip()
+
+
+def build_analysis_planner_system_prompt() -> str:
+    return ANALYSIS_PLANNER_SYSTEM_PROMPT

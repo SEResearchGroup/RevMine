@@ -22,6 +22,7 @@ import {
   Bot,
   Plus,
   Trash2,
+  Zap,
 } from "lucide-react";
 import { analyzeService } from "../../services/api";
 import CustomAnalysisModal from "../../components/analysis/CustomAnalysisModal";
@@ -128,6 +129,7 @@ const MetricsSelectionPage = () => {
   const [customAnalyses, setCustomAnalyses] = useState([]);
   const [selectedCustomAnalyses, setSelectedCustomAnalyses] = useState([]);
   const [showCustomModal, setShowCustomModal] = useState(false);
+  const [personalizedResults, setPersonalizedResults] = useState([]);
   const [llmPrompt, setLlmPrompt] = useState("");
   const [aiPreview, setAiPreview] = useState(null);
   const [llmProvider, setLlmProvider] = useState(LLM_PROVIDERS.OPENROUTER);
@@ -210,10 +212,22 @@ const MetricsSelectionPage = () => {
   };
 
   const handleSuggestCustomAnalysis = (payload) =>
-    analyzeService.suggestCustomAnalysis({
-      dataset_id: datasetId,
-      ...payload,
-    });
+    analyzeService.suggestCustomAnalysis({ dataset_id: datasetId, ...payload });
+
+  const handleDirectGenerate = (payload) =>
+    analyzeService.generatePersonalizedAnalysis({ dataset_id: datasetId, ...payload });
+
+  const handleAddDirectResult = (result) => {
+    const clientId = `personalized-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    setPersonalizedResults((prev) => [...prev, { ...result, clientId }]);
+    setShowCustomModal(false);
+    setSelectionMode("manual");
+    setError(null);
+  };
+
+  const removePersonalizedResult = (clientId) => {
+    setPersonalizedResults((prev) => prev.filter((r) => r.clientId !== clientId));
+  };
 
   const toggleCategory = (cat) =>
     setExpandedCats((prev) => ({ ...prev, [cat]: !prev[cat] }));
@@ -307,9 +321,28 @@ const MetricsSelectionPage = () => {
       setCreatingMessage("Generating dashboards...");
       const results = await runAnalyses(analysesToRun);
 
+      // Map pre-computed personalized results to dashboard format
+      const personalizedCharts = personalizedResults.map((r) => ({
+        metric_code: "custom_formula",
+        name: r.plan?.name,
+        chart_type: r.plan?.chart_type || "bar",
+        chart_data: r.chart_data,
+        image_base64: r.image_base64,
+        statistics: r.statistics,
+        config: {
+          name: r.plan?.name,
+          formula: r.plan?.formula,
+          output_column: r.output_column,
+          aggregation_scope: r.plan?.aggregation_scope,
+          aggregation: r.plan?.aggregation,
+          scenario: r.scenario,
+        },
+        personalized: true,
+      }));
+
       navigate(dashboardPath, {
         state: {
-          results,
+          results: [...results, ...personalizedCharts],
           dataset,
           selectionMode,
           automation: preview?.selection || null,
@@ -335,7 +368,7 @@ const MetricsSelectionPage = () => {
 
   const totalSelected =
     selectionMode === "manual"
-      ? selectedMetrics.length + selectedCustomAnalyses.length
+      ? selectedMetrics.length + selectedCustomAnalyses.length + personalizedResults.length
       : aiPreview?.analyses?.length || 0;
 
   if (loading) {
@@ -902,6 +935,65 @@ const MetricsSelectionPage = () => {
           </>
         )}
 
+        {/* Personalized charts (pre-computed via the new NL pipeline) */}
+        {personalizedResults.length > 0 && (
+          <div className="mt-6 bg-white rounded-xl border border-emerald-200/60 overflow-hidden">
+            <div className="px-5 py-4 border-b border-emerald-100 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <Zap className="w-4 h-4 text-emerald-600" />
+                <div>
+                  <p className="font-semibold text-gray-800">Personalized charts</p>
+                  <p className="text-xs text-gray-400">
+                    Generated from natural language — included automatically in the run.
+                  </p>
+                </div>
+              </div>
+              <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700">
+                {personalizedResults.length} ready
+              </span>
+            </div>
+            <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-3">
+              {personalizedResults.map((result) => {
+                const ChartIcon = CHART_ICONS[result.plan?.chart_type] || BarChart3;
+                return (
+                  <div
+                    key={result.clientId}
+                    className="relative flex items-start gap-3 p-4 rounded-xl border-2 border-emerald-200 bg-emerald-50/30"
+                  >
+                    <div className="mt-0.5 w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center shrink-0">
+                      <Zap className="w-3 h-3 text-white" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <p className="font-medium text-gray-800 truncate">{result.plan?.name}</p>
+                        <ChartIcon className="w-4 h-4 text-gray-400 shrink-0" />
+                      </div>
+                      {result.plan?.formula && (
+                        <p className="text-xs font-mono text-gray-500 truncate">{result.plan.formula}</p>
+                      )}
+                      <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
+                          {result.scenario}
+                        </span>
+                        <span className="text-xs text-gray-400">
+                          {result.plan?.aggregation_scope} · {result.plan?.aggregation}
+                        </span>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => removePersonalizedResult(result.clientId)}
+                      className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50"
+                      title="Remove"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         <div className="mt-8 flex justify-between">
           <button
             onClick={() => navigate(entryPath)}
@@ -939,6 +1031,8 @@ const MetricsSelectionPage = () => {
           onClose={() => setShowCustomModal(false)}
           onAdd={handleAddCustomAnalysis}
           onSuggest={handleSuggestCustomAnalysis}
+          onDirectGenerate={handleDirectGenerate}
+          onDirectResult={handleAddDirectResult}
         />
       </div>
     </div>
