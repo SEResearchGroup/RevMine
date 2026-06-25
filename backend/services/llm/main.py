@@ -9,9 +9,11 @@ from fastapi.responses import JSONResponse
 from ollama._types import ResponseError
 
 from config import settings
-from schemas import ParseRequest, ParseResponse
+from schemas import ParseRequest, ParseResponse, DSLGenerateRequest, DSLGenerateResponse, CodeGenerateRequest, CodeGenerateResponse
 from services.ollama_service import OllamaParserService
 from services.openrouter_service import OpenRouterParserService
+from services.dsl_agent import DSLGenerationAgent
+from services.code_agent import CodeGenerationAgent
 
 
 # ---------------------------------------------------------------------------
@@ -186,6 +188,72 @@ def parse_request(
         raise HTTPException(
             status_code=500, detail=f"Internal server error: {exc}"
         ) from exc
+
+
+@app.post("/dsl/generate", response_model=DSLGenerateResponse)
+def dsl_generate(payload: DSLGenerateRequest):
+    """
+    POST /dsl/generate
+
+    Translate a natural-language analysis request into an Analysis DSL JSON document.
+    The 'available_columns' list from the dataset is injected into the prompt so
+    the LLM can validate column references before returning the DSL.
+
+    Returns a DSLGenerateResponse where 'dsl' is either:
+      - A valid Analysis DSL document
+      - An error dict: {"error": "column_missing"|"dsl_insufficient", ...}
+    """
+    backend = payload.backend if payload.backend in ("openrouter", "ollama") else "openrouter"
+
+    try:
+        agent = DSLGenerationAgent(backend=backend)
+        dsl = agent.generate(
+            user_message=payload.user_message,
+            available_columns=payload.available_columns,
+            model=payload.model,
+        )
+        return DSLGenerateResponse(
+            backend=backend,
+            model=payload.model,
+            dsl=dsl,
+            has_error="error" in dsl,
+        )
+
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Internal server error: {exc}") from exc
+
+
+@app.post("/code/generate", response_model=CodeGenerateResponse)
+def code_generate(payload: CodeGenerateRequest):
+    """
+    POST /code/generate
+
+    Translate a natural-language analysis request into a Python code snippet
+    that computes the metric on a pandas DataFrame called `df`.
+
+    Used when the DSL is insufficient (complex metrics, custom formulas, etc.).
+    """
+    backend = payload.backend if payload.backend in ("openrouter", "ollama") else "openrouter"
+
+    try:
+        agent = CodeGenerationAgent(backend=backend)
+        code = agent.generate(
+            user_message=payload.user_message,
+            available_columns=payload.available_columns,
+            model=payload.model,
+        )
+        return CodeGenerateResponse(backend=backend, model=payload.model, code=code)
+
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Internal server error: {exc}") from exc
 
 
 @app.exception_handler(Exception)

@@ -1,0 +1,326 @@
+================================================================================
+REVMINE — REQUÊTES DE TEST POUR LES ANALYSES PERSONNALISÉES (DSL-First)
+================================================================================
+
+Comment utiliser ce fichier :
+  POST /api/analyze/custom/
+  Body: { "dataset_id": "<uuid>", "nl_query": "<requête>", "backend": "openrouter" }
+
+Ou via le frontend : onglet "Natural Language Query" → bouton "Preview & Run".
+
+Chaque section indique le niveau DSL attendu, le chart attendu, et les champs DSL
+clés que le moteur doit générer.
+
+================================================================================
+NIVEAU 1 — BASIQUE (agrégation globale, aucun groupement)
+================================================================================
+
+[NL-01] Requête :
+  "Quelle est la moyenne du Lead Time dans l'ensemble du dataset ?"
+  Attendu :
+    select.metric = Lead_Time, aggregation = avg, chart.type = bar (ou pie)
+    group_by = absent
+  DSL cible :
+    { "select": {"metric": "Lead_Time", "aggregation": "avg"}, "chart": {"type": "bar"} }
+
+[NL-02] Requête :
+  "Combien de merge requests existent dans ce dataset ?"
+  Attendu :
+    select.metric = quelconque (ex. MR_ID), aggregation = count
+    group_by = absent, chart.type = bar
+
+[NL-03] Requête :
+  "Affiche le maximum du churn d'ajouts."
+  Attendu :
+    select.metric = churn_addition, aggregation = max
+
+[NL-04] Requête :
+  "Donne la médiane du nombre de commits."
+  Attendu :
+    select.metric = #Commits, aggregation = median
+
+================================================================================
+NIVEAU 2 — GROUPEMENT SIMPLE (group_by colonne catégorielle)
+================================================================================
+
+[NL-05] Requête :
+  "Montre le temps moyen de lead time par auteur."
+  Attendu :
+    select.metric = Lead_Time, aggregation = avg
+    group_by.column = Author, chart.type = bar, sort = desc
+
+[NL-06] Requête :
+  "Top 10 des auteurs qui ont soumis le plus de merge requests."
+  Attendu :
+    select.metric = MR_ID (ou équivalent), aggregation = count
+    group_by.column = Author, sort.order = desc, limit = 10, chart.type = bar
+
+[NL-07] Requête :
+  "Distribution du lead time par état de la MR (merged, open, closed)."
+  Attendu :
+    select.metric = Lead_Time, aggregation = avg
+    group_by.column = State, chart.type = bar
+
+[NL-08] Requête :
+  "Nombre moyen de commits par auteur, trié croissant."
+  Attendu :
+    select.metric = #Commits, aggregation = avg
+    group_by.column = Author, sort.order = asc, chart.type = bar
+
+================================================================================
+NIVEAU 3 — SÉRIE TEMPORELLE (group_by time)
+================================================================================
+
+[NL-09] Requête :
+  "Évolution mensuelle du lead time moyen."
+  Attendu :
+    select.metric = Lead_Time, aggregation = avg
+    group_by.time.period = month, chart.type = line
+
+[NL-10] Requête :
+  "Tendance hebdomadaire du churn d'ajouts total avec ligne de tendance."
+  Attendu :
+    select.metric = churn_addition, aggregation = sum
+    group_by.time.period = week, chart.type = line, chart.trend_line = true
+
+[NL-11] Requête :
+  "Nombre de MRs soumises par trimestre."
+  Attendu :
+    aggregation = count, group_by.time.period = quarter, chart.type = bar
+
+[NL-12] Requête :
+  "Volume de rework mensuel sur toute la période du projet."
+  Attendu :
+    select.metric = rework_size, aggregation = sum
+    group_by.time.period = month, chart.type = area (ou line)
+
+================================================================================
+NIVEAU 4 — FILTRES
+================================================================================
+
+[NL-13] Requête :
+  "Lead time moyen par auteur, uniquement pour les MRs mergées."
+  Attendu :
+    filters = [{ column: State, op: eq, value: merged }]
+    group_by.column = Author, chart.type = bar
+
+[NL-14] Requête :
+  "Évolution du churn mensuel uniquement pour les MRs avec plus de 5 commits."
+  Attendu :
+    filters = [{ column: #Commits, op: gt, value: 5 }]
+    group_by.time.period = month, chart.type = line
+
+[NL-15] Requête :
+  "Top 5 auteurs par nombre de MRs parmi ceux avec un lead time inférieur à 7 jours."
+  Attendu :
+    filters = [{ column: Lead_Time, op: lt, value: 7 }]
+    group_by.column = Author, sort.order = desc, limit = 5
+
+[NL-16] Requête :
+  "Churn d'ajouts total par auteur en excluant les MRs ouvertes."
+  Attendu :
+    filters = [{ column: State, op: neq, value: open }]
+    select.metric = churn_addition, aggregation = sum, group_by.column = Author
+
+================================================================================
+NIVEAU 5 — DISTRIBUTION (histogram)
+================================================================================
+
+[NL-17] Requête :
+  "Distribution du lead time des merge requests."
+  Attendu :
+    chart.type = histogram, select.metric = Lead_Time, chart.bin_count = 30
+
+[NL-18] Requête :
+  "Distribution du nombre de commits par MR."
+  Attendu :
+    chart.type = histogram, select.metric = #Commits, chart.bin_count = 20
+
+[NL-19] Requête :
+  "Histogramme du churn d'ajouts en ne gardant que les valeurs positives."
+  Attendu :
+    chart.type = histogram
+    filters = [{ column: churn_addition, op: gt, value: 0 }]
+
+================================================================================
+NIVEAU 6 — MULTI-SÉRIES
+================================================================================
+
+[NL-20] Requête :
+  "Compare la moyenne et le P95 du lead time par mois."
+  Attendu :
+    series = [
+      { metric: Lead_Time, aggregation: avg, label: Moyenne },
+      { metric: Lead_Time, aggregation: p95, label: P95 }
+    ]
+    group_by.time.period = month, chart.type = line
+
+[NL-21] Requête :
+  "Affiche côte à côte le churn d'ajouts et le churn de suppressions par auteur."
+  Attendu :
+    series = [
+      { metric: churn_addition, aggregation: sum, label: Ajouts },
+      { metric: churn_deletions, aggregation: sum, label: Suppressions }
+    ]
+    group_by.column = Author, chart.type = multi_bar
+
+[NL-22] Requête :
+  "Évolution mensuelle du nombre de commits et du lead time moyen sur le même graphique."
+  Attendu :
+    series = 2 métriques, group_by.time.period = month, chart.type = line
+
+================================================================================
+NIVEAU 7 — SCATTER / CORRÉLATION
+================================================================================
+
+[NL-23] Requête :
+  "Relation entre le lead time et le churn d'ajouts."
+  Attendu :
+    chart.type = scatter
+    select.metric = Lead_Time (axe X)
+    secondary_metric = churn_addition (axe Y)
+
+[NL-24] Requête :
+  "Y a-t-il une corrélation entre le nombre de commits et la taille du rework ?"
+  Attendu :
+    chart.type = scatter
+    select.metric = #Commits
+    secondary_metric = rework_size
+
+[NL-25] Requête :
+  "Matrice de corrélation de toutes les métriques numériques."
+  Attendu :
+    chart.type = heatmap
+    select.metrics = [Lead_Time, #Commits, churn_addition, churn_deletions, initial_mr_size, rework_size]
+
+================================================================================
+NIVEAU 8 — COLONNES DÉRIVÉES (derived_column)
+================================================================================
+
+[NL-26] Requête :
+  "Taux de rework (rework_size / initial_mr_size) moyen par auteur."
+  Attendu :
+    derived_column = { name: rework_rate, formula: rework_size / initial_mr_size }
+    select.metric = rework_rate, aggregation = avg
+    group_by.column = Author, chart.type = bar
+
+[NL-27] Requête :
+  "Balance nette du churn (additions - suppressions) par auteur."
+  Attendu :
+    derived_column = { name: churn_balance, formula: churn_addition - churn_deletions }
+    select.metric = churn_balance, aggregation = sum
+    group_by.column = Author, chart.type = bar
+
+[NL-28] Requête :
+  "Vélocité de commits (nombre de commits / lead time) par auteur, top 10."
+  Attendu :
+    derived_column = { name: commit_velocity, formula: #Commits / Lead_Time }
+    select.metric = commit_velocity, aggregation = avg
+    group_by.column = Author, sort.order = desc, limit = 10
+
+================================================================================
+NIVEAU 9 — COMBINAISONS COMPLEXES
+================================================================================
+
+[NL-29] Requête :
+  "Évolution mensuelle du taux de rework moyen, avec interval de confiance à 95%,
+   uniquement pour les MRs mergées, avec une ligne de tendance."
+  Attendu :
+    derived_column: rework_size / initial_mr_size
+    filters = [State = merged]
+    group_by.time.period = month
+    chart.type = line, confidence_interval = 95, trend_line = true
+
+[NL-30] Requête :
+  "Top 5 auteurs par churn total (ajouts + suppressions) parmi les MRs de plus de
+   3 commits, sur les 6 derniers mois."
+  Attendu :
+    derived_column: churn_addition + churn_deletions
+    filters = [#Commits > 3, Creation_Date between ...]
+    group_by.column = Author, sort.order = desc, limit = 5
+
+[NL-31] Requête :
+  "Compare par mois la moyenne ET le P95 du lead time uniquement pour les MRs
+   mergées avec plus de 100 lignes ajoutées."
+  Attendu :
+    filters = [State = merged, churn_addition > 100]
+    series = [avg Lead_Time, p95 Lead_Time]
+    group_by.time.period = month, chart.type = line
+
+[NL-32] Requête :
+  "Répartition en camembert du nombre de MRs par auteur, en excluant les
+   auteurs avec moins de 2 MRs."
+  Attendu :
+    select.metric = MR_ID (count), aggregation = count
+    group_by.column = Author
+    chart.type = pie
+    (le filtre post-agrégation peut ne pas être supporté → doit être noté)
+
+================================================================================
+NIVEAU 10 — CAS LIMITES ET ESCALADE
+================================================================================
+
+[NL-33] Requête :
+  "Analyse de survie du temps de review (kaplan-meier)."
+  Comportement attendu :
+    DSL insuffisant → error: dsl_insufficient, escalate_to: analysis_plugin
+    (Level 5 — algorithme statistique avancé non supporté par le moteur DSL)
+
+[NL-34] Requête :
+  "Montre le score SonarQube moyen par équipe."
+  Comportement attendu :
+    error: column_missing, missing: [SonarQube_Score, Team]
+    (colonnes inexistantes dans le dataset de base)
+
+[NL-35] Requête :
+  "Anomalies de lead time par rapport à la moyenne mobile des 3 derniers mois."
+  Comportement attendu :
+    DSL insuffisant (fenêtre glissante non supportée)
+    → error: dsl_insufficient, escalate_to: analysis_plugin
+
+[NL-36] Requête :
+  "Comparaison avant/après le 1er janvier 2024 du lead time moyen par auteur."
+  Comportement attendu :
+    Peut être exprimé via 2 filtres `between` ou via un filtre `gte`/`lt` sur Creation_Date
+    → Deux analyses DSL séparées ou une multi-series avec filtres
+
+================================================================================
+REQUÊTES SPÉCIALES — TEST DE ROBUSTESSE
+================================================================================
+
+[NL-37] Requête floue :
+  "Montre moi des trucs sur le code."
+  Comportement attendu :
+    Le LLM doit choisir une métrique par défaut (ex. Lead_Time count) ou
+    retourner un DSL minimal sans crash
+
+[NL-38] Requête en anglais :
+  "Show average review cycle time by author sorted by slowest first."
+  Comportement attendu :
+    Même pipeline DSL — la langue ne doit pas empêcher la génération
+
+[NL-39] Requête avec typo de colonne :
+  "Lead time moyen par auteurs" (sans accent → pas de problème)
+  "Durée moyenne de leadtime par autheur."
+  Comportement attendu :
+    DSLValidator.suggestion doit proposer "Author" si "autheur" est reçu
+
+[NL-40] Requête en DSL direct (bypass LLM) :
+  POST body: {
+    "dataset_id": "<uuid>",
+    "dsl": {
+      "version": "1",
+      "source": { "type": "reviews" },
+      "select": { "metric": "Lead_Time", "aggregation": "avg" },
+      "group_by": { "column": "Author" },
+      "sort": { "by": "value", "order": "desc" },
+      "limit": 5,
+      "chart": { "type": "bar" }
+    }
+  }
+  Comportement attendu :
+    LLM bypassé, exécution directe → résultat identique à NL-06
+
+================================================================================
+FIN DU FICHIER — 40 requêtes de test (niveaux 1 à 10)
+================================================================================

@@ -938,5 +938,543 @@ class DatasetSummaryView(APIView):
         summary['platform'] = dataset.platform
         summary['workspace_id'] = dataset.workspace_id
         summary['repository_id'] = dataset.repository_id
-        
+
         return Response(summary)
+
+
+class AutomationPreviewView(APIView):
+    """
+    POST /automation/preview/
+
+    "AI Prompt" mode of MetricsSelectionPage.jsx.
+
+    Receives a natural-language prompt and maps it to existing metric_code values
+    via the LLM Service intent-parsing endpoint (the legacy 'analyze' flow).
+    This is DISTINCT from the DSL-First pipeline: the LLM here does NOT generate
+    a DSL document — it maps NL to catalogue metric codes.
+
+    Request body:
+    {
+        "dataset_id":   "<uuid>",
+        "prompt":       "Show commits over time for Alice",
+        "llm_provider": "openrouter" | "ollama",
+        "model":        "openai/gpt-4o-mini"   // optional
+    }
+
+    Response (200):
+    {
+        "prompt":    "Show commits over time for Alice",
+        "analyses":  [{"metric_code": "commits_over_time", "chart_type": "line", "config": {}}],
+        "selection": {
+            "metrics":       ["commits_over_time"],
+            "visualization": "line_chart",
+            "chart_type":    "line",
+            "filters":       {"date_range": null, "authors": ["Alice"], "repositories": []}
+        },
+        "warnings":  []
+    }
+    """
+
+    # Map LLM visualization label → chart_type string consumed by /generate/
+    _VIZ_TO_CHART = {
+        "line_chart":   "line",
+        "bar_chart":    "bar",
+        "pie_chart":    "pie",
+        "scatter_plot": "scatter",
+        "histogram":    "histogram",
+        "area_chart":   "area",
+        "heatmap":      "heatmap",
+    }
+
+    def post(self, request):
+        import requests as http_requests
+        from django.conf import settings
+
+        dataset_id  = request.data.get("dataset_id")
+        prompt      = (request.data.get("prompt") or "").strip()
+        llm_provider = request.data.get("llm_provider", "openrouter")
+        model       = request.data.get("model")
+
+        if not dataset_id:
+            return Response({"error": "'dataset_id' is required."}, status=status.HTTP_400_BAD_REQUEST)
+        if not prompt:
+            return Response({"error": "'prompt' is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        dataset = get_dataset_for_request(request, dataset_id)
+
+        # ── 1. Get available metric codes for this dataset ──────────────────
+        from analytics.services.dataset_service import DatasetService
+        svc = DatasetService()
+        metrics_result = svc.get_available_metrics(dataset)
+        available_codes = {m.code for m in metrics_result["available_metrics"]}
+        code_to_metric  = {m.code: m for m in metrics_result["available_metrics"]}
+
+        # ── 2. Call LLM Service (intent-parsing prompt) ─────────────────────
+        llm_base = getattr(settings, "LLM_SERVICE_URL", "http://llm-service:8004")
+        endpoint = f"{llm_base}/openrouter" if llm_provider == "openrouter" else f"{llm_base}/ollama"
+
+        llm_payload = {"user_message": prompt}
+        if model:
+            llm_payload["model"] = model
+
+        try:
+            resp = http_requests.post(endpoint, json=llm_payload, timeout=60)
+            resp.raise_for_status()
+            llm_data = resp.json()
+        except http_requests.exceptions.ConnectionError:
+            return Response(
+                {"error": f"LLM service unreachable at {llm_base}. Is the llm-service container running?"},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+        except http_requests.exceptions.HTTPError as exc:
+            return Response(
+                {"error": f"LLM service error: {exc.response.text}"},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+        # ── 3. Parse LLM intent response ─────────────────────────────────────
+        # LLM service wraps the result: {"model": "...", "result": {...}}
+        intent_result = llm_data.get("result") or llm_data
+
+        requested_metrics  = intent_result.get("metrics", [])
+        llm_filters        = intent_result.get("filters") or {}
+        llm_visualization  = intent_result.get("visualization", "")
+        chart_type         = self._VIZ_TO_CHART.get(llm_visualization, "bar")
+
+        # ── 4. Resolve metric codes to analyses ───────────────────────────────
+        warnings  = []
+        analyses  = []
+
+        for code in requested_metrics:
+            if code not in available_codes:
+                warnings.append(
+                    f"Metric '{code}' is not available for this dataset "
+                    "(missing required columns or not in catalogue)."
+                )
+                continue
+
+            metric_obj = code_to_metric[code]
+            # Use LLM-suggested chart type, but fall back to the metric's default
+            resolved_chart = chart_type or metric_obj.default_chart_type or "bar"
+            config = {}
+
+            # Propagate LLM filters into config if the metric supports them
+            if llm_filters.get("date_range"):
+                config["date_range"] = llm_filters["date_range"]
+            if llm_filters.get("authors"):
+                config["authors"] = llm_filters["authors"]
+
+            analyses.append({
+                "metric_code": code,
+                "chart_type":  resolved_chart,
+                "config":      config,
+            })
+
+        if not analyses and requested_metrics:
+            warnings.insert(0, "None of the LLM-suggested metrics are available for this dataset.")
+
+        return Response({
+            "prompt":    prompt,
+            "analyses":  analyses,
+            "selection": {
+                "metrics":       [a["metric_code"] for a in analyses],
+                "visualization": llm_visualization,
+                "chart_type":    chart_type,
+                "filters":       llm_filters,
+            },
+            "warnings": warnings,
+        })
+
+
+# ---------------------------------------------------------------------------
+# Custom DSL analysis views  (DSL-First pipeline)
+# ---------------------------------------------------------------------------
+
+class CustomAnalysisView(APIView):
+    """
+    POST /custom/
+
+    Accepts a natural-language query (or a raw DSL document) and returns
+    a fully executed chart + statistics without requiring the user to know
+    any metric code.
+
+    Body (NL mode):
+    {
+        "dataset_id":   "<uuid>",
+        "nl_query":     "Show average lead time by author",
+        "model":        "openai/gpt-4o-mini",   // optional
+        "backend":      "openrouter",            // optional: openrouter | ollama
+        "custom_label": "My custom chart"        // optional
+    }
+
+    Body (DSL mode – skips LLM):
+    {
+        "dataset_id": "<uuid>",
+        "dsl": { "version": "1", "source": {...}, ... }
+    }
+
+    Response:
+    {
+        "status":       "completed" | "dsl_error",
+        "analysis_id":  "<uuid>",
+        "dsl":          { ... },       // the DSL document used
+        "chart_type":   "bar",
+        "chart_data":   { ... },
+        "chart_image":  "data:image/png;base64,...",
+        "statistics":   { ... },
+        "generated_at": "ISO-8601"
+    }
+    """
+
+    def post(self, request):
+        from analytics.services.custom_analysis_service import CustomAnalysisService
+
+        dataset_id = request.data.get("dataset_id")
+        nl_query = request.data.get("nl_query", "").strip()
+        dsl_raw = request.data.get("dsl")
+        model = request.data.get("model")
+        backend = request.data.get("backend", "openrouter")
+        custom_label = request.data.get("custom_label")
+
+        if not dataset_id:
+            return Response(
+                {"error": "'dataset_id' is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if not nl_query and not dsl_raw:
+            return Response(
+                {"error": "Provide either 'nl_query' or 'dsl'."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        dataset = get_dataset_for_request(request, dataset_id)
+        service = CustomAnalysisService()
+
+        try:
+            if dsl_raw:
+                result = service.run_from_dsl(
+                    dataset=dataset,
+                    dsl_raw=dsl_raw,
+                    nl_query=nl_query or None,
+                    custom_label=custom_label,
+                )
+            else:
+                result = service.run_from_nl_query(
+                    dataset=dataset,
+                    nl_query=nl_query,
+                    model=model,
+                    backend=backend,
+                    custom_label=custom_label,
+                )
+        except RuntimeError as exc:
+            return Response(
+                {"error": str(exc)},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+        except Exception as exc:
+            return Response(
+                {"error": f"Custom analysis failed: {exc}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        if result.get("status") == "dsl_error":
+            return Response(result, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+
+        return Response(result, status=status.HTTP_201_CREATED)
+
+
+class CustomAnalysisHistoryView(APIView):
+    """
+    GET /custom/history/?dataset_id=<uuid>&workspace_id=<int>
+
+    Returns saved custom analyses for the current user/workspace,
+    ordered by most recent first.
+    """
+
+    def get(self, request):
+        dataset_id = request.query_params.get("dataset_id")
+        workspace_id = request.query_params.get("workspace_id")
+
+        queryset = filter_analysis_queryset_for_request(
+            Analysis.objects.filter(is_custom=True)
+                .select_related("dataset")
+                .prefetch_related("result"),
+            request,
+        ).order_by("-created_at")
+
+        if dataset_id:
+            queryset = queryset.filter(dataset_id=dataset_id)
+        if workspace_id:
+            queryset = queryset.filter(dataset__workspace_id=workspace_id)
+
+        results = []
+        for analysis in queryset[:50]:  # cap at 50
+            entry = {
+                "analysis_id": str(analysis.id),
+                "dataset_id": str(analysis.dataset_id),
+                "dataset_name": analysis.dataset.filename if analysis.dataset else "",
+                "nl_query": analysis.nl_query or "",
+                "custom_label": analysis.custom_label or "",
+                "chart_type": analysis.chart_type,
+                "dsl": analysis.dsl_config,
+                "status": analysis.status,
+                "created_at": analysis.created_at.isoformat(),
+                "completed_at": analysis.completed_at.isoformat() if analysis.completed_at else None,
+            }
+            if hasattr(analysis, "result") and analysis.result:
+                entry["chart_data"] = analysis.result.chart_data
+                entry["statistics"] = analysis.result.statistics
+            results.append(entry)
+
+        return Response({"count": len(results), "results": results})
+
+
+class CustomAnalysisValidateView(APIView):
+    """
+    POST /custom/validate/
+
+    Validate a DSL document against a dataset's columns without executing it.
+    Useful for the frontend to give immediate feedback before running.
+
+    Body: { "dataset_id": "<uuid>", "dsl": { ... } }
+
+    Response:
+    {
+        "valid": true | false,
+        "errors": ["..."],
+        "dsl": { ... }  // echo back on success
+    }
+    """
+
+    def post(self, request):
+        from analytics.domain.dsl.validator import DSLValidator
+
+        dataset_id = request.data.get("dataset_id")
+        dsl_raw = request.data.get("dsl", {})
+
+        if not dataset_id:
+            return Response({"error": "'dataset_id' is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        dataset = get_dataset_for_request(request, dataset_id)
+        columns_metadata = dataset.columns_metadata or {}
+
+        validator = DSLValidator(available_columns=columns_metadata)
+        errors = validator.validate_only(dsl_raw)
+
+        if errors:
+            return Response({"valid": False, "errors": errors})
+        return Response({"valid": True, "dsl": dsl_raw})
+
+
+class SmartPreviewView(APIView):
+    """
+    POST /automation/smart-preview/
+
+    Unified AI analysis preview (no execution):
+    1. Try predefined metrics via intent-parsing (AutomationPreviewView logic).
+    2. If no predefined analyses resolved → generate DSL only (no execute).
+    3. If DSL is insufficient → generate Python code.
+
+    Response:
+    {
+        "mode":      "predefined" | "custom_dsl" | "python_code" | "dsl_error",
+        // predefined:
+        "analyses":  [...],
+        "selection": {...},
+        "warnings":  [...],
+        // custom_dsl:
+        "dsl_raw":   {...},
+        "dsl_plan":  { "metric": "...", "aggregation": "avg", "group_by": {...}, ... },
+        // python_code:
+        "code":      "python code string",
+        "reason":    "why DSL was insufficient",
+        // dsl_error:
+        "error":     "...",
+    }
+    """
+
+    _VIZ_TO_CHART = {
+        "line_chart":   "line",
+        "bar_chart":    "bar",
+        "pie_chart":    "pie",
+        "scatter_plot": "scatter",
+        "histogram":    "histogram",
+        "area_chart":   "area",
+        "heatmap":      "heatmap",
+    }
+
+    def post(self, request):
+        import requests as http_requests
+        from django.conf import settings
+        from analytics.services.custom_analysis_service import CustomAnalysisService
+        from analytics.services.dataset_service import DatasetService
+
+        dataset_id   = request.data.get("dataset_id")
+        prompt       = (request.data.get("prompt") or "").strip()
+        llm_provider = request.data.get("llm_provider", "openrouter")
+        model        = request.data.get("model")
+
+        if not dataset_id:
+            return Response({"error": "'dataset_id' is required."}, status=status.HTTP_400_BAD_REQUEST)
+        if not prompt:
+            return Response({"error": "'prompt' is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        dataset = get_dataset_for_request(request, dataset_id)
+
+        # ── 1. Try predefined metrics ────────────────────────────────────
+        svc = DatasetService()
+        metrics_result   = svc.get_available_metrics(dataset)
+        available_codes  = {m.code for m in metrics_result["available_metrics"]}
+        code_to_metric   = {m.code: m for m in metrics_result["available_metrics"]}
+
+        llm_base = getattr(settings, "LLM_SERVICE_URL", "http://llm-service:8004")
+        intent_endpoint  = f"{llm_base}/openrouter" if llm_provider == "openrouter" else f"{llm_base}/ollama"
+
+        llm_payload = {"user_message": prompt}
+        if model:
+            llm_payload["model"] = model
+
+        predefined_analyses = []
+        predefined_warnings = []
+        predefined_selection = {}
+
+        try:
+            resp = http_requests.post(intent_endpoint, json=llm_payload, timeout=60)
+            resp.raise_for_status()
+            llm_data = resp.json()
+            intent_result = llm_data.get("result") or llm_data
+
+            requested_metrics = intent_result.get("metrics", [])
+            llm_filters       = intent_result.get("filters") or {}
+            llm_visualization = intent_result.get("visualization", "")
+            chart_type        = self._VIZ_TO_CHART.get(llm_visualization, "bar")
+
+            for code in requested_metrics:
+                if code not in available_codes:
+                    predefined_warnings.append(
+                        f"Metric '{code}' is not available for this dataset."
+                    )
+                    continue
+                metric_obj     = code_to_metric[code]
+                resolved_chart = chart_type or metric_obj.default_chart_type or "bar"
+                config = {}
+                if llm_filters.get("date_range"):
+                    config["date_range"] = llm_filters["date_range"]
+                if llm_filters.get("authors"):
+                    config["authors"] = llm_filters["authors"]
+                predefined_analyses.append({
+                    "metric_code": code,
+                    "chart_type":  resolved_chart,
+                    "config":      config,
+                })
+
+            predefined_selection = {
+                "metrics":       [a["metric_code"] for a in predefined_analyses],
+                "visualization": llm_visualization,
+                "chart_type":    chart_type,
+                "filters":       llm_filters,
+            }
+
+        except (http_requests.exceptions.ConnectionError, http_requests.exceptions.HTTPError):
+            # LLM service unreachable — skip predefined, go straight to DSL
+            pass
+
+        # If predefined metrics found → return immediately
+        if predefined_analyses:
+            return Response({
+                "mode":      "predefined",
+                "analyses":  predefined_analyses,
+                "selection": predefined_selection,
+                "warnings":  predefined_warnings,
+            })
+
+        # ── 2. No predefined match → try DSL generation ─────────────────
+        custom_svc = CustomAnalysisService()
+        try:
+            preview = custom_svc.preview_nl_query(
+                dataset=dataset,
+                nl_query=prompt,
+                model=model,
+                backend=llm_provider,
+            )
+        except RuntimeError as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
+
+        return Response(preview)
+
+
+class PythonAnalysisView(APIView):
+    """
+    POST /custom/python/
+
+    Execute a Python code snippet on the dataset.
+
+    Body:
+    {
+        "dataset_id":   "<uuid>",
+        "code":         "result_data = [...]; chart_type = 'bar'",
+        "nl_query":     "...",       // optional, for history
+        "custom_label": "..."        // optional
+    }
+
+    Or generate code from NL and execute in one shot:
+    {
+        "dataset_id":  "<uuid>",
+        "nl_query":    "Defect rate per author",
+        "generate":    true,
+        "backend":     "openrouter",
+        "model":       "openai/gpt-4o-mini"
+    }
+    """
+
+    def post(self, request):
+        from analytics.services.custom_analysis_service import CustomAnalysisService
+
+        dataset_id   = request.data.get("dataset_id")
+        code         = request.data.get("code", "").strip()
+        nl_query     = (request.data.get("nl_query") or "").strip()
+        custom_label = request.data.get("custom_label")
+        generate     = request.data.get("generate", False)
+        model        = request.data.get("model")
+        backend      = request.data.get("backend", "openrouter")
+
+        if not dataset_id:
+            return Response({"error": "'dataset_id' is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        dataset = get_dataset_for_request(request, dataset_id)
+        service = CustomAnalysisService()
+
+        # Auto-generate code from NL if requested
+        if generate and nl_query and not code:
+            columns_metadata = dataset.columns_metadata or {}
+            column_names = list(columns_metadata.keys())
+            try:
+                code = service._generate_python_code(
+                    nl_query, column_names, model=model, backend=backend
+                )
+            except RuntimeError as exc:
+                return Response({"error": str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
+
+        if not code:
+            return Response(
+                {"error": "Provide either 'code' or set 'generate': true with 'nl_query'."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            result = service.run_python_analysis(
+                dataset=dataset,
+                python_code=code,
+                nl_query=nl_query or None,
+                custom_label=custom_label,
+            )
+        except Exception as exc:
+            return Response(
+                {"error": f"Python analysis failed: {exc}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        if result.get("status") == "python_error":
+            return Response(result, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+
+        return Response(result, status=status.HTTP_201_CREATED)

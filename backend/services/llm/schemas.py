@@ -41,3 +41,44 @@ class ChatResponse(BaseModel):
     model: str
     content: str
     raw: dict[str, Any]
+
+
+# --- DSL-First schemas ---
+
+class DSLGenerateRequest(BaseModel):
+    """Request body for POST /dsl/generate"""
+    user_message: str = Field(
+        ..., min_length=1, description="Natural language analysis request"
+    )
+    available_columns: List[str] = Field(
+        default_factory=list,
+        description="Column names present in the target dataset",
+    )
+    model: Optional[str] = Field(None, description="LLM model override")
+    backend: str = Field(
+        default="openrouter",
+        description="LLM backend: 'openrouter' or 'ollama'",
+    )
+
+
+class DSLGenerateResponse(BaseModel):
+    """Response from POST /dsl/generate"""
+    backend: str
+    model: Optional[str]
+    dsl: Dict[str, Any]
+    has_error: bool
+
+
+class CodeGenerateRequest(BaseModel):
+    """Request body for POST /code/generate"""
+    user_message: str = Field(..., min_length=1)
+    available_columns: List[str] = Field(default_factory=list)
+    model: Optional[str] = Field(None)
+    backend: str = Field(default="openrouter")
+
+
+class CodeGenerateResponse(BaseModel):
+    """Response from POST /code/generate"""
+    backend: str
+    model: Optional[str]
+    code: str

@@ -17,6 +17,10 @@ COPY --chown=revmine:revmine --chmod=0555 analyze_service ./analyze_service
 COPY --chown=revmine:revmine --chmod=0555 analytics ./analytics
 COPY --chown=revmine:revmine --chmod=0555 kafka_utils ./kafka_utils
 
+# Pre-create media directory owned by the app user so Docker can seed
+# the named volume with the correct ownership on first run.
+RUN mkdir -p /app/media/datasets && chown -R revmine:revmine /app/media
+
 USER revmine
 
 EXPOSE 8003

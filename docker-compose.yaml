@@ -388,6 +388,7 @@ services:
         condition: service_healthy
     volumes:
       - ./backend/services/analyze:/app
+      - analyze_media:/app/media
     networks:
       - app-network
     command: sh -c "sleep 10 && python manage.py migrate --run-syncdb && python manage.py runserver 0.0.0.0:8003"
@@ -417,6 +418,7 @@ services:
         condition: service_healthy
     volumes:
       - ./backend/services/analyze:/app
+      - analyze_media:/app/media
     networks:
       - app-network
     command: celery -A analyze_service worker --loglevel=info
@@ -510,6 +512,7 @@ volumes:
   configuration_postgres_data:
   collection_postgres_data:
   analyze_postgres_data:
+  analyze_media:
   notification_postgres_data:
   loki_data:
   grafana_data:

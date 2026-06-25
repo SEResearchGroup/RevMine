@@ -21,13 +21,14 @@ import {
   Sparkles,
   Bot,
 } from "lucide-react";
-import { analyzeService } from "../../services/api";
+import { analyzeService, customAnalysisService, smartAnalysisService } from "../../services/api";
 import {
   LLM_PROVIDERS,
   OPENROUTER_MODELS,
   DEFAULT_OLLAMA_MODEL,
   DEFAULT_OPENROUTER_MODEL,
 } from "../../utils/llmConfig";
+import DynamicChart from "../../components/analysis/DynamicChart";
 
 const CATEGORY_META = {
   timeseries: { icon: LineChart, color: "blue", label: "Time Series" },
@@ -94,6 +95,154 @@ const deriveSection = (pathname) => {
   return SECTION_TO_SOURCE.hasOwnProperty(first) ? first : "analysis";
 };
 
+/* ------------------------------------------------------------------ */
+/*  AIPlanPreview — shows the resolved plan before execution           */
+/* ------------------------------------------------------------------ */
+const AIPlanPreview = ({ plan, metricsMap }) => {
+  const [showCode, setShowCode] = useState(false);
+
+  if (!plan) return null;
+
+  const modeBadge = {
+    predefined:  { label: "Predefined Metrics",  color: "blue" },
+    custom_dsl:  { label: "Custom DSL Analysis", color: "violet" },
+    python_code: { label: "Python Analysis",      color: "emerald" },
+  }[plan.mode] || { label: plan.mode, color: "gray" };
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-gray-200/60 p-5 space-y-4">
+      {/* Header */}
+      <div className="flex items-center gap-3">
+        <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${
+          plan.mode === "predefined" ? "bg-blue-100 text-blue-600" :
+          plan.mode === "custom_dsl" ? "bg-violet-100 text-violet-600" :
+          "bg-emerald-100 text-emerald-600"
+        }`}>
+          <Bot className="w-5 h-5" />
+        </div>
+        <div>
+          <h2 className="text-base font-semibold text-gray-800">Analysis Plan</h2>
+          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+            plan.mode === "predefined" ? "bg-blue-100 text-blue-700" :
+            plan.mode === "custom_dsl" ? "bg-violet-100 text-violet-700" :
+            "bg-emerald-100 text-emerald-700"
+          }`}>{modeBadge.label}</span>
+        </div>
+      </div>
+
+      {/* Predefined plan */}
+      {plan.mode === "predefined" && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+          <div className="rounded-xl border border-gray-200 bg-gray-50/70 p-4">
+            <p className="text-xs font-medium tracking-wide text-gray-400 uppercase mb-2">Metrics ({plan.analyses.length})</p>
+            <div className="flex flex-wrap gap-2">
+              {plan.analyses.map((a) => (
+                <span key={a.metric_code} className="px-2.5 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-medium">
+                  {metricsMap.get(a.metric_code)?.name || a.metric_code}
+                </span>
+              ))}
+            </div>
+          </div>
+          <div className="rounded-xl border border-gray-200 bg-gray-50/70 p-4">
+            <p className="text-xs font-medium tracking-wide text-gray-400 uppercase mb-2">Visualization</p>
+            <p className="text-sm font-medium text-gray-700">{plan.selection?.visualization || "Metric defaults"}</p>
+            <p className="text-xs text-gray-500 mt-1">Chart type: {plan.selection?.chart_type || "default"}</p>
+          </div>
+          <div className="rounded-xl border border-gray-200 bg-gray-50/70 p-4">
+            <p className="text-xs font-medium tracking-wide text-gray-400 uppercase mb-2">Filters</p>
+            <p className="text-sm text-gray-700">{(plan.selection?.filters?.authors || []).length} author filter(s)</p>
+            <p className="text-sm text-gray-700">{plan.selection?.filters?.date_range ? "Date range applied" : "No date range"}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Custom DSL plan */}
+      {plan.mode === "custom_dsl" && plan.dsl_plan && (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {[
+            { label: "Chart", value: plan.dsl_plan.chart_type },
+            { label: "Metric", value: plan.dsl_plan.metric || (plan.dsl_plan.series?.length > 0 ? `${plan.dsl_plan.series.length} series` : "—") },
+            { label: "Aggregation", value: plan.dsl_plan.aggregation || "—" },
+            {
+              label: "Group By",
+              value: plan.dsl_plan.group_by
+                ? plan.dsl_plan.group_by.type === "time"
+                  ? `${plan.dsl_plan.group_by.column} (${plan.dsl_plan.group_by.period})`
+                  : plan.dsl_plan.group_by.column
+                : "None",
+            },
+          ].map(({ label, value }) => (
+            <div key={label} className="rounded-xl border border-gray-200 bg-gray-50/70 p-3">
+              <p className="text-xs font-medium tracking-wide text-gray-400 uppercase mb-1">{label}</p>
+              <p className="text-sm font-semibold text-gray-800 capitalize">{value}</p>
+            </div>
+          ))}
+
+          {plan.dsl_plan.filters?.length > 0 && (
+            <div className="col-span-2 lg:col-span-4 rounded-xl border border-gray-200 bg-gray-50/70 p-3">
+              <p className="text-xs font-medium tracking-wide text-gray-400 uppercase mb-2">Filters</p>
+              <div className="flex flex-wrap gap-2">
+                {plan.dsl_plan.filters.map((f, i) => (
+                  <span key={i} className="text-xs px-2 py-1 bg-white border border-gray-200 rounded-lg text-gray-700">
+                    {f.column} {f.op} {JSON.stringify(f.value)}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {plan.dsl_plan.derived_column && (
+            <div className="col-span-2 lg:col-span-4 rounded-xl border border-violet-200 bg-violet-50/50 p-3">
+              <p className="text-xs font-medium tracking-wide text-violet-400 uppercase mb-1">Derived Column</p>
+              <p className="text-sm font-mono text-violet-800">
+                {plan.dsl_plan.derived_column.name} = {plan.dsl_plan.derived_column.formula}
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Python code plan */}
+      {plan.mode === "python_code" && (
+        <div>
+          {plan.reason && (
+            <div className="mb-3 p-3 rounded-xl bg-amber-50 border border-amber-200 text-sm text-amber-700">
+              <strong>Why Python?</strong> {plan.reason}
+            </div>
+          )}
+          <div className="rounded-xl border border-gray-200 overflow-hidden">
+            <div
+              className="flex items-center justify-between px-4 py-2 bg-gray-900 text-gray-300 text-xs cursor-pointer"
+              onClick={() => setShowCode((v) => !v)}
+            >
+              <span className="font-mono">Generated Python code</span>
+              <span>{showCode ? "▲ Hide" : "▼ Show"}</span>
+            </div>
+            {showCode && (
+              <pre className="bg-gray-950 text-green-300 text-xs p-4 overflow-x-auto max-h-72 font-mono leading-relaxed">
+                {plan.code}
+              </pre>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Warnings */}
+      {plan.warnings?.length > 0 && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
+          <p className="text-sm font-medium text-amber-800 mb-2">Warnings</p>
+          {plan.warnings.map((w) => (
+            <div key={w} className="flex items-start gap-2 text-sm text-amber-700">
+              <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+              <span>{w}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const MetricsSelectionPage = () => {
   const { datasetId } = useParams();
   const navigate = useNavigate();
@@ -111,7 +260,8 @@ const MetricsSelectionPage = () => {
   const [selectionMode, setSelectionMode] = useState("manual");
   const [selectedMetrics, setSelectedMetrics] = useState([]);
   const [llmPrompt, setLlmPrompt] = useState("");
-  const [aiPreview, setAiPreview] = useState(null);
+  // planState: null | { mode: "predefined"|"custom_dsl"|"python_code"|"dsl_error", ...data }
+  const [planState, setPlanState] = useState(null);
   const [llmProvider, setLlmProvider] = useState(LLM_PROVIDERS.OPENROUTER);
   const [llmModel, setLlmModel] = useState(DEFAULT_OPENROUTER_MODEL);
 
@@ -209,66 +359,137 @@ const MetricsSelectionPage = () => {
     return results;
   };
 
-  const handleRunAnalysis = async () => {
-    const isManual = selectionMode === "manual";
+  // ── Step 1: Resolve prompt → generate plan (no execution) ──────────────
+  const handleResolve = async () => {
+    if (!llmPrompt.trim()) {
+      setError("Enter a prompt first.");
+      return;
+    }
+    try {
+      setCreating(true);
+      setError(null);
+      setPlanState(null);
+      setCreatingMessage("Analysing your prompt…");
+
+      const plan = await smartAnalysisService.preview(datasetId, llmPrompt.trim(), {
+        model: llmModel,
+        llmProvider,
+      });
+
+      if (plan.mode === "dsl_error") {
+        setError(plan.error || "Could not resolve prompt. Try rephrasing.");
+        return;
+      }
+      setPlanState(plan);
+    } catch (err) {
+      console.error(err);
+      setError(getErrorMessage(err, "AI prompt resolution failed."));
+    } finally {
+      setCreating(false);
+      setCreatingMessage("");
+    }
+  };
+
+  // ── Step 2: Execute plan → navigate to dashboard ────────────────────────
+  const handleExecutePlan = async () => {
+    if (!planState) return;
+    try {
+      setCreating(true);
+      setError(null);
+
+      if (planState.mode === "predefined") {
+        setCreatingMessage("Generating dashboards…");
+        const results = await runAnalyses(planState.analyses);
+        navigate(dashboardPath, {
+          state: {
+            results,
+            dataset,
+            selectionMode: "ai",
+            automation: planState.selection,
+            prompt: llmPrompt,
+            warnings: planState.warnings || [],
+          },
+        });
+
+      } else if (planState.mode === "custom_dsl") {
+        setCreatingMessage("Executing custom DSL analysis…");
+        const result = await customAnalysisService.runFromDsl(
+          datasetId,
+          planState.dsl_raw,
+          llmPrompt.trim()
+        );
+        if (result.status === "dsl_error") {
+          throw new Error(result.error || "DSL execution failed.");
+        }
+        navigate(dashboardPath, {
+          state: {
+            results: [{
+              ...result,
+              metric_code: "custom_dsl",
+              is_custom: true,
+            }],
+            dataset,
+            selectionMode: "ai",
+            automation: { mode: "custom_dsl", dsl_plan: planState.dsl_plan },
+            prompt: llmPrompt,
+            warnings: [],
+          },
+        });
+
+      } else if (planState.mode === "python_code") {
+        setCreatingMessage("Executing Python analysis…");
+        const result = await smartAnalysisService.runPython(
+          datasetId,
+          planState.code,
+          llmPrompt.trim()
+        );
+        if (result.status === "python_error") {
+          throw new Error(result.error || "Python execution failed.");
+        }
+        navigate(dashboardPath, {
+          state: {
+            results: [{
+              ...result,
+              metric_code: "custom_python",
+              is_custom: true,
+            }],
+            dataset,
+            selectionMode: "ai",
+            automation: { mode: "python_code" },
+            prompt: llmPrompt,
+            warnings: [],
+          },
+        });
+      }
+    } catch (err) {
+      console.error(err);
+      setError(getErrorMessage(err, "Execution failed. Refine the prompt or try again."));
+    } finally {
+      setCreating(false);
+      setCreatingMessage("");
+    }
+  };
+
+  // ── Manual mode run ─────────────────────────────────────────────────────
+  const handleRunManual = async () => {
     const manualAnalyses = selectedMetrics.map((metricCode) => ({
       metric_code: metricCode,
       chart_type: availableMetricsMap.get(metricCode)?.default_chart_type,
       config: {},
     }));
-
-    if (isManual && manualAnalyses.length === 0) return;
-    if (!isManual && !llmPrompt.trim()) {
-      setError("Enter an AI prompt or switch back to manual selection.");
-      return;
-    }
+    if (manualAnalyses.length === 0) return;
 
     try {
       setCreating(true);
       setError(null);
-
-      let analysesToRun = manualAnalyses;
-      let preview = aiPreview;
-
-      if (!isManual) {
-        setCreatingMessage("Resolving prompt...");
-        preview = await analyzeService.previewAnalysisPrompt({
-          dataset_id: datasetId,
-          prompt: llmPrompt.trim(),
-          llm_provider: llmProvider,
-          model: llmModel,
-        });
-        setAiPreview(preview);
-        analysesToRun = preview.analyses || [];
-
-        if (analysesToRun.length === 0) {
-          throw new Error("The AI response did not resolve to any runnable metrics.");
-        }
-      }
-
-      setCreatingMessage("Generating dashboards...");
-      const results = await runAnalyses(analysesToRun);
-
+      setCreatingMessage("Generating dashboards…");
+      const results = await runAnalyses(manualAnalyses);
       navigate(dashboardPath, {
-        state: {
-          results,
-          dataset,
-          selectionMode,
-          automation: preview?.selection || null,
-          prompt: preview?.prompt || null,
-          warnings: preview?.warnings || [],
-        },
+        state: { results, dataset, selectionMode: "manual", automation: null, prompt: null, warnings: [] },
       });
     } catch (err) {
       console.error(err);
-      if (selectionMode === "ai") {
-        setAiPreview(null);
-      }
-      setError(
-        selectionMode === "ai"
-          ? `${getErrorMessage(err, "AI prompt analysis failed.")} You can refine the prompt or switch to manual selection.`
-          : getErrorMessage(err, "Analysis failed. Try again.")
-      );
+      setError(getErrorMessage(err, "Analysis failed. Try again."));
     } finally {
       setCreating(false);
       setCreatingMessage("");
@@ -278,7 +499,7 @@ const MetricsSelectionPage = () => {
   const totalSelected =
     selectionMode === "manual"
       ? selectedMetrics.length
-      : aiPreview?.analyses?.length || 0;
+      : planState?.mode === "predefined" ? planState.analyses.length : 0;
 
   if (loading) {
     return (
@@ -365,6 +586,7 @@ const MetricsSelectionPage = () => {
                   onClick={() => {
                     setSelectionMode(mode);
                     setError(null);
+                    setPlanState(null);
                   }}
                   className={`text-left rounded-xl border p-4 transition-all ${
                     isActive
@@ -424,40 +646,67 @@ const MetricsSelectionPage = () => {
                     ? "Deselect all"
                     : "Select all available"}
                 </button>
-              ) : aiPreview?.warnings?.length ? (
+              ) : planState?.warnings?.length ? (
                 <p className="text-xs text-amber-600">
-                  {aiPreview.warnings.length} warning{aiPreview.warnings.length !== 1 ? "s" : ""}
+                  {planState.warnings.length} warning{planState.warnings.length !== 1 ? "s" : ""}
+                </p>
+              ) : planState ? (
+                <p className="text-xs text-green-600 font-medium">
+                  Plan ready — review below and click Run
                 </p>
               ) : (
                 <p className="text-xs text-gray-400">
-                  The prompt will be validated before charts run.
+                  Resolve your prompt to preview the analysis plan.
                 </p>
               )}
             </div>
 
-            <button
-              onClick={handleRunAnalysis}
-              disabled={
-                creating ||
-                (selectionMode === "manual" && totalSelected === 0) ||
-                (selectionMode === "ai" && !llmPrompt.trim())
-              }
-              className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-xl font-medium shadow-lg shadow-blue-200/50 hover:bg-blue-700 disabled:bg-gray-300 disabled:shadow-none disabled:cursor-not-allowed transition-all"
-            >
-              {creating ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  {creatingMessage || "Generating..."}
-                </>
-              ) : (
-                <>
-                  <Play className="w-5 h-5" />
-                  {selectionMode === "manual"
-                    ? `Run Analysis (${totalSelected})`
-                    : "Resolve Prompt & Run"}
-                </>
-              )}
-            </button>
+            {selectionMode === "manual" ? (
+              <button
+                onClick={handleRunManual}
+                disabled={creating || totalSelected === 0}
+                className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-xl font-medium shadow-lg shadow-blue-200/50 hover:bg-blue-700 disabled:bg-gray-300 disabled:shadow-none disabled:cursor-not-allowed transition-all"
+              >
+                {creating ? (
+                  <><Loader2 className="w-5 h-5 animate-spin" />{creatingMessage || "Generating..."}</>
+                ) : (
+                  <><Play className="w-5 h-5" />Run Analysis ({totalSelected})</>
+                )}
+              </button>
+            ) : planState ? (
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setPlanState(null)}
+                  disabled={creating}
+                  className="flex items-center gap-2 px-4 py-3 border border-gray-200 rounded-xl text-gray-600 text-sm font-medium hover:bg-gray-50 disabled:opacity-50 transition-all"
+                >
+                  Revise
+                </button>
+                <button
+                  onClick={handleExecutePlan}
+                  disabled={creating}
+                  className="flex items-center gap-2 px-6 py-3 bg-green-600 text-white rounded-xl font-medium shadow-lg shadow-green-200/50 hover:bg-green-700 disabled:bg-gray-300 disabled:shadow-none disabled:cursor-not-allowed transition-all"
+                >
+                  {creating ? (
+                    <><Loader2 className="w-5 h-5 animate-spin" />{creatingMessage || "Running..."}</>
+                  ) : (
+                    <><Play className="w-5 h-5" />Run Analysis</>
+                  )}
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={handleResolve}
+                disabled={creating || !llmPrompt.trim()}
+                className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-xl font-medium shadow-lg shadow-blue-200/50 hover:bg-blue-700 disabled:bg-gray-300 disabled:shadow-none disabled:cursor-not-allowed transition-all"
+              >
+                {creating ? (
+                  <><Loader2 className="w-5 h-5 animate-spin" />{creatingMessage || "Resolving..."}</>
+                ) : (
+                  <><Sparkles className="w-5 h-5" />Resolve Prompt</>
+                )}
+              </button>
+            )}
           </div>
 
           {error && (
@@ -546,91 +795,20 @@ const MetricsSelectionPage = () => {
                 value={llmPrompt}
                 onChange={(event) => {
                   setLlmPrompt(event.target.value);
-                  setAiPreview(null);
+                  setPlanState(null);
                   setError(null);
                 }}
                 placeholder="Show me commits over time"
                 className="w-full min-h-36 rounded-xl border border-gray-200 bg-gray-50/60 px-4 py-3 text-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-y"
               />
 
-              <div className="mt-4 p-3 rounded-xl bg-gray-50 border border-gray-200 text-sm text-gray-600 flex items-start gap-2">
-                <Info className="w-4 h-4 mt-0.5 shrink-0 text-gray-400" />
-                The prompt goes through the API gateway, gets normalized against this dataset's available metrics, and then runs through the same chart generation pipeline as manual mode.
+              <div className="mt-4 p-3 rounded-xl bg-blue-50 border border-blue-200 text-sm text-blue-700 flex items-start gap-2">
+                <Sparkles className="w-4 h-4 mt-0.5 shrink-0 text-blue-500" />
+                The AI tries predefined metrics first, then generates a custom DSL analysis, and falls back to Python code for complex metrics.
               </div>
             </div>
 
-            {aiPreview && (
-              <div className="bg-white rounded-xl shadow-sm border border-gray-200/60 p-5">
-                <div className="flex items-center gap-2 mb-4">
-                  <Bot className="w-5 h-5 text-blue-600" />
-                  <h2 className="text-lg font-semibold text-gray-800">AI Resolution</h2>
-                </div>
-
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
-                  <div className="rounded-xl border border-gray-200 bg-gray-50/70 p-4">
-                    <p className="text-xs font-medium tracking-wide text-gray-400 uppercase mb-2">
-                      Metrics
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      {(aiPreview.selection?.metrics || []).map((metricCode) => (
-                        <span
-                          key={metricCode}
-                          className="px-2.5 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-medium"
-                        >
-                          {availableMetricsMap.get(metricCode)?.name || metricCode}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="rounded-xl border border-gray-200 bg-gray-50/70 p-4">
-                    <p className="text-xs font-medium tracking-wide text-gray-400 uppercase mb-2">
-                      Visualization
-                    </p>
-                    <p className="text-sm font-medium text-gray-700">
-                      {aiPreview.selection?.visualization || "Metric defaults"}
-                    </p>
-                    <p className="text-xs text-gray-500 mt-1">
-                      Applied chart type: {aiPreview.selection?.chart_type || "default"}
-                    </p>
-                  </div>
-
-                  <div className="rounded-xl border border-gray-200 bg-gray-50/70 p-4">
-                    <p className="text-xs font-medium tracking-wide text-gray-400 uppercase mb-2">
-                      Filters
-                    </p>
-                    <p className="text-sm text-gray-700">
-                      {(aiPreview.selection?.filters?.authors || []).length} author filter
-                      {(aiPreview.selection?.filters?.authors || []).length !== 1 ? "s" : ""}
-                    </p>
-                    <p className="text-sm text-gray-700">
-                      {(aiPreview.selection?.filters?.repositories || []).length} repository filter
-                      {(aiPreview.selection?.filters?.repositories || []).length !== 1 ? "s" : ""}
-                    </p>
-                    <p className="text-sm text-gray-700">
-                      {aiPreview.selection?.filters?.date_range ? "Date range applied" : "No date range"}
-                    </p>
-                  </div>
-                </div>
-
-                {aiPreview.warnings?.length > 0 && (
-                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
-                    <p className="text-sm font-medium text-amber-800 mb-2">Warnings</p>
-                    <div className="space-y-2">
-                      {aiPreview.warnings.map((warning) => (
-                        <div
-                          key={warning}
-                          className="flex items-start gap-2 text-sm text-amber-700"
-                        >
-                          <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
-                          <span>{warning}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
+            {planState && <AIPlanPreview plan={planState} metricsMap={availableMetricsMap} />}
           </div>
         ) : (
           <>
@@ -780,27 +958,43 @@ const MetricsSelectionPage = () => {
             <ArrowLeft className="w-4 h-4" />
             Back
           </button>
-          <button
-            onClick={handleRunAnalysis}
-            disabled={
-              creating ||
-              (selectionMode === "manual" && totalSelected === 0) ||
-              (selectionMode === "ai" && !llmPrompt.trim())
-            }
-            className="flex items-center gap-2 px-8 py-3 bg-blue-600 text-white rounded-xl font-medium shadow-lg shadow-blue-200/50 hover:bg-blue-700 disabled:bg-gray-300 disabled:shadow-none disabled:cursor-not-allowed transition-all"
-          >
-            {creating ? (
-              <>
-                <Loader2 className="w-5 h-5 animate-spin" />
-                {creatingMessage || "Generating..."}
-              </>
-            ) : (
-              <>
-                {selectionMode === "manual" ? "Run Analysis" : "Resolve Prompt & Run"}
-                <ArrowRight className="w-4 h-4" />
-              </>
-            )}
-          </button>
+          {selectionMode === "manual" ? (
+            <button
+              onClick={handleRunManual}
+              disabled={creating || totalSelected === 0}
+              className="flex items-center gap-2 px-8 py-3 bg-blue-600 text-white rounded-xl font-medium shadow-lg shadow-blue-200/50 hover:bg-blue-700 disabled:bg-gray-300 disabled:shadow-none disabled:cursor-not-allowed transition-all"
+            >
+              {creating ? (
+                <><Loader2 className="w-5 h-5 animate-spin" />{creatingMessage || "Generating..."}</>
+              ) : (
+                <>Run Analysis ({totalSelected})<ArrowRight className="w-4 h-4" /></>
+              )}
+            </button>
+          ) : planState ? (
+            <button
+              onClick={handleExecutePlan}
+              disabled={creating}
+              className="flex items-center gap-2 px-8 py-3 bg-green-600 text-white rounded-xl font-medium shadow-lg shadow-green-200/50 hover:bg-green-700 disabled:bg-gray-300 disabled:shadow-none disabled:cursor-not-allowed transition-all"
+            >
+              {creating ? (
+                <><Loader2 className="w-5 h-5 animate-spin" />{creatingMessage || "Running..."}</>
+              ) : (
+                <>Run Analysis<ArrowRight className="w-4 h-4" /></>
+              )}
+            </button>
+          ) : (
+            <button
+              onClick={handleResolve}
+              disabled={creating || !llmPrompt.trim()}
+              className="flex items-center gap-2 px-8 py-3 bg-blue-600 text-white rounded-xl font-medium shadow-lg shadow-blue-200/50 hover:bg-blue-700 disabled:bg-gray-300 disabled:shadow-none disabled:cursor-not-allowed transition-all"
+            >
+              {creating ? (
+                <><Loader2 className="w-5 h-5 animate-spin" />{creatingMessage || "Resolving..."}</>
+              ) : (
+                <><Sparkles className="w-5 h-5" />Resolve Prompt<ArrowRight className="w-4 h-4" /></>
+              )}
+            </button>
+          )}
         </div>
       </div>
     </div>

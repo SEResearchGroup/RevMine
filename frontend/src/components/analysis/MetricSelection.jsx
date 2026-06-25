@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { AVAILABLE_METRICS } from "../../utils/constants";
 import {
   CheckSquare,
@@ -6,13 +6,22 @@ import {
   Sparkles,
   BarChart3,
   Loader2,
+  Eye,
 } from "lucide-react";
+import DSLPreview from "./DSLPreview";
+import { customAnalysisService } from "../../services/api";
 
 
-const MetricSelection = ({ onStartAnalysis, loading }) => {
+const MetricSelection = ({ onStartAnalysis, datasetId, loading }) => {
   const [useLLM, setUseLLM] = useState(false);
   const [selectedMetrics, setSelectedMetrics] = useState([]);
   const [llmQuery, setLLMQuery] = useState("");
+
+  // DSL preview state (DSL-First layer)
+  const [dslPreview, setDslPreview] = useState(null);
+  const [dslErrors, setDslErrors] = useState([]);
+  const [dslLoading, setDslLoading] = useState(false);
+  const [showDslPreview, setShowDslPreview] = useState(false);
 
   const toggleMetric = (metricId) => {
     setSelectedMetrics((prev) =>
@@ -37,6 +46,41 @@ const MetricSelection = ({ onStartAnalysis, loading }) => {
       onStartAnalysis({ type: 'metrics', metrics: selectedMetrics });
     }
   };
+
+  // Generate DSL preview without running the full analysis
+  const handlePreviewDsl = useCallback(async () => {
+    if (!llmQuery.trim() || !datasetId) return;
+    setDslLoading(true);
+    setDslErrors([]);
+    setDslPreview(null);
+    setShowDslPreview(true);
+    try {
+      const result = await customAnalysisService.runFromNl(datasetId, llmQuery, {});
+      if (result.status === "dsl_error") {
+        setDslErrors([result.error]);
+        setDslPreview(result.dsl_raw || null);
+      } else {
+        setDslPreview(result.dsl || null);
+        // Signal parent: the analysis is done, show result
+        onStartAnalysis({ type: 'custom_dsl', result });
+      }
+    } catch (err) {
+      setDslErrors([err.message || "Failed to generate DSL"]);
+    } finally {
+      setDslLoading(false);
+    }
+  }, [llmQuery, datasetId, onStartAnalysis]);
+
+  // Re-run with an edited DSL
+  const handleRunEditedDsl = useCallback(async (editedDsl) => {
+    if (!datasetId) return;
+    try {
+      const result = await customAnalysisService.runFromDsl(datasetId, editedDsl, llmQuery);
+      onStartAnalysis({ type: 'custom_dsl', result });
+    } catch (err) {
+      setDslErrors([err.message || "DSL execution failed"]);
+    }
+  }, [datasetId, llmQuery, onStartAnalysis]);
 
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
@@ -83,16 +127,33 @@ const MetricSelection = ({ onStartAnalysis, loading }) => {
         </button>
       </div>
 
-      {/* LLM Query Input */}
+      {/* LLM Query Input — DSL-First mode */}
       {useLLM ? (
         <div>
           <textarea
             value={llmQuery}
             onChange={(e) => setLLMQuery(e.target.value)}
-            placeholder="Describe your research questions in plain text, and AI will generate custom analysis..."
+            placeholder="Describe your research question in plain language, e.g. 'Show average lead time by author' or 'Monthly code churn trend'…"
             className="w-full h-32 p-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
           />
-          <div className="mt-4 flex justify-end">
+          <div className="mt-4 flex justify-end gap-3">
+            {/* Preview DSL before running (DSL-First transparency) */}
+            {datasetId && (
+              <button
+                onClick={handlePreviewDsl}
+                disabled={!llmQuery.trim() || dslLoading || loading}
+                className="px-5 py-3 border border-blue-500 text-blue-600 rounded-lg hover:bg-blue-50 disabled:border-gray-300 disabled:text-gray-400 flex items-center space-x-2"
+              >
+                {dslLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Eye className="w-4 h-4" />
+                )}
+                <span>Preview &amp; Run</span>
+              </button>
+            )}
+
+            {/* Legacy NL→chart path (kept for backward compatibility) */}
             <button
               onClick={handleStart}
               disabled={!llmQuery.trim() || loading}
@@ -106,11 +167,23 @@ const MetricSelection = ({ onStartAnalysis, loading }) => {
               ) : (
                 <>
                   <Sparkles className="w-5 h-5" />
-                  <span>Generate Analysis</span>
+                  <span>Generate (classic)</span>
                 </>
               )}
             </button>
           </div>
+
+          {/* DSL Preview panel */}
+          {showDslPreview && (
+            <div className="mt-4">
+              <DSLPreview
+                dsl={dslPreview}
+                isLoading={dslLoading}
+                errors={dslErrors}
+                onEdit={handleRunEditedDsl}
+              />
+            </div>
+          )}
         </div>
       ) : (
         /* Metric Selection */

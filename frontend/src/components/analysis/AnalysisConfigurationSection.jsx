@@ -9,6 +9,7 @@ import {
 import jsPDF from "jspdf";
 import MetricSelection from "./MetricSelection";
 import ResultsDisplay from "./ResultsDisplay";
+import CustomAnalysisResult from "./CustomAnalysisResult";
 
 const AnalysisConfigurationSection = ({
   dataset,
@@ -22,6 +23,10 @@ const AnalysisConfigurationSection = ({
   const [pollInterval, setPollInterval] = useState(null);
   const [analysisId, setAnalysisId] = useState(analysisResults?.id || null);
   const [exportLoading, setExportLoading] = useState(false);
+
+  // Custom DSL-First result (separate from the legacy polling flow)
+  const [customResult, setCustomResult] = useState(null);
+  const [customNlQuery, setCustomNlQuery] = useState("");
 
   useEffect(() => {
     return () => {
@@ -79,11 +84,21 @@ const AnalysisConfigurationSection = ({
       }
     }
 
+    // DSL-First custom analysis — result already computed in MetricSelection
+    if (config.type === 'custom_dsl') {
+      setCustomResult(config.result);
+      setCustomNlQuery(config.result?.nl_query || "");
+      setLoading(false);
+      setAnalysisStatus("completed");
+      return;
+    }
+
     if (config.type === 'metrics') {
       for (const metric of config.metrics) {
         formData.append("requested_charts", metric);
       }
     } else {
+      setCustomNlQuery(config.query || "");
       formData.append("llm_query", config.query);
     }
 
@@ -243,8 +258,22 @@ const AnalysisConfigurationSection = ({
         <MetricSelection
           onStartAnalysis={handleStartAnalysis}
           loading={loading}
+          datasetId={dataset?.id || null}
         />
       </div>
+
+      {/* Custom DSL-First Analysis Result */}
+      {customResult && (
+        <div className="mb-6">
+          <CustomAnalysisResult
+            result={customResult}
+            nlQuery={customNlQuery}
+            onRerun={() => {
+              setCustomResult(null);
+            }}
+          />
+        </div>
+      )}
 
       {/* Loading State */}
       {(analysisStatus === "processing" || loading) && (

@@ -37,6 +37,16 @@ from analytics.api.views import (
 
     # Generate (core endpoint)
     GenerateChartView,
+
+    # Custom DSL-First analysis
+    CustomAnalysisView,
+    CustomAnalysisHistoryView,
+    CustomAnalysisValidateView,
+    PythonAnalysisView,
+
+    # AI intent-parsing + smart hybrid preview
+    AutomationPreviewView,
+    SmartPreviewView,
 )
 
 urlpatterns = [
@@ -67,6 +77,17 @@ urlpatterns = [
     path('analyses/<uuid:pk>/result/',                      AnalysisResultView.as_view(),            name='analysis-result'),
     path('analyses/<uuid:pk>/retry/',                       AnalysisRetryView.as_view(),             name='analysis-retry'),
     path('analyses/history/',                               AnalysisHistoryView.as_view(),           name='analysis-history'),
+
+    # AI intent-parsing  (MetricsSelectionPage "AI Prompt" mode → metric codes)
+    path('automation/preview/',                              AutomationPreviewView.as_view(),       name='automation-preview'),
+    # Smart hybrid preview (predefined first → DSL → Python)
+    path('automation/smart-preview/',                        SmartPreviewView.as_view(),            name='automation-smart-preview'),
+
+    # Custom DSL-First analysis
+    path('custom/',                                          CustomAnalysisView.as_view(),          name='custom-analysis'),
+    path('custom/history/',                                  CustomAnalysisHistoryView.as_view(),   name='custom-analysis-history'),
+    path('custom/validate/',                                 CustomAnalysisValidateView.as_view(),  name='custom-analysis-validate'),
+    path('custom/python/',                                   PythonAnalysisView.as_view(),          name='custom-python-analysis'),
 
     # DevOps live collection (Kanban + CI/CD)
     path('devops/kanban/boards/',      KanbanListBoardsView.as_view(),   name='devops-kanban-boards'),

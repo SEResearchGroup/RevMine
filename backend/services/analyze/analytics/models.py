@@ -238,10 +238,33 @@ class Analysis(models.Model):
         }"""
     )
     
+    # DSL-First custom analysis fields
+    dsl_config = models.JSONField(
+        null=True,
+        blank=True,
+        help_text="Analysis DSL document (version 1) when analysis was generated via natural language."
+    )
+    nl_query = models.TextField(
+        null=True,
+        blank=True,
+        help_text="Original natural-language query that produced this analysis."
+    )
+    custom_label = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True,
+        help_text="User-provided label for saved custom analyses."
+    )
+    is_custom = models.BooleanField(
+        default=False,
+        db_index=True,
+        help_text="True when this analysis was generated via the DSL/NL pipeline."
+    )
+
     # Status et résultats
     status = models.CharField(
-        max_length=20, 
-        choices=STATUS_CHOICES, 
+        max_length=20,
+        choices=STATUS_CHOICES,
         default='pending'
     )
     error_message = models.TextField(null=True, blank=True)

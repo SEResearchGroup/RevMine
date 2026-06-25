@@ -667,6 +667,132 @@ export const cicdService = {
   },
 };
 
+// ============================================================
+// Custom DSL-First Analysis
+// ============================================================
+export const customAnalysisService = {
+  /**
+   * Run a custom analysis from a natural-language query.
+   * @param {string} datasetId
+   * @param {string} nlQuery
+   * @param {object} options   { model, backend, customLabel }
+   */
+  runFromNl: async (datasetId, nlQuery, { model, backend, customLabel } = {}) => {
+    const response = await analyzeApi.post(
+      "/custom/",
+      {
+        dataset_id: datasetId,
+        nl_query: nlQuery,
+        model: model || undefined,
+        backend: backend || "openrouter",
+        custom_label: customLabel || undefined,
+      },
+      { timeout: 120000 }
+    );
+    return response.data;
+  },
+
+  /**
+   * Execute a DSL document directly (skips LLM generation).
+   * @param {string} datasetId
+   * @param {object} dsl        The Analysis DSL document
+   * @param {string} [nlQuery]  Optional original NL query to save alongside
+   */
+  runFromDsl: async (datasetId, dsl, nlQuery) => {
+    const response = await analyzeApi.post(
+      "/custom/",
+      {
+        dataset_id: datasetId,
+        dsl,
+        nl_query: nlQuery || undefined,
+      },
+      { timeout: 120000 }
+    );
+    return response.data;
+  },
+
+  /**
+   * Validate a DSL document against a dataset's columns without executing it.
+   * @param {string} datasetId
+   * @param {object} dsl
+   */
+  validateDsl: async (datasetId, dsl) => {
+    const response = await analyzeApi.post("/custom/validate/", {
+      dataset_id: datasetId,
+      dsl,
+    });
+    return response.data;
+  },
+
+  /**
+   * Retrieve history of custom analyses for a dataset or workspace.
+   * @param {object} params  { datasetId, workspaceId }
+   */
+  getHistory: async ({ datasetId, workspaceId } = {}) => {
+    const params = new URLSearchParams();
+    if (datasetId) params.append("dataset_id", datasetId);
+    if (workspaceId) params.append("workspace_id", workspaceId);
+    const response = await analyzeApi.get(`/custom/history/?${params.toString()}`);
+    return response.data;
+  },
+};
+
+export const smartAnalysisService = {
+  /**
+   * Smart AI preview: tries predefined metrics first, falls back to DSL,
+   * then Python code generation. Returns the plan WITHOUT executing.
+   */
+  preview: async (datasetId, prompt, { model, llmProvider } = {}) => {
+    const response = await analyzeApi.post(
+      "/automation/smart-preview/",
+      {
+        dataset_id: datasetId,
+        prompt,
+        llm_provider: llmProvider || "openrouter",
+        model: model || undefined,
+      },
+      { timeout: 90000 }
+    );
+    return response.data;
+  },
+
+  /**
+   * Execute a Python code snippet on the dataset (generated or hand-crafted).
+   */
+  runPython: async (datasetId, code, nlQuery, { customLabel } = {}) => {
+    const response = await analyzeApi.post(
+      "/custom/python/",
+      {
+        dataset_id: datasetId,
+        code,
+        nl_query: nlQuery || undefined,
+        custom_label: customLabel || undefined,
+      },
+      { timeout: 120000 }
+    );
+    return response.data;
+  },
+
+  /**
+   * Generate Python code from NL and execute it in one shot.
+   */
+  generateAndRunPython: async (datasetId, nlQuery, { model, backend, customLabel } = {}) => {
+    const response = await analyzeApi.post(
+      "/custom/python/",
+      {
+        dataset_id: datasetId,
+        nl_query: nlQuery,
+        generate: true,
+        model: model || undefined,
+        backend: backend || "openrouter",
+        custom_label: customLabel || undefined,
+      },
+      { timeout: 120000 }
+    );
+    return response.data;
+  },
+};
+
 export const notificationService = {
   getAll: (limit = 20, offset = 0) => {
     return notificationApi.get(`/?limit=${limit}&offset=${offset}`);
