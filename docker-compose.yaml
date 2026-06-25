@@ -205,6 +205,26 @@ services:
     networks:
       - app-network
 
+  qualitative-db:
+    image: postgres:15
+    container_name: qualitative-db
+    environment:
+      POSTGRES_DB: qualitative_db
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    ports:
+      - "5437:5432"
+    volumes:
+      - qualitative_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    logging: *default-logging
+    networks:
+      - app-network
+
   notification-db:
     image: postgres:15
     container_name: notification-db
@@ -280,6 +300,7 @@ services:
       ANALYZE_SERVICE_URL: http://analyze-service:8003/api/analysis
       LLM_SERVICE_URL: http://llm-service:8004
       NOTIFICATION_SERVICE_URL: http://notification-service:8005/api/notifications
+      QUALITATIVE_SERVICE_URL: http://qualitative-service:8007/api/qualitative
       RATE_LIMIT_REQUESTS: "120"
       RATE_LIMIT_WINDOW_SECONDS: "60"
     depends_on:
@@ -463,6 +484,35 @@ services:
     restart: unless-stopped
     logging: *default-logging
 
+  qualitative-service:
+    build:
+      context: ./backend/services/qualitative
+    container_name: qualitative-service
+    hostname: qualitative-service
+    ports:
+      - "8007:8007"
+    env_file:
+      - ./.env
+    environment:
+      QUALITATIVE_DATABASE_HOST: qualitative-db
+      QUALITATIVE_DATABASE_NAME: qualitative_db
+      DATABASE_USER: ${POSTGRES_USER:-postgres}
+      DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      QUALITATIVE_DATABASE_PORT: 5432
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+    depends_on:
+      qualitative-db:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    volumes:
+      - ./backend/services/qualitative:/app
+    networks:
+      - app-network
+    command: sh -c "sleep 10 && python manage.py migrate --run-syncdb && python manage.py runserver 0.0.0.0:8007"
+    restart: unless-stopped
+    logging: *default-logging
+
   notification-service:
     build:
       context: ./backend/services/notification
@@ -512,6 +562,7 @@ volumes:
   configuration_postgres_data:
   collection_postgres_data:
   analyze_postgres_data:
+  qualitative_postgres_data:
   analyze_media:
   notification_postgres_data:
   loki_data:

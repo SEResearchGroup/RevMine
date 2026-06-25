@@ -1,3 +1,4 @@
+import copy
 import threading
 import time
 from datetime import datetime, date
@@ -138,9 +139,19 @@ def execute_collection_task(plan_id, resume=False):
         if resume and collection.raw_data_filename:
             existing_data = minio_client.get_json(collection.raw_data_filename) or {}
         
-        # Compute required endpoints based on selected metrics
+        # Compute required endpoints based on selected metrics.
+        # For qualitative collections we force the full endpoint set (required_endpoints=None
+        # makes the collector fetch every endpoint) plus the enrichment fetches below.
         selected_metrics = collection.selected_metrics or []
-        required_endpoints = get_required_endpoints(collection.platform, selected_metrics) if selected_metrics else None
+        for_qualitative = bool(collection.for_qualitative)
+        if for_qualitative:
+            required_endpoints = None
+        else:
+            required_endpoints = (
+                get_required_endpoints(collection.platform, selected_metrics)
+                if selected_metrics
+                else None
+            )
         logger.info(
             "Collection metrics resolved",
             extra={
@@ -148,6 +159,7 @@ def execute_collection_task(plan_id, resume=False):
                 "repository": collection.repository_full_name,
                 "selected_metrics": selected_metrics,
                 "required_endpoints": required_endpoints,
+                "for_qualitative": for_qualitative,
                 "event": "collection_metrics_resolved",
             },
         )
@@ -162,7 +174,9 @@ def execute_collection_task(plan_id, resume=False):
             project_id=collection.external_id,
         )
         collector.required_endpoints = required_endpoints
-        
+        # Enable qualitative enrichment fetches (thread resolution, reactions, award_emoji)
+        collector.for_qualitative = for_qualitative
+
         # Progress callback with batched saving
         batch_size = collection.save_batch_size or 1
         items_since_last_save = 0
@@ -292,8 +306,20 @@ def execute_collection_task(plan_id, resume=False):
 
         _fetch_duration = round(time.monotonic() - _fetch_start, 3)
 
-        # Calculate statistics
-        stats = calculate_statistics(all_data, collection.platform)
+        # For qualitative collections we fetched the complete dataset. Derive the
+        # quantitative view (only the user's selected metrics, without qualitative
+        # enrichment) so the two files differ: raw_data_filename = selected config,
+        # qualitative_data_filename = complete data. For normal collections all_data
+        # already contains only the selected endpoints, so no pruning is needed.
+        if for_qualitative:
+            quantitative_data = _prune_for_selected_endpoints(
+                all_data, collection.platform, selected_metrics
+            )
+        else:
+            quantitative_data = all_data
+
+        # Calculate statistics from the quantitative view the user configured
+        stats = calculate_statistics(quantitative_data, collection.platform)
 
         # Update collection
         collection.stats = stats
@@ -307,10 +333,28 @@ def execute_collection_task(plan_id, resume=False):
                 collection.repository_name, collection.id, "json"
             )
 
-        # Save final data
+        # Save final quantitative data (selected configuration only)
         _minio_start = time.monotonic()
-        minio_client.save_json(all_data, collection.raw_data_filename)
+        minio_client.save_json(quantitative_data, collection.raw_data_filename)
         _minio_duration = round(time.monotonic() - _minio_start, 3)
+
+        # For qualitative collections, write the complete dataset to a dedicated
+        # MinIO object that the future qualitative-analysis service will consume.
+        if for_qualitative:
+            if not collection.qualitative_data_filename:
+                collection.qualitative_data_filename = minio_client.generate_filename(
+                    collection.repository_name, collection.id, "qualitative.json"
+                )
+            minio_client.save_json(all_data, collection.qualitative_data_filename)
+            logger.info(
+                "Qualitative dataset saved to MinIO",
+                extra={
+                    "collection_id": collection.id,
+                    "repository": collection.repository_full_name,
+                    "qualitative_filename": collection.qualitative_data_filename,
+                    "event": "collection_qualitative_saved",
+                },
+            )
 
         collection.save()
 
@@ -323,8 +367,12 @@ def execute_collection_task(plan_id, resume=False):
                 'user_id': collection.user,
                 'workspace_id': collection.workspace_id,
                 'repository_id': collection.repository_id,
+                'repository_full_name': collection.repository_full_name,
+                'platform': collection.platform,
                 'status': 'completed',
                 'result_summary': stats,
+                'for_qualitative': for_qualitative,
+                'qualitative_data_filename': collection.qualitative_data_filename,
             },
         )
         
@@ -446,6 +494,83 @@ def execute_collection_task(plan_id, resume=False):
                             "event": "kafka_publish_failed",
                         },
                     )
+
+
+# Map collector endpoint keys to the per-item JSON keys they populate.
+_GITHUB_ENDPOINT_ITEM_KEYS = {
+    "commits": "commits",
+    "comments": "comments",
+    "reviews": "reviews",
+    "review_comments": "review_comments",
+    "files": "files",
+}
+_GITLAB_ENDPOINT_ITEM_KEYS = {
+    "commits": "commits",
+    "discussions": "discussions",
+    "notes": "notes",
+    "changes": "changes",
+}
+
+
+def _strip_enrichment(value, platform, key):
+    """Drop qualitative-only nested keys (reactions / award_emoji) from a copied
+    endpoint value so the quantitative file mirrors a non-qualitative collection."""
+    if platform == "github":
+        if key == "comments" and isinstance(value, list):
+            for comment in value:
+                if isinstance(comment, dict):
+                    comment.pop("reactions", None)
+    else:
+        if key == "notes" and isinstance(value, list):
+            for note in value:
+                if isinstance(note, dict):
+                    note.pop("award_emoji", None)
+        elif key == "discussions" and isinstance(value, list):
+            for discussion in value:
+                notes = discussion.get("notes") if isinstance(discussion, dict) else None
+                for note in notes or []:
+                    if isinstance(note, dict):
+                        note.pop("award_emoji", None)
+    return value
+
+
+def _prune_for_selected_endpoints(all_data, platform, selected_metrics):
+    """Project a fully-collected (qualitative) dataset down to only the endpoints
+    implied by ``selected_metrics``, stripping qualitative-only enrichment
+    (``review_threads`` / ``award_emoji`` at item level, per-comment/note reactions).
+
+    The result is equivalent to what a non-qualitative collection with the same
+    selected metrics would have produced, so existing quantitative consumers see
+    exactly the configured data while the untouched ``all_data`` feeds the
+    qualitative file.
+    """
+    required = (
+        get_required_endpoints(platform, selected_metrics) if selected_metrics else None
+    )
+
+    if platform == "github":
+        item_key = "pull_requests"
+        id_key = "pull_request_number"
+        endpoint_item_keys = _GITHUB_ENDPOINT_ITEM_KEYS
+    else:
+        item_key = "merge_requests"
+        id_key = "merge_request_id"
+        endpoint_item_keys = _GITLAB_ENDPOINT_ITEM_KEYS
+
+    pruned = {k: v for k, v in all_data.items() if k != item_key}
+    pruned_items = []
+    for item in all_data.get(item_key, []) or []:
+        new_item = {id_key: item.get(id_key), "details": item.get("details")}
+        for endpoint, key in endpoint_item_keys.items():
+            if required is None or endpoint in required:
+                new_item[key] = _strip_enrichment(
+                    copy.deepcopy(item.get(key, [])), platform, key
+                )
+            else:
+                new_item[key] = []
+        pruned_items.append(new_item)
+    pruned[item_key] = pruned_items
+    return pruned
 
 
 def calculate_statistics(all_data, platform):

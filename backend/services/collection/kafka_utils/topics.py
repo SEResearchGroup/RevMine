@@ -8,15 +8,17 @@ class Topics:
     COLLECTION_COMPLETED = "collection.events.completed"
     COLLECTION_FAILED    = "collection.events.failed"
 
-    # Analysis service (legacy)
+    # Analysis service
     ANALYSIS_REQUESTED  = "analysis.events.requested"
     ANALYSIS_COMPLETED  = "analysis.events.completed"
+
+    # Qualitative service
+    QUALITATIVE_REQUESTED = "qualitative.events.requested"
+    QUALITATIVE_COMPLETED = "qualitative.events.completed"
 
     # Notification service
     NOTIFICATION_EVENTS = "notification.events"
 
-    # --- Metric Registry ---
-    # Published when a MetricPlugin is added/updated/removed from the registry
     METRIC_REGISTRY_CREATED = "metric.registry.created"
     METRIC_REGISTRY_UPDATED = "metric.registry.updated"
     METRIC_REGISTRY_DELETED = "metric.registry.deleted"

@@ -229,6 +229,170 @@ class TestGitHubCollector:
         with pytest.raises(Exception, match="Network error fetching comments"):
             c._process_pull_request(7)
 
+    def test_normalize_review_thread_shapes_node(self):
+        node = {
+            "id": "PRRT_1",
+            "isResolved": True,
+            "isOutdated": False,
+            "path": "src/x.py",
+            "line": 42,
+            "originalLine": 40,
+            "diffSide": "RIGHT",
+            "comments": {"nodes": [
+                {
+                    "databaseId": 111,
+                    "body": "why mutex?",
+                    "diffHunk": "@@ -1 +1 @@",
+                    "path": "src/x.py",
+                    "line": 42,
+                    "originalLine": 40,
+                    "createdAt": "2026-01-11T10:05:00Z",
+                    "updatedAt": "2026-01-11T10:05:00Z",
+                    "author": {"__typename": "User", "login": "bob"},
+                    "replyTo": None,
+                    "pullRequestReview": {"databaseId": 555},
+                    "reactions": {"nodes": [{"content": "THUMBS_UP", "user": {"login": "carol"}}]},
+                },
+                {
+                    "databaseId": 112,
+                    "body": "because recursion",
+                    "diffHunk": "@@ -1 +1 @@",
+                    "path": "src/x.py",
+                    "line": 42,
+                    "originalLine": 40,
+                    "createdAt": "2026-01-11T11:00:00Z",
+                    "updatedAt": "2026-01-11T11:00:00Z",
+                    "author": {"__typename": "Bot", "login": "dependabot"},
+                    "replyTo": {"databaseId": 111},
+                    "pullRequestReview": None,
+                    "reactions": {"nodes": []},
+                },
+            ]},
+        }
+        thread = GitHubCollector._normalize_review_thread(node)
+        assert thread["is_resolved"] is True
+        assert thread["is_outdated"] is False
+        assert thread["side"] == "RIGHT"
+        assert len(thread["comments"]) == 2
+        first = thread["comments"][0]
+        assert first["id"] == 111
+        assert first["author"] == "bob"
+        assert first["author_is_bot"] is False
+        assert first["review_id"] == 555
+        assert first["reply_to_id"] is None
+        assert first["reactions"] == [{"content": "THUMBS_UP", "user": "carol"}]
+        second = thread["comments"][1]
+        assert second["author_is_bot"] is True
+        assert second["reply_to_id"] == 111
+
+    def test_collect_review_threads_parses_single_page(self):
+        c = GitHubCollector(token="t", repo_full_name="owner/repo")
+        payload = {"data": {"repository": {"pullRequest": {"reviewThreads": {
+            "pageInfo": {"hasNextPage": False, "endCursor": None},
+            "nodes": [{
+                "id": "PRRT_1", "isResolved": False, "isOutdated": False,
+                "path": "a.py", "line": 1, "originalLine": 1, "diffSide": "RIGHT",
+                "comments": {"nodes": []},
+            }],
+        }}}}}
+        c.session.post = MagicMock(return_value=ResponseStub(payload=payload))
+        threads = c._collect_review_threads(7)
+        assert len(threads) == 1
+        assert threads[0]["id"] == "PRRT_1"
+
+    def test_collect_review_threads_returns_empty_on_graphql_errors(self):
+        c = GitHubCollector(token="t", repo_full_name="owner/repo")
+        c.session.post = MagicMock(
+            return_value=ResponseStub(payload={"errors": [{"message": "bad"}]})
+        )
+        assert c._collect_review_threads(7) == []
+
+    def test_review_threads_query_stays_under_github_node_limit(self):
+        """Regression for MAX_NODE_LIMIT_EXCEEDED: nested first: sizes must keep the
+        estimated node count well under GitHub's 500,000 cap."""
+        import re
+        c = GitHubCollector(token="t", repo_full_name="owner/repo")
+        captured = {}
+
+        def fake_post(url, json=None, headers=None, timeout=None):
+            captured["query"] = json["query"]
+            return ResponseStub(payload={"data": {"repository": {"pullRequest": {
+                "reviewThreads": {"pageInfo": {"hasNextPage": False, "endCursor": None}, "nodes": []}
+            }}}})
+
+        c.session.post = MagicMock(side_effect=fake_post)
+        c._collect_review_threads(7)
+
+        firsts = [int(n) for n in re.findall(r"first:\s*(\d+)", captured["query"])]
+        assert len(firsts) == 3  # reviewThreads x comments x reactions
+        estimate, cum = 0, 1
+        for n in firsts:
+            cum *= n
+            estimate += cum
+        assert estimate < 500000
+
+    def test_collect_review_threads_paginates(self):
+        c = GitHubCollector(token="t", repo_full_name="owner/repo")
+
+        def node(thread_id):
+            return {"id": thread_id, "isResolved": False, "isOutdated": False,
+                    "path": "a.py", "line": 1, "originalLine": 1, "diffSide": "RIGHT",
+                    "comments": {"nodes": []}}
+
+        page1 = {"data": {"repository": {"pullRequest": {"reviewThreads": {
+            "pageInfo": {"hasNextPage": True, "endCursor": "C1"}, "nodes": [node("T1")]}}}}}
+        page2 = {"data": {"repository": {"pullRequest": {"reviewThreads": {
+            "pageInfo": {"hasNextPage": False, "endCursor": None}, "nodes": [node("T2")]}}}}}
+        c.session.post = MagicMock(side_effect=[ResponseStub(payload=page1), ResponseStub(payload=page2)])
+
+        threads = c._collect_review_threads(7)
+        assert [t["id"] for t in threads] == ["T1", "T2"]
+        assert c.session.post.call_count == 2
+
+    def test_collect_issue_comment_reactions_normalizes(self):
+        c = GitHubCollector(token="t", repo_full_name="owner/repo")
+        c.session.get = MagicMock(
+            return_value=ResponseStub(payload=[{"content": "heart", "user": {"login": "bob"}}])
+        )
+        assert c._collect_issue_comment_reactions(99) == [{"content": "heart", "user": "bob"}]
+
+    def test_process_pull_request_qualitative_enrichment(self):
+        c = GitHubCollector(token="t", repo_full_name="owner/repo")
+        # Restrict HTTP endpoints to keep the test focused on the enrichment branch.
+        c.required_endpoints = {"comments"}
+        c.for_qualitative = True
+        c.session.get = MagicMock(
+            side_effect=[
+                ResponseStub(payload={"number": 7, "title": "PR"}),  # details
+                ResponseStub(payload=[{"id": 1, "body": "hi"}]),      # comments
+            ]
+        )
+        c._collect_review_threads = MagicMock(return_value=[{"id": "PRRT_1"}])
+        c._collect_issue_comment_reactions = MagicMock(
+            return_value=[{"content": "heart", "user": "bob"}]
+        )
+
+        result = c._process_pull_request(7)
+
+        assert result["review_threads"] == [{"id": "PRRT_1"}]
+        assert result["comments"][0]["reactions"] == [{"content": "heart", "user": "bob"}]
+        c._collect_review_threads.assert_called_once_with(7)
+        c._collect_issue_comment_reactions.assert_called_once_with(1)
+
+    def test_process_pull_request_no_enrichment_when_not_qualitative(self):
+        c = GitHubCollector(token="t", repo_full_name="owner/repo")
+        c.required_endpoints = {"comments"}
+        c.for_qualitative = False
+        c.session.get = MagicMock(
+            side_effect=[
+                ResponseStub(payload={"number": 7}),
+                ResponseStub(payload=[{"id": 1, "body": "hi"}]),
+            ]
+        )
+        result = c._process_pull_request(7)
+        assert "review_threads" not in result
+        assert "reactions" not in result["comments"][0]
+
     @patch("collectors.infrastructure.providers.github_fetcher.GitHubCollector._process_pull_request")
     @patch("collectors.infrastructure.providers.github_fetcher.GitHubCollector._get_pull_requests_page")
     @patch("collectors.infrastructure.providers.github_fetcher.GitHubCollector._get_total_pr_count", return_value=2)
@@ -421,6 +585,53 @@ class TestGitLabCollector:
 
         with pytest.raises(Exception, match="Délai d'attente"):
             c._process_merge_request(11)
+
+    def test_normalize_award_emoji_shapes_rows(self):
+        c = GitLabCollector(token="t", repo_full_name="group/proj", project_id="1")
+        rows = [{"name": "thumbsup", "user": {"username": "bob"}}, {"name": "rocket", "user": None}]
+        assert c._normalize_award_emoji(rows) == [
+            {"name": "thumbsup", "user": "bob"},
+            {"name": "rocket", "user": None},
+        ]
+
+    def test_process_merge_request_qualitative_enrichment(self):
+        c = GitLabCollector(token="t", repo_full_name="group/proj", project_id="1")
+        c.required_endpoints = {"discussions", "notes"}
+        c.for_qualitative = True
+        c.session.get = MagicMock(
+            side_effect=[
+                ResponseStub(payload={"iid": 11, "title": "MR"}),  # details
+                ResponseStub(payload=[{"id": "d1", "notes": [{"id": 9001, "system": False}]}]),  # discussions
+                ResponseStub(payload=[{"id": 9001, "system": False}, {"id": 9002, "system": True}]),  # notes
+            ]
+        )
+        c._collect_mr_award_emoji = MagicMock(return_value=[{"name": "rocket", "user": "bob"}])
+        c._collect_note_award_emoji = MagicMock(return_value=[{"name": "thumbsup", "user": "carol"}])
+
+        result = c._process_merge_request(11)
+
+        assert result["award_emoji"] == [{"name": "rocket", "user": "bob"}]
+        # discussion note + flat note share id 9001 -> fetched once (cached)
+        assert result["discussions"][0]["notes"][0]["award_emoji"] == [{"name": "thumbsup", "user": "carol"}]
+        # system note (9002) is skipped
+        flat_notes = {n["id"]: n for n in result["notes"]}
+        assert "award_emoji" in flat_notes[9001]
+        assert "award_emoji" not in flat_notes[9002]
+        c._collect_note_award_emoji.assert_called_once_with(11, 9001)
+
+    def test_process_merge_request_no_enrichment_when_not_qualitative(self):
+        c = GitLabCollector(token="t", repo_full_name="group/proj", project_id="1")
+        c.required_endpoints = {"notes"}
+        c.for_qualitative = False
+        c.session.get = MagicMock(
+            side_effect=[
+                ResponseStub(payload={"iid": 11}),
+                ResponseStub(payload=[{"id": 9001, "system": False}]),
+            ]
+        )
+        result = c._process_merge_request(11)
+        assert "award_emoji" not in result
+        assert "award_emoji" not in result["notes"][0]
 
     def test_get_commit_diff_returns_empty_on_http_error_or_exception(self):
         c = GitLabCollector(token="t", repo_full_name="group/proj", project_id="1")

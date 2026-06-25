@@ -31,3 +31,7 @@ class Topics:
     PLUGIN_VALIDATED  = "plugin.validated"
     PLUGIN_FAILED     = "plugin.failed"
     PLUGIN_REGISTERED = "plugin.registered"
+
+    # Qualitative service
+    QUALITATIVE_REQUESTED = "qualitative.events.requested"
+    QUALITATIVE_COMPLETED = "qualitative.events.completed"

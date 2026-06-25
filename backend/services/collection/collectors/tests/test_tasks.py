@@ -1,3 +1,4 @@
+import copy
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -147,6 +148,126 @@ class TestExecuteCollectionTask:
         assert "collection.events.started" in published_topics
         assert "collection.events.completed" in published_topics
         mock_required.assert_called_once_with("github", ["pr_title", "commit_sha"])
+
+    @patch("collectors.tasks.KafkaClient")
+    @patch("collectors.tasks.FetcherFactory")
+    @patch("collectors.tasks.MinIOClient")
+    def test_qualitative_collection_forces_full_set_and_writes_separate_file(
+        self,
+        mock_minio_cls,
+        mock_factory,
+        mock_kafka,
+        create_collection,
+    ):
+        collection = create_collection(
+            status="pending",
+            # Only a Comments-category metric is selected: the quantitative file must
+            # keep comments but drop review_comments / review_threads, while the
+            # qualitative file keeps everything.
+            selected_metrics=["pr_comment_body"],
+            for_qualitative=True,
+        )
+        data = {
+            "pull_requests": [
+                {
+                    "pull_request_number": 7,
+                    "details": {"created_at": "2024-01-15T12:00:00Z"},
+                    "comments": [
+                        {"id": 1, "body": "hi", "reactions": [{"content": "heart", "user": "bob"}]}
+                    ],
+                    "review_comments": [{"id": 2, "body": "inline"}],
+                    "review_threads": [{"id": "PRRT_1", "is_resolved": True}],
+                }
+            ]
+        }
+        fake_collector = FakeCollector(
+            data=data,
+            progress_items=[(1, 1, {"pull_request_number": 7}, data)],
+        )
+
+        saved = {}
+
+        def _capture_save(payload, filename):
+            saved[filename] = copy.deepcopy(payload)
+            return True
+
+        minio = MagicMock()
+        minio.generate_filename.side_effect = lambda repo, cid, ext: f"file.{ext}"
+        minio.get_json.return_value = None
+        minio.save_json.side_effect = _capture_save
+        mock_minio_cls.return_value = minio
+        mock_factory.create.return_value = fake_collector
+        mock_kafka.publish.return_value = None
+
+        execute_collection_task(collection.id)
+
+        collection.refresh_from_db()
+        assert collection.status == "completed"
+        # required_endpoints=None makes the collector fetch every endpoint
+        assert fake_collector.required_endpoints is None
+        assert fake_collector.for_qualitative is True
+        assert collection.qualitative_data_filename == "file.qualitative.json"
+
+        # The qualitative file holds the complete data...
+        qual_pr = saved["file.qualitative.json"]["pull_requests"][0]
+        assert qual_pr["review_threads"] == [{"id": "PRRT_1", "is_resolved": True}]
+        assert qual_pr["review_comments"] == [{"id": 2, "body": "inline"}]
+        assert qual_pr["comments"][0]["reactions"] == [{"content": "heart", "user": "bob"}]
+
+        # ...while the quantitative file reflects only the selected configuration.
+        raw_pr = saved["file.json"]["pull_requests"][0]
+        assert "review_threads" not in raw_pr
+        assert raw_pr["review_comments"] == []        # endpoint not selected
+        assert raw_pr["comments"][0]["body"] == "hi"  # comments selected
+        assert "reactions" not in raw_pr["comments"][0]  # enrichment stripped
+
+        # the completed event carries the qualitative metadata
+        completed = [
+            call.args[1]
+            for call in mock_kafka.publish.call_args_list
+            if call.args[0] == "collection.events.completed"
+        ][0]
+        assert completed["for_qualitative"] is True
+        assert completed["qualitative_data_filename"] == "file.qualitative.json"
+
+    @patch("collectors.tasks.get_required_endpoints", return_value={"details"})
+    @patch("collectors.tasks.KafkaClient")
+    @patch("collectors.tasks.FetcherFactory")
+    @patch("collectors.tasks.MinIOClient")
+    def test_non_qualitative_collection_writes_no_qualitative_file(
+        self,
+        mock_minio_cls,
+        mock_factory,
+        mock_kafka,
+        mock_required,
+        create_collection,
+    ):
+        collection = create_collection(
+            status="pending",
+            selected_metrics=["pr_title"],
+            for_qualitative=False,
+        )
+        data = {"pull_requests": [{"details": {"created_at": "2024-01-15T12:00:00Z"}}]}
+        fake_collector = FakeCollector(
+            data=data,
+            progress_items=[(1, 1, {"pull_request_number": 7}, data)],
+        )
+        minio = MagicMock()
+        minio.generate_filename.side_effect = lambda repo, cid, ext: f"file.{ext}"
+        minio.get_json.return_value = None
+        minio.save_json.return_value = True
+        mock_minio_cls.return_value = minio
+        mock_factory.create.return_value = fake_collector
+        mock_kafka.publish.return_value = None
+
+        execute_collection_task(collection.id)
+
+        collection.refresh_from_db()
+        assert collection.status == "completed"
+        assert collection.qualitative_data_filename is None
+        assert fake_collector.for_qualitative is False
+        saved_files = {call.args[1] for call in minio.save_json.call_args_list}
+        assert "file.qualitative.json" not in saved_files
 
     @patch("collectors.tasks.KafkaClient")
     @patch("collectors.tasks.FetcherFactory")
@@ -314,3 +435,73 @@ class TestCalculateStatisticsBranches:
         assert stats["discussions_count"] == 1
         assert stats["start_date"] == "01/02/2024"
         assert stats["end_date"] == "03/02/2024"
+
+
+class TestPruneForSelectedEndpoints:
+    def test_github_keeps_selected_endpoints_and_strips_enrichment(self):
+        from collectors.tasks import _prune_for_selected_endpoints
+
+        full = {
+            "project_created_at": "2020-01-01T00:00:00Z",
+            "pull_requests": [
+                {
+                    "pull_request_number": 7,
+                    "details": {"number": 7},
+                    "comments": [{"id": 1, "body": "hi", "reactions": [{"content": "heart"}]}],
+                    "review_comments": [{"id": 2}],
+                    "reviews": [{"id": 3}],
+                    "files": [{"filename": "a.py"}],
+                    "commits": [{"commit_sha": "abc"}],
+                    "review_threads": [{"id": "PRRT_1"}],
+                }
+            ],
+        }
+
+        pruned = _prune_for_selected_endpoints(full, "github", ["pr_comment_body"])
+        item = pruned["pull_requests"][0]
+
+        # top-level metadata preserved
+        assert pruned["project_created_at"] == "2020-01-01T00:00:00Z"
+        # selected endpoint (comments) kept, enrichment stripped
+        assert item["comments"][0]["body"] == "hi"
+        assert "reactions" not in item["comments"][0]
+        # unselected endpoints emptied; qualitative-only key dropped
+        assert item["review_comments"] == []
+        assert item["reviews"] == []
+        assert item["files"] == []
+        assert item["commits"] == []
+        assert "review_threads" not in item
+        # original full data is not mutated
+        assert full["pull_requests"][0]["comments"][0]["reactions"] == [{"content": "heart"}]
+        assert "review_threads" in full["pull_requests"][0]
+
+    def test_gitlab_keeps_selected_endpoints_and_strips_award_emoji(self):
+        from collectors.tasks import _prune_for_selected_endpoints
+
+        full = {
+            "merge_requests": [
+                {
+                    "merge_request_id": 11,
+                    "details": {"iid": 11},
+                    "notes": [{"id": 1, "body": "n", "award_emoji": [{"name": "rocket"}]}],
+                    "discussions": [
+                        {"id": "d1", "notes": [{"id": 1, "award_emoji": [{"name": "rocket"}]}]}
+                    ],
+                    "changes": {"changes": [{"new_path": "a.py"}]},
+                    "commits": [{"commit_id": "abc"}],
+                    "award_emoji": [{"name": "thumbsup"}],
+                }
+            ],
+        }
+
+        pruned = _prune_for_selected_endpoints(full, "gitlab", ["note_body"])
+        item = pruned["merge_requests"][0]
+
+        # selected endpoint (notes) kept, award_emoji stripped
+        assert item["notes"][0]["body"] == "n"
+        assert "award_emoji" not in item["notes"][0]
+        # unselected endpoints emptied; MR-level award_emoji dropped
+        assert item["discussions"] == []
+        assert item["changes"] == []
+        assert item["commits"] == []
+        assert "award_emoji" not in item

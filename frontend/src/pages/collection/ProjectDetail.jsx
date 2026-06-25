@@ -78,6 +78,7 @@ function ProjectDetail() {
   const [saveBatchSize, setSaveBatchSize] = useState(1);
   const [editingBatchSize, setEditingBatchSize] = useState(false);
   const [batchSizeDraft, setBatchSizeDraft] = useState(1);
+  const [forQualitative, setForQualitative] = useState(false);
   const [collectionMode, setCollectionMode] = useState(initialMode);
 
   // Global date range of MRs/PRs in the repository
@@ -249,6 +250,11 @@ function ProjectDetail() {
         // Restore branch
         if (existingCollection.branch_name) {
           setSelectedBranch(existingCollection.branch_name);
+        }
+
+        // Restore qualitative-analysis intent
+        if (existingCollection.for_qualitative) {
+          setForQualitative(true);
         }
       }
 
@@ -573,6 +579,7 @@ function ProjectDetail() {
         status: selectedStatus,
         branch_name: selectedBranch,
         save_batch_size: saveBatchSize,
+        for_qualitative: forQualitative,
       });
 
       // Get validation summary
@@ -1328,6 +1335,32 @@ function ProjectDetail() {
                       </div>
                     </div>
                   )}
+                </div>
+
+                {/* Qualitative analysis intent */}
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Qualitative analysis
+                  </label>
+                  <label className="flex items-start gap-3 p-3 bg-purple-50 border border-purple-200 rounded-lg cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={forQualitative}
+                      onChange={(e) => setForQualitative(e.target.checked)}
+                      className="mt-0.5 w-5 h-5 text-purple-600"
+                    />
+                    <span>
+                      <span className="block text-sm text-purple-900 font-medium">
+                        Will you use this collection for qualitative analysis of review comments?
+                      </span>
+                      <span className="block text-xs text-purple-700 mt-1">
+                        If enabled, RevMine collects the complete review dataset (all comments,
+                        review threads with resolution status, and reactions) into a dedicated
+                        file — so no second collection is needed later. Leave off for a standard
+                        quantitative collection.
+                      </span>
+                    </span>
+                  </label>
                 </div>
               </div>
 

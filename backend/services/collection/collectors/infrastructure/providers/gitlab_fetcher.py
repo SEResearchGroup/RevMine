@@ -36,6 +36,7 @@ class GitLabCollector:
         self.project_id = project_id  # Can be passed directly from external_id
         self.selected_metrics = selected_metrics
         self.required_endpoints = None  # Computed lazily
+        self.for_qualitative = False  # Enables award_emoji (reactions) enrichment
         self.project_created_at = None  # Fetched from API
     
     def collect_all_data(self, filters=None, progress_callback=None, resume_from=None, existing_data=None):
@@ -440,8 +441,9 @@ class GitLabCollector:
                 "discussions": [],
                 "notes": [],
                 "changes": [],
+                "commit_comments": [],
             }
-            
+
             # Get commits (only if selected)
             if self._needs_endpoint('commits'):
                 try:
@@ -450,7 +452,7 @@ class GitLabCollector:
                         params={'per_page': 9999},
                         timeout=30
                     )
-                    
+
                     if commits_response.status_code == 200:
                         commits = commits_response.json()
                         for commit in commits:
@@ -460,6 +462,14 @@ class GitLabCollector:
                                 'details': commit,
                                 'changesHist': commit_diff
                             })
+                            # Commit-level discussions (rare; qualitative enrichment only)
+                            if self.for_qualitative:
+                                cc = self._collect_commit_discussions(commit['short_id'])
+                                if cc:
+                                    organized_mr['commit_comments'].append({
+                                        'commit_id': commit['short_id'],
+                                        'discussions': cc,
+                                    })
                 except requests.exceptions.RequestException as e:
                     logger.error(f"Network error fetching commits for MR !{mr_iid}: {e}")
                     raise Exception(f"Erreur réseau lors de la récupération des commits pour MR !{mr_iid}: {str(e)}")
@@ -506,7 +516,29 @@ class GitLabCollector:
                 except requests.exceptions.RequestException as e:
                     logger.error(f"Network error fetching changes for MR !{mr_iid}: {e}")
                     raise Exception(f"Erreur réseau lors de la récupération des changements pour MR !{mr_iid}: {str(e)}")
-            
+
+            # Qualitative enrichment: award_emoji (reactions) at MR level and per note.
+            # Added under new keys so existing consumers stay unaffected. GitLab already
+            # provides resolution + position inside discussions, so only reactions are missing.
+            if self.for_qualitative:
+                organized_mr['award_emoji'] = self._collect_mr_award_emoji(mr_iid)
+                reaction_cache = {}
+
+                def _attach_note_reactions(note):
+                    note_id = note.get('id')
+                    # System notes cannot carry award_emoji — skip to save API calls.
+                    if note_id is None or note.get('system'):
+                        return
+                    if note_id not in reaction_cache:
+                        reaction_cache[note_id] = self._collect_note_award_emoji(mr_iid, note_id)
+                    note['award_emoji'] = reaction_cache[note_id]
+
+                for discussion in organized_mr.get('discussions', []) or []:
+                    for note in discussion.get('notes', []) or []:
+                        _attach_note_reactions(note)
+                for note in organized_mr.get('notes', []) or []:
+                    _attach_note_reactions(note)
+
             return organized_mr
 
         except requests.exceptions.ConnectionError as e:
@@ -540,4 +572,60 @@ class GitLabCollector:
 
         except Exception as e:
             logger.warning(f"Error getting commit diff for {commit_id}: {e}")
+            return []
+
+    def _normalize_award_emoji(self, raw):
+        """Shape GitLab award_emoji rows into a stable {name, user} list."""
+        return [
+            {"name": a.get("name"), "user": (a.get("user") or {}).get("username")}
+            for a in (raw or [])
+        ]
+
+    def _collect_commit_discussions(self, commit_id):
+        """Fetch discussions left directly on a commit (qualitative enrichment).
+
+        The GitLab equivalent of GitHub commit comments — review feedback made on
+        a commit outside the MR thread. Never raises — best-effort.
+        """
+        try:
+            response = self.session.get(
+                f"{self.base_url}/projects/{self.project_id}/repository/commits/{commit_id}/discussions",
+                params={'per_page': 100},
+                timeout=30,
+            )
+            if response.status_code != 200:
+                return []
+            return response.json()
+        except Exception as e:
+            logger.warning(f"Error fetching commit discussions for {commit_id}: {e}")
+            return []
+
+    def _collect_mr_award_emoji(self, mr_iid):
+        """Fetch MR-level reactions (qualitative enrichment). Never raises."""
+        try:
+            response = self.session.get(
+                f"{self.base_url}/projects/{self.project_id}/merge_requests/{mr_iid}/award_emoji",
+                params={'per_page': 100},
+                timeout=30,
+            )
+            if response.status_code != 200:
+                return []
+            return self._normalize_award_emoji(response.json())
+        except Exception as e:
+            logger.warning(f"Error fetching award_emoji for MR !{mr_iid}: {e}")
+            return []
+
+    def _collect_note_award_emoji(self, mr_iid, note_id):
+        """Fetch reactions on a single note (qualitative enrichment). Never raises."""
+        try:
+            response = self.session.get(
+                f"{self.base_url}/projects/{self.project_id}/merge_requests/{mr_iid}/notes/{note_id}/award_emoji",
+                params={'per_page': 100},
+                timeout=30,
+            )
+            if response.status_code != 200:
+                return []
+            return self._normalize_award_emoji(response.json())
+        except Exception as e:
+            logger.warning(f"Error fetching award_emoji for note {note_id} (MR !{mr_iid}): {e}")
             return []

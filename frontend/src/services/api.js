@@ -159,6 +159,7 @@ export const workspaceApi = createApiInstance(serviceUrl("workspaces"));
 export const collectionApi = createApiInstance(serviceUrl("collections"));
 export const analysisApi = createApiInstance(serviceUrl("analysis"));
 export const notificationApi = createApiInstance(serviceUrl("notifications"));
+export const qualitativeApi = createApiInstance(serviceUrl("qualitative"));
 
 export const authService = {
   register: (email, password, sendUpdates, firstName, lastName, position) => {
@@ -811,11 +812,54 @@ export const notificationService = {
   },
 };
 
+
+export const qualitativeService = {
+  // Datasets (qualitative-ready projects to explore before analysis)
+  getDatasets: async (params = {}) => {
+    const response = await qualitativeApi.get("/datasets/", { params });
+    return response.data;
+  },
+  getDataset: async (datasetId) => {
+    const response = await qualitativeApi.get(`/datasets/${datasetId}/`);
+    return response.data;
+  },
+  rebuildDataset: async (datasetId) => {
+    const response = await qualitativeApi.post(`/datasets/${datasetId}/rebuild/`);
+    return response.data;
+  },
+  // Comment cards (paginated + searchable + filterable)
+  getComments: async (datasetId, params = {}) => {
+    const response = await qualitativeApi.get(`/datasets/${datasetId}/comments/`, { params });
+    return response.data;
+  },
+  getComment: async (datasetId, commentId) => {
+    const response = await qualitativeApi.get(
+      `/datasets/${datasetId}/comments/${commentId}/`
+    );
+    return response.data;
+  },
+  getFacets: async (datasetId) => {
+    const response = await qualitativeApi.get(`/datasets/${datasetId}/facets/`);
+    return response.data;
+  },
+  getTimeseries: async (datasetId, params = {}) => {
+    const response = await qualitativeApi.get(`/datasets/${datasetId}/timeseries/`, { params });
+    return response.data;
+  },
+  // Bridge to Phase B
+  startAnalysis: async (datasetId) => {
+    const response = await qualitativeApi.post(`/datasets/${datasetId}/analyses/`);
+    return response.data;
+  },
+};
+
+
 export default {
   auth: authService,
   workspace: workspaceService,
   collection: collectionService,
   analyze: analyzeService,
+  qualitative: qualitativeService,
   kanban: kanbanService,
   cicd: cicdService,
   notification: notificationService,

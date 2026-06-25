@@ -73,7 +73,7 @@ def resolve_repository_metadata(
     """Retrieve imported repository metadata from the configuration service."""
     base_url = os.getenv(
         "CONFIGURATION_SERVICE_URL",
-        "http://configuration-service:8001/api/workspaces",
+        "http://configuration-service:8001/api/v1/workspaces",
     ).rstrip("/")
     timeout = float(os.getenv("CONFIGURATION_SERVICE_TIMEOUT", "10"))
 
@@ -412,6 +412,10 @@ class CollectionService:
         if save_batch_size is not None:
             collection.save_batch_size = max(1, min(100, int(save_batch_size)))
 
+        for_qualitative = filters.get("for_qualitative")
+        if for_qualitative is not None:
+            collection.for_qualitative = bool(for_qualitative)
+
         collection.save()
 
         logger.info(
@@ -537,7 +541,11 @@ class CollectionService:
             # Delete raw data file
             if raw_data_filename:
                 minio_client.delete_file(raw_data_filename)
-            
+
+            # Delete the qualitative dataset file if one was produced
+            if collection.qualitative_data_filename:
+                minio_client.delete_file(collection.qualitative_data_filename)
+
             # Delete legacy CSV files if they exist
             if collection.structured_csv_filename:
                 minio_client.delete_file(collection.structured_csv_filename)

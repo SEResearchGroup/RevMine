@@ -172,6 +172,24 @@ class TestCollectionService:
                 filters={},
             )
 
+    def test_configure_metrics_persists_for_qualitative_flag(self, create_collection):
+        collection = create_collection(status="pending")
+        result = CollectionService.configure_metrics(
+            collection=collection,
+            selected_metrics=["pr_title"],
+            filters={"for_qualitative": True},
+        )
+        assert result.for_qualitative is True
+
+    def test_configure_metrics_defaults_for_qualitative_false(self, create_collection):
+        collection = create_collection(status="pending")
+        result = CollectionService.configure_metrics(
+            collection=collection,
+            selected_metrics=["pr_title"],
+            filters={},
+        )
+        assert result.for_qualitative is False
+
     def test_get_collection_summary(self, create_collection):
         collection = create_collection(
             status="pending",

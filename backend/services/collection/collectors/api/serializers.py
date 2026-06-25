@@ -36,6 +36,7 @@ class MetricsFilterSerializer(serializers.Serializer):
     save_batch_size = serializers.IntegerField(
         required=False, default=1, min_value=1, max_value=100
     )
+    for_qualitative = serializers.BooleanField(required=False, default=False)
 
     def validate(self, data):
         """Validate that end_date is after start_date"""
@@ -87,6 +88,8 @@ class CollectionSerializer(serializers.ModelSerializer):
             'error_message',
             'raw_data_filename',
             'is_external',
+            'for_qualitative',
+            'qualitative_data_filename',
         ]
         read_only_fields = [
             "id",
@@ -97,6 +100,7 @@ class CollectionSerializer(serializers.ModelSerializer):
             "is_active",
             "can_resume",
             "raw_data_filename",
+            "qualitative_data_filename",
         ]
 
 

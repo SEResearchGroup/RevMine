@@ -43,6 +43,12 @@ import DatasetDetailPage from "../pages/Analysis/DatasetDetailPage";
 import CreateAnalysisPage from "../pages/Analysis/CreateAnalysisPage";
 import AnalysisResultsPage from "../pages/Analysis/AnalysisResultsPage";
 
+// Qualitative Analysis Pages
+import QualitativePickerPage from "../pages/Qualitative/QualitativePickerPage";
+import QualitativeDashboardPage from "../pages/Qualitative/QualitativeDashboardPage";
+import QualitativeCommentPage from "../pages/Qualitative/QualitativeCommentPage";
+
+
 // DevOps: Kanban Pages
 import NewKanbanAnalysisPage from "../pages/Kanban/NewKanbanAnalysisPage";
 import KanbanSourceSelectionPage from "../pages/Kanban/KanbanSourceSelectionPage";
@@ -130,6 +136,13 @@ const AppRoutes = () => {
         <Route path="/analysis/datasets/:datasetId" element={<DatasetDetailPage />} />
         <Route path="/analysis/datasets/:datasetId/analyze" element={<CreateAnalysisPage />} />
         <Route path="/analysis/datasets/:datasetId/results" element={<AnalysisResultsPage />} />
+
+
+        {/* Qualitative Analysis Routes */}
+        <Route path="/qualitative" element={<QualitativePickerPage />} />
+        <Route path="/qualitative/:datasetId" element={<QualitativeDashboardPage />} />
+        <Route path="/qualitative/:datasetId/comments/:commentId" element={<QualitativeCommentPage />} />
+
 
         {/* DevOps: Kanban Analysis */}
         <Route path="/kanban" element={<NewKanbanAnalysisPage />} />

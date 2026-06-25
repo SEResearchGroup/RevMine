@@ -113,7 +113,23 @@ class Collection(models.Model):
         blank=True,
         help_text="Pre-computed metadata for cleaning config (authors, extensions, item count)"
     )
-    
+
+    # Qualitative analysis support
+    for_qualitative = models.BooleanField(
+        default=False,
+        help_text=(
+            "If True, collect the complete review dataset (all endpoints + "
+            "thread resolution + reactions) for downstream qualitative analysis"
+        ),
+    )
+
+    qualitative_data_filename = models.CharField(
+        max_length=500,
+        null=True,
+        blank=True,
+        help_text="Filename in MinIO for the complete qualitative JSON dataset",
+    )
+
     class Meta:
         db_table = "collections"
         ordering = ["-created_at"]

@@ -47,6 +47,7 @@ def load_settings() -> GatewaySettings:
         Route("/api/analysis", get_env("ANALYZE_SERVICE_URL")),
         Route("/api/llm", get_env("LLM_SERVICE_URL"), auth_required=False),
         Route("/api/notifications", get_env("NOTIFICATION_SERVICE_URL")),
+        Route("/api/qualitative",get_env("QUALITATIVE_SERVICE_URL")),
     )
     cors_origins = tuple(
         origin.strip()

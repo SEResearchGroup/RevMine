@@ -7,6 +7,7 @@ import {
   Grid3x3,
   FolderOpen,
   BarChart3,
+  MessageSquareText,
   Settings,
   HelpCircle,
   Menu,
@@ -82,6 +83,12 @@ const Sidebar = () => {
       icon: BarChart3,
       label: "Analysis",
       subItems: ["History", "New Analysis"],
+    },
+    {
+      id: "qualitative",
+      icon: MessageSquareText,
+      label: "Qualitative Analysis",
+      path: "/qualitative",
     },
     {
       id: "kanbanAnalysis",
