@@ -1,3 +1,8 @@
+# Notice
+This repository is a research extension of the original project
+- Original GitLab repository: https://gitlab.com/samah37/revmine
+
+
 # Welcome to RevMine
 
 **RevMine** is an open-source tool for *mining and analyzing modern code review data*. It connects to your Git hosting provider (GitHub or GitLab), collects merge/pull request activity, and surfaces process metrics — lead time, rework, review size, reviewer workload, and more — through an interactive dashboard with an LLM-assisted exploration interface.
